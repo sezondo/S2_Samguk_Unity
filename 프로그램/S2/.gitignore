@@ -1,0 +1,44 @@
+# Unity 관련 불필요한 폴더
+[Ll]ibrary/
+[Tt]emp/
+[Oo]bj/
+[Bb]uild/
+[Bb]uilds/
+MemoryCaptures/
+
+# Visual Studio/JetBrains 관련
+.vscode/
+*.csproj
+*.sln
+*.user
+*.unityproj
+*.pidb
+*.booproj
+*.svd
+*.suo
+
+# 유저 설정
+UserSettings/
+*.prefs
+
+# OS 관련
+.DS_Store
+Thumbs.db
+
+# 유닛 테스트 관련
+*.testresult.xml
+*.ncrunch*
+
+# Unity LFS 확장자 (LFS에서 관리하고, Git에는 경로만)
+
+
+# 기타
+*.log
+*.tmp
+*.keystore
+
+# 패키지 관리자 파일
+Packages/packages-lock.json
+
+# UnityPackage files
+*.unitypackage
