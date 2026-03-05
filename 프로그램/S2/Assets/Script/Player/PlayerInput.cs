@@ -3,18 +3,9 @@ using UnityEngine;
 using UnityEngine.InputSystem;
 #endif
 
-[RequireComponent(typeof(Rigidbody2D))]
-public class PlayerCharacterMove2D : MonoBehaviour
+public class PlayerInput : MonoBehaviour
 {
-    [SerializeField] private float moveSpeed = 5f;
-
-    private Rigidbody2D rb;
-    private Vector2 moveInput;
-
-    private void Awake()
-    {
-        rb = GetComponent<Rigidbody2D>();
-    }
+    public Vector2 move{ get; private set; }
 
     private void Update()
     {
@@ -29,19 +20,11 @@ public class PlayerCharacterMove2D : MonoBehaviour
             if (Keyboard.current.wKey.isPressed) input.y += 1f;
         }
 
-        moveInput = input.normalized;
+        move = input.normalized;
 #else
         float horizontal = Input.GetAxisRaw("Horizontal");
         float vertical = Input.GetAxisRaw("Vertical");
-        moveInput = new Vector2(horizontal, vertical).normalized;
+        move = new Vector2(horizontal, vertical).normalized;
 #endif
-    }
-
-    private void FixedUpdate()
-    {
-        if (rb == null) return;
-
-        Vector2 nextPosition = rb.position + moveInput * moveSpeed * Time.fixedDeltaTime;
-        rb.MovePosition(nextPosition);
     }
 }
