@@ -1,14 +1,31 @@
-
-
 public enum PlayerState
 {
     Idle,
-    Move,
     MeleeAttack,
     BowCharge,
     BowShoot,
-    Hit,
+    Dodge,
     Dead,
+}
+
+public enum PlayerHitJudgment
+{
+    NonHit,
+    Hit,
+}
+
+public enum PlayerUnderState
+{
+    Idle,
+    Move,
+}
+
+public enum PlayerAttackCount
+{
+    None,
+    One,
+    Two,
+    Three,
 }
 
 /// <summary>
