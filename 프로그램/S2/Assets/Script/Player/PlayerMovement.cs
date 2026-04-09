@@ -1,30 +1,40 @@
 using UnityEngine;
-#if ENABLE_INPUT_SYSTEM
-using UnityEngine.InputSystem;
-#endif
 
 [RequireComponent(typeof(Rigidbody2D))]
+[RequireComponent(typeof(PlayerInput))]
+[RequireComponent(typeof(PlayerFSMManager))]
 public class PlayerMovement : MonoBehaviour
 {
     [SerializeField] private float moveSpeed = 5f;
 
     private Rigidbody2D rb;
-    private Vector2 move;
     private PlayerInput input;
-
+    private PlayerFSMManager fsm;
 
     private void Awake()
     {
         rb = GetComponent<Rigidbody2D>();
         input = GetComponent<PlayerInput>();
+        fsm = GetComponent<PlayerFSMManager>();
+
+        if (rb == null || input == null || fsm == null)
+        {
+            Debug.LogError($"{nameof(PlayerMovement)} on {name} is missing a required component.", this);
+            enabled = false;
+        }
+
+        // Render frame between physics steps is smoothed through interpolation.
+        rb.interpolation = RigidbodyInterpolation2D.Interpolate;
     }
 
     private void FixedUpdate()
     {
-        if (rb == null) return;
-        if (input == null) return;
+        if (!fsm.CanMoveInMainState())
+        {
+            return;
+        }
 
-        move = input.move;
+        Vector2 move = input.Move;
 
         Vector2 nextPosition = rb.position + move * moveSpeed * Time.fixedDeltaTime;
         rb.MovePosition(nextPosition);

@@ -2,54 +2,54 @@ using UnityEngine;
 
 public class CameraMove : MonoBehaviour
 {
-    private Transform player;
-    private Vector3 offset;
-    [SerializeField]
-    private float followSpeed = 5f;
-    [SerializeField]
-    private float followThreshold = 0.5f;
+    [SerializeField] private Transform target;
+    [SerializeField] private Vector3 offset = new(0f, 0f, -6f);
+    [SerializeField] private float smoothTime = 0.08f;
+    [SerializeField] private float snapDistance = 0.01f;
 
-    // Start is called once before the first execution of Update after the MonoBehaviour is created
-    void Start()
+    private Vector3 currentVelocity;
+
+    private void Awake()
     {
-        player = GameObject.FindWithTag("Player").transform;
-        transform.position = Vector3.zero;
-
-        Vector3 InitialPositionValue = new Vector3(0,0,-6f);
-        offset = InitialPositionValue + player.position;
-        
-    }
-
-    // Update is called once per frame
-    void Update()
-    {
-        
-
-    }
-
-    
-    void FixedUpdate()
-    {
-        Vector3 targetPos = player.position + offset;
-        float distance = Vector3.Distance(transform.position, targetPos);
-        
-        if (distance > followThreshold)
+        if (target == null)
         {
-            transform.position = Vector3.Lerp(
-            transform.position,
-            targetPos,
-            followSpeed * Time.deltaTime
-            );
+            GameObject playerObject = GameObject.FindWithTag("Player");
+            if (playerObject != null)
+            {
+                target = playerObject.transform;
+            }
         }
-        
-        Vector3 moveDir = player.forward;
-        moveDir.y = 0;
-        moveDir.Normalize();
 
-        
+        if (target == null)
+        {
+            Debug.LogError($"{nameof(CameraMove)} could not find a target with the Player tag.", this);
+            enabled = false;
+            return;
+        }
 
-        
-
+        transform.position = target.position + offset;
     }
 
+    private void LateUpdate()
+    {
+        if (target == null)
+        {
+            return;
+        }
+
+        Vector3 targetPosition = target.position + offset;
+        float distance = Vector3.Distance(transform.position, targetPosition);
+
+        if (distance <= snapDistance)
+        {
+            transform.position = targetPosition;
+            return;
+        }
+
+        transform.position = Vector3.SmoothDamp(
+            transform.position,
+            targetPosition,
+            ref currentVelocity,
+            smoothTime);
+    }
 }

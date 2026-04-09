@@ -3,6 +3,7 @@ using UnityEngine;
 
 public class PlayerFSMManager : MonoBehaviour
 {
+    
     public PlayerState CurrentState { get; private set; } = PlayerState.Idle;
 
     public event Action<PlayerState, PlayerState> OnStateChanged;
