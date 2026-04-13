@@ -72,7 +72,9 @@ public class PlayerFSMManager : MonoBehaviour
 
     public bool CanMoveInMainState() //Move 가능 여부 헬퍼
     {
-        return CurrentState == PlayerState.Idle || CurrentState == PlayerState.BowCharge;
+        return CurrentState == PlayerState.Idle 
+        || CurrentState == PlayerState.BowCharge 
+        || CurrentState == PlayerState.BowShoot;
     }
 
     private static bool CanEnterIdle(PlayerState from)
@@ -91,7 +93,7 @@ public class PlayerFSMManager : MonoBehaviour
 
     private static bool CanEnterBowCharge(PlayerState from)
     {
-        return from == PlayerState.Idle;
+        return from == PlayerState.Idle || from == PlayerState.BowShoot;
     }
 
     private static bool CanEnterBowShoot(PlayerState from)
