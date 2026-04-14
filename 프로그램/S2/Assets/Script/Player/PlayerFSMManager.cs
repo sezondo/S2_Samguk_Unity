@@ -93,7 +93,7 @@ public class PlayerFSMManager : MonoBehaviour
 
     private static bool CanEnterBowCharge(PlayerState from)
     {
-        return from == PlayerState.Idle || from == PlayerState.BowShoot;
+        return from == PlayerState.Idle;
     }
 
     private static bool CanEnterBowShoot(PlayerState from)

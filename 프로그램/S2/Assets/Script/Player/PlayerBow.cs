@@ -1,3 +1,4 @@
+using System;
 using UnityEngine;
 #if ENABLE_INPUT_SYSTEM
 using UnityEngine.InputSystem;
@@ -7,9 +8,18 @@ using UnityEngine.InputSystem;
 [RequireComponent(typeof(PlayerFSMManager))]
 public class PlayerBow : MonoBehaviour
 {
+    [Serializable]
+    private struct FirePointEntry
+    {
+        // 조준 8방향마다 사용할 발사 시작 위치.
+        public PlayerSide8 side;
+        public Transform point;
+    }
+
     [Header("References")]
     [SerializeField] private PlayerData playerData;
-    [SerializeField] private Transform firePoint;
+    [SerializeField] private Transform defaultFirePoint;
+    [SerializeField] private FirePointEntry[] firePoints;
 
     [Header("Bow Settings")]
     [SerializeField] private float maxChargeTime = 1.2f;
@@ -38,9 +48,9 @@ public class PlayerBow : MonoBehaviour
             return;
         }
 
-        if (firePoint == null)
+        if (defaultFirePoint == null)
         {
-            firePoint = transform;
+            defaultFirePoint = transform;
         }
     }
 
@@ -64,7 +74,7 @@ public class PlayerBow : MonoBehaviour
     {
         UpdateAimDirection();
 
-        // 활 입력은 현재 메인 FSM 상태에 따라 요청/처리를 나눈다.
+        // 활은 "입력 즉시 실행"이 아니라 현재 상태에 따라 요청/처리를 나눈다.
         if (fsm.IsState(PlayerState.Idle))
         {
             TryEnterBowCharge();
@@ -85,7 +95,8 @@ public class PlayerBow : MonoBehaviour
 
     private void TryEnterBowCharge()
     {
-        if (!input.BowHeld)
+        // 우클릭을 누른 첫 프레임에만 활 차지 상태를 요청한다.
+        if (!input.BowPressedThisFrame)
         {
             return;
         }
@@ -95,16 +106,10 @@ public class PlayerBow : MonoBehaviour
 
     private void UpdateBowCharge()
     {
-        // 차지 시간은 BowShoot의 명중 오차 계산에만 사용한다.
+        // BowCharge는 우클릭을 누르고 있는 동안만 유지되며 release 시 발사로 넘어간다.
         currentChargeTime = Mathf.Min(currentChargeTime + Time.deltaTime, maxChargeTime);
 
-        if (!input.BowHeld || input.BowReleasedThisFrame)
-        {
-            fsm.RequestState(PlayerState.Idle);
-            return;
-        }
-
-        if (input.MeleeAttackPressedThisFrame)
+        if (input.BowReleasedThisFrame)
         {
             fsm.RequestState(PlayerState.BowShoot);
         }
@@ -118,13 +123,7 @@ public class PlayerBow : MonoBehaviour
             return;
         }
 
-        // 발사 직후에도 우클릭을 계속 누르고 있으면 다시 차지 상태로 복귀한다.
-        if (input.BowHeld)
-        {
-            fsm.RequestState(PlayerState.BowCharge);
-            return;
-        }
-
+        // BowShoot은 짧은 실행 상태만 맡고 끝나면 항상 Idle로 복귀한다.
         fsm.RequestState(PlayerState.Idle);
     }
 
@@ -132,7 +131,7 @@ public class PlayerBow : MonoBehaviour
     {
         if (nextState == PlayerState.BowCharge)
         {
-            // 새 차지는 이전 발사의 차지 시간을 이어받지 않는다.
+            // 새 차지가 시작되면 이전 차지 시간은 버린다.
             currentChargeTime = 0f;
             return;
         }
@@ -149,29 +148,37 @@ public class PlayerBow : MonoBehaviour
 
     private void FireArrow()
     {
-        // 실제 발사 방향은 현재 조준 방향 + 차지 시간 기반 오차로 결정한다.
+        // PlayerBow는 발사 타이밍/방향/오차만 결정하고,
+        // 실제 이동/수명/충돌 처리는 Arrow 쪽으로 넘긴다.
         Vector2 finalDirection = GetShotDirection();
+        Transform selectedFirePoint = ResolveFirePoint(finalDirection);
 
         if (playerData != null && playerData.bulletPrefab != null)
         {
-            GameObject bullet = Instantiate(playerData.bulletPrefab, firePoint.position, Quaternion.identity);
+            GameObject bullet = Instantiate(playerData.bulletPrefab, selectedFirePoint.position, Quaternion.identity);
             bullet.transform.right = finalDirection;
 
-            if (bullet.TryGetComponent<Rigidbody2D>(out Rigidbody2D bulletRb))
+            if (bullet.TryGetComponent<Arrow>(out Arrow arrow))
             {
-                bulletRb.linearVelocity = finalDirection * projectileSpeed;
+                int arrowTypeId = playerData != null ? playerData.equippedArrowTypeId : 0;
+                arrow.Initialize(finalDirection, projectileSpeed, arrowTypeId);
+            }
+            else
+            {
+                Debug.LogWarning($"{playerData.bulletPrefab.name} is missing an {nameof(Arrow)} component.", this);
             }
         }
 
-        Debug.DrawRay(firePoint.position, finalDirection * 2.5f, Color.yellow, 1f);
+        Debug.DrawRay(selectedFirePoint.position, finalDirection * 2.5f, Color.yellow, 1f);
     }
 
     private Vector2 GetShotDirection()
     {
         Vector2 aimDirection = ResolveAimDirection();
         float spreadAngle = GetSpreadAngle();
-        float randomAngle = Random.Range(-spreadAngle, spreadAngle);
+        float randomAngle = UnityEngine.Random.Range(-spreadAngle, spreadAngle);
 
+        // 차지 시간에 따라 spread를 계산한 뒤 최종 발사 방향을 만든다.
         return Rotate(aimDirection, randomAngle).normalized;
     }
 
@@ -194,7 +201,7 @@ public class PlayerBow : MonoBehaviour
     private Vector2 ResolveAimDirection()
     {
 #if ENABLE_INPUT_SYSTEM
-        // 현재 1순위 조준 기준은 마우스 월드 좌표다.
+        // 현재 1순위 조준 기준은 마우스의 월드 위치다.
         if (Mouse.current != null && Camera.main != null)
         {
             Vector3 mouseScreenPosition = Mouse.current.position.ReadValue();
@@ -207,7 +214,7 @@ public class PlayerBow : MonoBehaviour
         }
 #endif
 
-        // 마우스 조준이 불가능한 상황에서는 마지막 이동/조준 방향을 fallback으로 사용한다.
+        // 마우스 조준이 불가능할 때만 이동 방향/이전 조준 방향으로 fallback 한다.
         if (input.Move.sqrMagnitude > 0.0001f)
         {
             return input.Move.normalized;
@@ -219,6 +226,22 @@ public class PlayerBow : MonoBehaviour
         }
 
         return defaultAimDirection.normalized;
+    }
+
+    private Transform ResolveFirePoint(Vector2 aimDirection)
+    {
+        // 조준 방향을 8방향으로 양자화해서 해당 방향 firePoint를 고른다.
+        PlayerSide8 side = PlayerFacingUtil.Quantize8OrDefault(aimDirection, PlayerSide8.Down);
+
+        foreach (FirePointEntry firePointEntry in firePoints)
+        {
+            if (firePointEntry.side == side && firePointEntry.point != null)
+            {
+                return firePointEntry.point;
+            }
+        }
+
+        return defaultFirePoint;
     }
 
     private static Vector2 Rotate(Vector2 direction, float angleDegrees)

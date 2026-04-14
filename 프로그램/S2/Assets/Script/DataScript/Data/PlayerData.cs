@@ -6,6 +6,9 @@ using UnityEngine;
 public class PlayerData : ScriptableObject
 {
     public int maxHp;
+    // 현재 플레이어가 사용할 화살 종류 번호.
+    // 실제 번호 해석과 장착 로직은 나중에 인벤토리/장비 시스템에서 담당한다.
+    public int equippedArrowTypeId;
     public float attackIntersection;
     public float moveSpeed;
     public float attackSpeed;
