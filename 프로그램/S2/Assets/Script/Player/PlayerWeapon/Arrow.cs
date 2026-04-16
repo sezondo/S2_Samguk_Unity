@@ -9,6 +9,7 @@ public class Arrow : MonoBehaviour
     private float lifeTimer;
     private int arrowTypeId;
 
+    // 피격 처리나 속성 효과에서 어떤 화살인지 확인할 때 사용한다.
     public int ArrowTypeId => arrowTypeId;
 
     protected virtual void Awake()

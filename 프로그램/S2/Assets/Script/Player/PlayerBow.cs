@@ -1,17 +1,15 @@
 using System;
 using UnityEngine;
-#if ENABLE_INPUT_SYSTEM
-using UnityEngine.InputSystem;
-#endif
 
 [RequireComponent(typeof(PlayerInput))]
 [RequireComponent(typeof(PlayerFSMManager))]
+[RequireComponent(typeof(PlayerAim))]
 public class PlayerBow : MonoBehaviour
 {
     [Serializable]
     private struct FirePointEntry
     {
-        // 조준 8방향마다 사용할 발사 시작 위치.
+        // 조준 8방향마다 사용할 발사 시작 위치를 연결한다.
         public PlayerSide8 side;
         public Transform point;
     }
@@ -24,24 +22,23 @@ public class PlayerBow : MonoBehaviour
     [Header("Bow Settings")]
     [SerializeField] private float maxChargeTime = 1.2f;
     [SerializeField] private float bowShootDuration = 0.08f;
-    [SerializeField] private float projectileSpeed = 12f;
     [SerializeField] private float maxSpreadAngle = 12f;
     [SerializeField] private float minSpreadAngle = 0.5f;
-    [SerializeField] private Vector2 defaultAimDirection = Vector2.down;
 
     private PlayerInput input;
     private PlayerFSMManager fsm;
+    private PlayerAim aim;
 
     private float currentChargeTime;
     private float bowShootTimer;
-    private Vector2 lastAimDirection = Vector2.down;
 
     private void Awake()
     {
         input = GetComponent<PlayerInput>();
         fsm = GetComponent<PlayerFSMManager>();
+        aim = GetComponent<PlayerAim>();
 
-        if (input == null || fsm == null)
+        if (input == null || fsm == null || aim == null)
         {
             Debug.LogError($"{nameof(PlayerBow)} on {name} is missing a required component.", this);
             enabled = false;
@@ -72,8 +69,6 @@ public class PlayerBow : MonoBehaviour
 
     private void Update()
     {
-        UpdateAimDirection();
-
         // 활은 "입력 즉시 실행"이 아니라 현재 상태에 따라 요청/처리를 나눈다.
         if (fsm.IsState(PlayerState.Idle))
         {
@@ -151,22 +146,18 @@ public class PlayerBow : MonoBehaviour
         // PlayerBow는 발사 타이밍/방향/오차만 결정하고,
         // 실제 이동/수명/충돌 처리는 Arrow 쪽으로 넘긴다.
         Vector2 finalDirection = GetShotDirection();
-        Transform selectedFirePoint = ResolveFirePoint(finalDirection);
+        Transform selectedFirePoint = ResolveFirePoint(aim.AimSide);
+        ArrowData arrowData = playerData != null ? playerData.GetEquippedArrowData() : null;
 
-        if (playerData != null && playerData.bulletPrefab != null)
+        if (arrowData != null && arrowData.arrowPrefab != null)
         {
-            GameObject bullet = Instantiate(playerData.bulletPrefab, selectedFirePoint.position, Quaternion.identity);
-            bullet.transform.right = finalDirection;
-
-            if (bullet.TryGetComponent<Arrow>(out Arrow arrow))
-            {
-                int arrowTypeId = playerData != null ? playerData.equippedArrowTypeId : 0;
-                arrow.Initialize(finalDirection, projectileSpeed, arrowTypeId);
-            }
-            else
-            {
-                Debug.LogWarning($"{playerData.bulletPrefab.name} is missing an {nameof(Arrow)} component.", this);
-            }
+            // 화살 종류에 따라 다른 프리팹을 생성하고, 이동에 필요한 초기값만 넘긴다.
+            Arrow arrow = Instantiate(arrowData.arrowPrefab, selectedFirePoint.position, Quaternion.identity);
+            arrow.Initialize(finalDirection, arrowData.projectileSpeed, arrowData.arrowTypeId);
+        }
+        else
+        {
+            Debug.LogWarning($"{nameof(PlayerBow)} could not find an equipped arrow prefab.", this);
         }
 
         Debug.DrawRay(selectedFirePoint.position, finalDirection * 2.5f, Color.yellow, 1f);
@@ -174,7 +165,7 @@ public class PlayerBow : MonoBehaviour
 
     private Vector2 GetShotDirection()
     {
-        Vector2 aimDirection = ResolveAimDirection();
+        Vector2 aimDirection = aim.AimDirection;
         float spreadAngle = GetSpreadAngle();
         float randomAngle = UnityEngine.Random.Range(-spreadAngle, spreadAngle);
 
@@ -189,50 +180,9 @@ public class PlayerBow : MonoBehaviour
         return Mathf.Lerp(maxSpreadAngle, minSpreadAngle, chargeRatio);
     }
 
-    private void UpdateAimDirection()
+    private Transform ResolveFirePoint(PlayerSide8 side)
     {
-        Vector2 aimDirection = ResolveAimDirection();
-        if (aimDirection.sqrMagnitude > 0.0001f)
-        {
-            lastAimDirection = aimDirection.normalized;
-        }
-    }
-
-    private Vector2 ResolveAimDirection()
-    {
-#if ENABLE_INPUT_SYSTEM
-        // 현재 1순위 조준 기준은 마우스의 월드 위치다.
-        if (Mouse.current != null && Camera.main != null)
-        {
-            Vector3 mouseScreenPosition = Mouse.current.position.ReadValue();
-            Vector3 worldPosition = Camera.main.ScreenToWorldPoint(mouseScreenPosition);
-            Vector2 aimDirection = worldPosition - transform.position;
-            if (aimDirection.sqrMagnitude > 0.0001f)
-            {
-                return aimDirection.normalized;
-            }
-        }
-#endif
-
-        // 마우스 조준이 불가능할 때만 이동 방향/이전 조준 방향으로 fallback 한다.
-        if (input.Move.sqrMagnitude > 0.0001f)
-        {
-            return input.Move.normalized;
-        }
-
-        if (lastAimDirection.sqrMagnitude > 0.0001f)
-        {
-            return lastAimDirection.normalized;
-        }
-
-        return defaultAimDirection.normalized;
-    }
-
-    private Transform ResolveFirePoint(Vector2 aimDirection)
-    {
-        // 조준 방향을 8방향으로 양자화해서 해당 방향 firePoint를 고른다.
-        PlayerSide8 side = PlayerFacingUtil.Quantize8OrDefault(aimDirection, PlayerSide8.Down);
-
+        // PlayerAim이 계산한 8방향에 맞는 firePoint를 고른다.
         foreach (FirePointEntry firePointEntry in firePoints)
         {
             if (firePointEntry.side == side && firePointEntry.point != null)
