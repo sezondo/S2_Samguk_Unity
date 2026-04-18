@@ -42,6 +42,7 @@ public class PlayerAim : MonoBehaviour
     {
 #if ENABLE_INPUT_SYSTEM
         // 1순위: 마우스 월드 위치를 기준으로 플레이어에서 마우스까지의 방향을 구한다.
+        
         if (Mouse.current != null && Camera.main != null)
         {
             Vector3 mouseScreenPosition = Mouse.current.position.ReadValue();
@@ -53,6 +54,7 @@ public class PlayerAim : MonoBehaviour
                 return lastAimDirection;
             }
         }
+        
 #endif
 
         // 2순위: 마우스 기준을 못 잡으면 이동 방향을 조준 방향으로 사용한다.
