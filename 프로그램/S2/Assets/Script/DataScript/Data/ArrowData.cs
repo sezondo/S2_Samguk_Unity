@@ -12,4 +12,7 @@ public class ArrowData : ScriptableObject
 
     // 타입별 기본 투사체 속도. 필요하면 화살 종류마다 다르게 줄 수 있다.
     public float projectileSpeed = 12f;
+
+    // 테스트용 데미지. 나중에 전투 데이터가 분리되면 그쪽으로 옮길 수 있다.
+    public int damage = 1;
 }

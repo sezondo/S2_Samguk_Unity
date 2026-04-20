@@ -153,7 +153,7 @@ public class PlayerBow : MonoBehaviour
         {
             // 화살 종류에 따라 다른 프리팹을 생성하고, 이동에 필요한 초기값만 넘긴다.
             Arrow arrow = Instantiate(arrowData.arrowPrefab, selectedFirePoint.position, Quaternion.identity);
-            arrow.Initialize(finalDirection, arrowData.projectileSpeed, arrowData.arrowTypeId);
+            arrow.Initialize(finalDirection, arrowData);
         }
         else
         {
