@@ -56,6 +56,7 @@ public class Arrow : MonoBehaviour
 
     protected virtual void OnTriggerEnter2D(Collider2D other)
     {
+        // 발사 직후 플레이어 콜라이더와 닿아도 화살이 사라지지 않게 한다.
         if (IsPlayerObject(other.gameObject))
         {
             return;
@@ -66,6 +67,7 @@ public class Arrow : MonoBehaviour
 
     protected virtual void OnCollisionEnter2D(Collision2D collision)
     {
+        // Trigger가 아닌 충돌에서도 Player 태그는 무시한다.
         if (IsPlayerObject(collision.gameObject))
         {
             return;
