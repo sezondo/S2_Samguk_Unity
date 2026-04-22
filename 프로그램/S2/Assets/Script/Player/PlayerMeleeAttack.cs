@@ -1,5 +1,6 @@
 using UnityEngine;
 
+[RequireComponent(typeof(Rigidbody2D))]
 [RequireComponent(typeof(PlayerInput))]
 [RequireComponent(typeof(PlayerFSMManager))]
 [RequireComponent(typeof(PlayerAim))]
@@ -18,6 +19,7 @@ public class PlayerMeleeAttack : MonoBehaviour
     private PlayerInput input;
     private PlayerFSMManager fsm;
     private PlayerAim aim;
+    private Rigidbody2D rb;
 
     // 현재 실행 중인 공격 데이터와, 공격 시작 순간에 고정한 방향.
     // 공격 중 마우스를 움직여도 이미 시작한 공격의 방향이 흔들리지 않게 한다.
@@ -27,6 +29,9 @@ public class PlayerMeleeAttack : MonoBehaviour
     // attackTimer는 현재 공격의 진행 시간, meleeInputBufferTimer는 미리 입력된 공격 입력의 남은 시간이다.
     private float attackTimer;
     private float meleeInputBufferTimer;
+    // 현재 공격에서 이미 전진한 거리다.
+    // 공격 데이터별 advanceDistance를 넘지 않도록 누적해서 프레임마다 남은 거리만 이동한다.
+    private float advancedDistance;
     // 공격이 끝난 뒤 다음 공격으로 이어질 수 있는 유예 시간이다.
     private float comboExpireTimer;
 
@@ -43,6 +48,7 @@ public class PlayerMeleeAttack : MonoBehaviour
         input = GetComponent<PlayerInput>();
         fsm = GetComponent<PlayerFSMManager>();
         aim = GetComponent<PlayerAim>();
+        rb = GetComponent<Rigidbody2D>();
 
         // 인스펙터에 직접 연결하지 않아도 자식 오브젝트에서 한 번 찾아본다.
         if (meleeHitbox == null)
@@ -50,7 +56,7 @@ public class PlayerMeleeAttack : MonoBehaviour
             meleeHitbox = GetComponentInChildren<MeleeHitbox>(true);
         }
 
-        if (input == null || fsm == null || aim == null)
+        if (input == null || fsm == null || aim == null || rb == null)
         {
             Debug.LogError($"{nameof(PlayerMeleeAttack)} on {name} is missing a required component.", this);
             enabled = false;
@@ -110,6 +116,12 @@ public class PlayerMeleeAttack : MonoBehaviour
         }
 
         UpdateAttack();
+    }
+
+    private void FixedUpdate()
+    {
+        // Rigidbody2D 이동은 물리 프레임에서 처리해서 일반 이동/회피와 같은 방식으로 맞춘다.
+        ApplyAttackAdvance();
     }
 
     private void HandleStateChanged(PlayerState previousState, PlayerState nextState)
@@ -194,6 +206,7 @@ public class PlayerMeleeAttack : MonoBehaviour
         comboTimerPaused = false;
 
         attackTimer = 0f;
+        advancedDistance = 0f;
         hitboxActivated = false;
         hitboxDeactivated = false;
         // 새 공격을 시작하기 전 이전 판정 상태를 정리한다.
@@ -231,6 +244,44 @@ public class PlayerMeleeAttack : MonoBehaviour
         FinishAttack();
     }
 
+    private void ApplyAttackAdvance()
+    {
+        // 공격 상태가 아니거나 공격 데이터가 없으면 전진 이동을 하지 않는다.
+        if (!fsm.IsState(PlayerState.MeleeAttack) || currentAttackData == null || rb == null)
+        {
+            return;
+        }
+
+        // advanceDistance가 0이면 이 공격은 제자리 공격으로 처리한다.
+        float totalDistance = Mathf.Max(0f, currentAttackData.advanceDistance);
+        if (totalDistance <= 0f || advancedDistance >= totalDistance)
+        {
+            return;
+        }
+
+        // 공격마다 전진 시작 타이밍을 다르게 줄 수 있게 한다.
+        if (attackTimer < currentAttackData.advanceStartTime)
+        {
+            return;
+        }
+
+        float remainingDistance = totalDistance - advancedDistance;
+        float advanceDuration = Mathf.Max(0f, currentAttackData.advanceDuration);
+        // advanceDuration이 0이면 남은 거리를 한 번에 이동한다.
+        // 값이 있으면 총 이동 거리를 duration 동안 나눠서 이동한다.
+        float distanceThisStep = advanceDuration <= 0f
+            ? remainingDistance
+            : totalDistance / advanceDuration * Time.fixedDeltaTime;
+
+        // 마지막 프레임에서 목표 거리보다 더 나아가지 않도록 남은 거리로 제한한다.
+        distanceThisStep = Mathf.Min(distanceThisStep, remainingDistance);
+        advancedDistance += distanceThisStep;
+
+        Vector2 moveDirection = GetAttackAdvanceDirection();
+        Vector2 nextPosition = rb.position + moveDirection * distanceThisStep;
+        rb.MovePosition(nextPosition);
+    }
+
     private void FinishAttack()
     {
         DeactivateHitbox();
@@ -260,8 +311,23 @@ public class PlayerMeleeAttack : MonoBehaviour
 
         // Hitbox의 위치/크기/회전 적용은 MeleeHitbox가 담당한다.
         // PlayerMeleeAttack은 어떤 공격 데이터와 방향을 쓸지만 넘긴다.
-        Vector2 attackDirection = PlayerFacingUtil.Side8ToDir(currentAttackSide);
-        meleeHitbox.Activate(transform, currentAttackData, attackDirection);
+        meleeHitbox.Activate(transform, currentAttackData, GetAttackDirection());
+    }
+
+    private Vector2 GetAttackDirection()
+    {
+        // 공격 자체의 방향은 공격 시작 순간에 고정한 currentAttackSide를 기준으로 계산한다.
+        return PlayerFacingUtil.Side8ToDir(currentAttackSide);
+    }
+
+    private Vector2 GetAttackAdvanceDirection()
+    {
+        Vector2 attackDirection = GetAttackDirection();
+        // 이동 방향만 데이터 값에 따라 정방향/역방향으로 바꾼다.
+        // 히트박스 방향은 항상 공격 방향을 유지한다.
+        return currentAttackData != null && currentAttackData.moveBackwardByAdvance
+            ? -attackDirection
+            : attackDirection;
     }
 
     private void DeactivateHitbox(bool markDeactivated = true)
@@ -345,6 +411,7 @@ public class PlayerMeleeAttack : MonoBehaviour
         comboExpireTimer = 0f;
         comboTimerPaused = false;
         currentAttackData = null;
+        advancedDistance = 0f;
     }
 
     private bool HasBufferedMeleeInput()

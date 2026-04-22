@@ -19,6 +19,17 @@ public class MeleeAttackData : ScriptableObject
     // 공격 종료 후 콤보 흐름을 유지할 수 있는 시간. 정책은 나중에 조정한다.
     public float comboExpireTime = 0.45f;
 
+    [Header("Movement")]
+    // 공격 중 플레이어가 공격 방향으로 전진할 총 거리다. 0이면 이동하지 않는다.
+    public float advanceDistance = 0f;
+    // 공격 시작 후 몇 초 뒤부터 전진을 시작할지 정한다.
+    public float advanceStartTime = 0f;
+    // 전진 거리를 몇 초에 걸쳐 이동할지 정한다. 0이면 한 번에 이동한다.
+    public float advanceDuration = 0.08f;
+    // 꺼져 있으면 공격 방향으로 이동하고, 켜져 있으면 공격 반대 방향으로 이동한다.
+    // 무기 반동이나 뒤로 빠지는 공격을 만들 때 사용한다.
+    public bool moveBackwardByAdvance = false;
+
     [Header("Hitbox")]
     // x는 공격 방향 앞쪽 거리, y는 공격 방향의 수직 오프셋이다.
     // 예: (0.6, 0)은 플레이어 앞쪽 0.6만큼 떨어진 위치에 판정을 둔다.
