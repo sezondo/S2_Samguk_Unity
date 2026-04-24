@@ -4,8 +4,9 @@ using UnityEngine;
 [RequireComponent(typeof(Collider2D))]
 public class MeleeHitbox : MonoBehaviour
 {
-    // 한 번의 공격에서 같은 적이 여러 콜라이더로 중복 피격되는 것을 막는다.
-    private readonly HashSet<EnemyHealthTest> hitEnemies = new();
+    // 한 번의 공격에서 같은 대상이 여러 콜라이더로 중복 피격되는 것을 막는다.
+    // 인터페이스 자체는 HashSet 키로 쓰기 애매하므로 실제 MonoBehaviour 컴포넌트를 저장한다.
+    private readonly HashSet<Component> hitTargets = new();
 
     private Collider2D hitboxCollider;
     private Transform owner;
@@ -41,7 +42,7 @@ public class MeleeHitbox : MonoBehaviour
         ApplyColliderShape();
 
         // 공격이 새로 시작될 때마다 중복 피격 기록을 초기화한다.
-        hitEnemies.Clear();
+        hitTargets.Clear();
 
         if (hitboxCollider != null)
         {
@@ -59,7 +60,7 @@ public class MeleeHitbox : MonoBehaviour
             hitboxCollider.enabled = false;
         }
 
-        hitEnemies.Clear();
+        hitTargets.Clear();
     }
 
     private void ApplyHitboxTransform(Vector2 attackDirection) //히트박스 위치
@@ -131,15 +132,26 @@ public class MeleeHitbox : MonoBehaviour
             return;
         }
 
-        // 지금은 테스트용 EnemyHealthTest만 데미지 대상으로 사용한다.
-        EnemyHealthTest enemyHealth = target.GetComponentInParent<EnemyHealthTest>();
-        if (enemyHealth == null || hitEnemies.Contains(enemyHealth))
+        // 데미지를 받을 수 있는 대상이면 구체 타입을 몰라도 공격할 수 있다.
+        IDamageable damageable = target.GetComponentInParent<IDamageable>();
+        if (damageable == null)
         {
             return;
         }
 
-        hitEnemies.Add(enemyHealth);
-        enemyHealth.TakeDamage(damage);
+        Component damageableComponent = damageable as Component;
+        if (damageableComponent != null)
+        {
+            // 같은 공격 판정이 켜져 있는 동안에는 같은 대상에게 한 번만 데미지를 준다.
+            if (hitTargets.Contains(damageableComponent))
+            {
+                return;
+            }
+
+            hitTargets.Add(damageableComponent);
+        }
+
+        damageable.TakeDamage(damage);
     }
 
     private bool IsOwnerObject(GameObject target)

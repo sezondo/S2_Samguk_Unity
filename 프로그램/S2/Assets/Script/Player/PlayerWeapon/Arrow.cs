@@ -83,11 +83,12 @@ public class Arrow : MonoBehaviour
 
     protected virtual void HandleHit(GameObject otherObject)
     {
-        // 테스트용 적 HP가 있으면 데미지를 적용한다.
-        EnemyHealthTest enemyHealth = otherObject.GetComponentInParent<EnemyHealthTest>();
-        if (enemyHealth != null)
+        // 데미지를 받을 수 있는 대상이면 플레이어/적/파괴 오브젝트를 구분하지 않고 처리한다.
+        // 속성 화살에서 추가 효과가 필요하면 이 메서드를 override해서 확장한다.
+        IDamageable damageable = otherObject.GetComponentInParent<IDamageable>();
+        if (damageable != null)
         {
-            enemyHealth.TakeDamage(damage);
+            damageable.TakeDamage(damage);
         }
 
         // 기본 화살은 충돌 후 자기 자신을 제거한다.

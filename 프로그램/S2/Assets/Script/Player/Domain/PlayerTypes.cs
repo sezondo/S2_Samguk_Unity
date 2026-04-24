@@ -10,8 +10,8 @@ public enum PlayerState
 
 public enum PlayerHitJudgment
 {
-    NonHit,
-    Hit,
+    Vulnerable,
+    Invincible,
 }
 
 public enum PlayerUnderState

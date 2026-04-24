@@ -6,6 +6,8 @@ using UnityEngine;
 public class PlayerData : ScriptableObject
 {
     public int maxHp;
+    // 피격 후 추가 데미지를 막는 시간. PlayerHealth의 HitJudgment 유지 시간으로 사용한다.
+    public float invincibleDuration = 0.6f;
     // 현재 플레이어가 사용할 화살 종류 번호.
     // 실제 번호 해석과 장착 로직은 나중에 인벤토리/장비 시스템에서 담당한다.
     public int equippedArrowTypeId;

@@ -1,8 +1,9 @@
 using UnityEngine;
 
-public class EnemyHealthTest : MonoBehaviour
+public class EnemyHealthTest : MonoBehaviour, IDamageable
 {
-    // 전투 시스템이 생기기 전까지 쓰는 테스트용 HP 컴포넌트.
+    // 전투 시스템이 완성되기 전까지 쓰는 테스트용 HP 컴포넌트.
+    // IDamageable을 구현해서 화살/근접 공격이 구체 타입을 몰라도 데미지를 줄 수 있게 한다.
     [SerializeField] private int maxHp = 3;
     [SerializeField] private bool destroyOnDeath = true;
 
@@ -16,12 +17,12 @@ public class EnemyHealthTest : MonoBehaviour
         currentHp = maxHp;
     }
 
-    public void TakeDamage(int damage)
+    public bool TakeDamage(int damage)
     {
         // 이미 죽은 대상은 추가 데미지를 받지 않는다.
         if (IsDead)
         {
-            return;
+            return false;
         }
 
         // 음수 데미지가 들어와도 회복처럼 동작하지 않게 막는다.
@@ -34,6 +35,9 @@ public class EnemyHealthTest : MonoBehaviour
         {
             Die();
         }
+
+        // 현재는 데미지가 0이어도 공격 처리는 성공한 것으로 본다.
+        return true;
     }
 
     private void Die()
