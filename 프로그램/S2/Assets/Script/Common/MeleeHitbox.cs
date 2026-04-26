@@ -4,6 +4,11 @@ using UnityEngine;
 [RequireComponent(typeof(Collider2D))]
 public class MeleeHitbox : MonoBehaviour
 {
+    [Header("Target Filter")]
+    // 플레이어/적 모두 같은 Hitbox를 쓸 수 있게 타격 대상은 레이어로 제한한다.
+    [SerializeField] private LayerMask targetLayers = ~0;
+    [SerializeField] private bool ignoreOwner = true;
+
     // 한 번의 공격에서 같은 대상이 여러 콜라이더로 중복 피격되는 것을 막는다.
     // 인터페이스 자체는 HashSet 키로 쓰기 애매하므로 실제 MonoBehaviour 컴포넌트를 저장한다.
     private readonly HashSet<Component> hitTargets = new();
@@ -11,7 +16,7 @@ public class MeleeHitbox : MonoBehaviour
     private Collider2D hitboxCollider;
     private Transform owner;
     // 활성화된 공격의 데이터. 위치/크기/데미지/디버그 표시를 여기서 읽는다.
-    private MeleeAttackData attackData;
+    private PlayerMeleeAttackData attackData;
     private int damage;
     private bool drawDebug;
     private Color debugColor;
@@ -28,7 +33,7 @@ public class MeleeHitbox : MonoBehaviour
         }
     }
 
-    public void Activate(Transform newOwner, MeleeAttackData newAttackData, Vector2 attackDirection)
+    public void Activate(Transform newOwner, PlayerMeleeAttackData newAttackData, Vector2 attackDirection)
     {
         // owner는 플레이어 본인/자식 오브젝트를 때리지 않기 위해 저장한다.
         owner = newOwner;
@@ -126,8 +131,7 @@ public class MeleeHitbox : MonoBehaviour
 
     private void TryHit(GameObject target)
     {
-        // 플레이어 본인이나 Player 태그 대상은 근접 공격 대상으로 보지 않는다.
-        if (IsOwnerObject(target) || target.CompareTag("Player"))
+        if (!CanHitTarget(target))
         {
             return;
         }
@@ -154,9 +158,26 @@ public class MeleeHitbox : MonoBehaviour
         damageable.TakeDamage(damage);
     }
 
+    private bool CanHitTarget(GameObject target)
+    {
+        if (target == null)
+        {
+            return false;
+        }
+
+        // Hitbox가 공격자 자식이어도 자기 자신을 때리지 않도록 한다.
+        if (ignoreOwner && IsOwnerObject(target))
+        {
+            return false;
+        }
+
+        // 플레이어 공격은 Enemy 레이어, 적 공격은 Player 레이어처럼 인스펙터에서 지정한다.
+        int targetLayerMask = 1 << target.layer;
+        return (targetLayers.value & targetLayerMask) != 0;
+    }
+
     private bool IsOwnerObject(GameObject target)
     {
-        // Hitbox가 플레이어 자식이라도 자기 자신을 때리지 않도록 한다.
         return owner != null && target.transform.IsChildOf(owner);
     }
 

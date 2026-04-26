@@ -3,7 +3,7 @@ using UnityEngine;
 [CreateAssetMenu(menuName = "Scriptable/ArrowData", fileName = "ArrowData")]
 public class ArrowData : ScriptableObject
 {
-    // PlayerData.equippedArrowTypeId와 매칭되는 화살 종류 번호.
+    // 세이브/해금/장착 같은 외부 시스템에서 화살 종류를 구분할 때 쓰는 번호.
     public int arrowTypeId;
 
     // 이 타입으로 발사할 실제 화살 프리팹.

@@ -4,26 +4,26 @@ using UnityEngine;
 [RequireComponent(typeof(PlayerInput))]
 [RequireComponent(typeof(PlayerFSMManager))]
 [RequireComponent(typeof(PlayerAim))]
+[RequireComponent(typeof(PlayerLoadout))]
 public class PlayerMeleeAttack : MonoBehaviour
 {
     [Header("References")]
     // 플레이어 자식 오브젝트에 붙일 실제 공격 판정 콜라이더.
     [SerializeField] private MeleeHitbox meleeHitbox;
 
-    [Header("Attack Data")]
-    // 지금은 1개만 넣어도 되고, 나중에 1타/2타/3타 데이터를 순서대로 넣으면 된다.
-    [SerializeField] private MeleeAttackData[] comboAttacks;
+    [Header("Attack Settings")]
     // 콤보 데이터가 1개뿐일 때 입력 버퍼가 있으면 같은 공격을 반복할지 정한다.
     [SerializeField] private bool repeatSingleAttackFromBuffer = true;
 
     private PlayerInput input;
     private PlayerFSMManager fsm;
     private PlayerAim aim;
+    private PlayerLoadout loadout;
     private Rigidbody2D rb;
 
     // 현재 실행 중인 공격 데이터와, 공격 시작 순간에 고정한 방향.
     // 공격 중 마우스를 움직여도 이미 시작한 공격의 방향이 흔들리지 않게 한다.
-    private MeleeAttackData currentAttackData;
+    private PlayerMeleeAttackData currentAttackData;
     private PlayerSide8 currentAttackSide;
 
     // attackTimer는 현재 공격의 진행 시간, meleeInputBufferTimer는 미리 입력된 공격 입력의 남은 시간이다.
@@ -48,6 +48,7 @@ public class PlayerMeleeAttack : MonoBehaviour
         input = GetComponent<PlayerInput>();
         fsm = GetComponent<PlayerFSMManager>();
         aim = GetComponent<PlayerAim>();
+        loadout = GetComponent<PlayerLoadout>();
         rb = GetComponent<Rigidbody2D>();
 
         // 인스펙터에 직접 연결하지 않아도 자식 오브젝트에서 한 번 찾아본다.
@@ -56,7 +57,7 @@ public class PlayerMeleeAttack : MonoBehaviour
             meleeHitbox = GetComponentInChildren<MeleeHitbox>(true);
         }
 
-        if (input == null || fsm == null || aim == null || rb == null)
+        if (input == null || fsm == null || aim == null || loadout == null || rb == null)
         {
             Debug.LogError($"{nameof(PlayerMeleeAttack)} on {name} is missing a required component.", this);
             enabled = false;
@@ -155,7 +156,7 @@ public class PlayerMeleeAttack : MonoBehaviour
     {
         // 현재 공격 중이면 현재 공격 데이터의 버퍼 시간을 쓰고,
         // 아직 공격 전이면 이번에 시작할 공격 데이터의 버퍼 시간을 쓴다.
-        MeleeAttackData attackData = currentAttackData != null ? currentAttackData : 
+        PlayerMeleeAttackData attackData = currentAttackData != null ? currentAttackData : 
         GetCurrentComboAttackData();
 
         float bufferDuration = attackData != null ? attackData.inputBufferDuration : 0f;
@@ -190,7 +191,7 @@ public class PlayerMeleeAttack : MonoBehaviour
         fsm.RequestState(PlayerState.MeleeAttack);
     }
 
-    private void StartAttack(MeleeAttackData attackData, int nextComboIndex)
+    private void StartAttack(PlayerMeleeAttackData attackData, int nextComboIndex)
     {
         if (attackData == null)
         {
@@ -201,6 +202,7 @@ public class PlayerMeleeAttack : MonoBehaviour
         currentAttackData = attackData;
         // 공격 방향은 자유 각도가 아니라 PlayerSide8 기준 8방향으로 고정한다.
         currentAttackSide = aim.AimSide;
+        PlayerMeleeAttackData[] comboAttacks = GetComboAttacks();
         comboIndex = Mathf.Clamp(nextComboIndex, 0, comboAttacks.Length - 1);
         comboExpireTimer = 0f;
         comboTimerPaused = false;
@@ -295,6 +297,14 @@ public class PlayerMeleeAttack : MonoBehaviour
             return;
         }
 
+        if (IsLastComboAttack())
+        {
+            ConsumeMeleeInputBuffer();
+            ResetCombo();
+            fsm.RequestState(PlayerState.Idle);
+            return;
+        }
+
         OpenComboWindow();
         fsm.RequestState(PlayerState.Idle);
     }
@@ -350,6 +360,7 @@ public class PlayerMeleeAttack : MonoBehaviour
             return false;
         }
 
+        PlayerMeleeAttackData[] comboAttacks = GetComboAttacks();
         // 다음 칸에 공격 데이터가 있으면 그 데이터를 다음 콤보 공격으로 사용한다.
         if (comboIndex + 1 < comboAttacks.Length && comboAttacks[comboIndex + 1] != null)
         {
@@ -365,6 +376,17 @@ public class PlayerMeleeAttack : MonoBehaviour
         }
 
         return false;
+    }
+
+    private bool IsLastComboAttack()
+    {
+        if (!HasAttackData())
+        {
+            return true;
+        }
+
+        PlayerMeleeAttackData[] comboAttacks = GetComboAttacks();
+        return comboIndex >= comboAttacks.Length - 1 || comboAttacks[comboIndex + 1] == null;
     }
 
     private void OpenComboWindow()
@@ -429,19 +451,26 @@ public class PlayerMeleeAttack : MonoBehaviour
         return comboExpireTimer > 0f || comboTimerPaused;
     }
 
-    private MeleeAttackData GetCurrentComboAttackData()
+    private PlayerMeleeAttackData GetCurrentComboAttackData()
     {
         if (!HasAttackData())
         {
             return null;
         }
 
+        PlayerMeleeAttackData[] comboAttacks = GetComboAttacks();
         comboIndex = Mathf.Clamp(comboIndex, 0, comboAttacks.Length - 1);
         return comboAttacks[comboIndex];
     }
 
     private bool HasAttackData()
     {
+        PlayerMeleeAttackData[] comboAttacks = GetComboAttacks();
         return comboAttacks != null && comboAttacks.Length > 0 && comboAttacks[0] != null;
+    }
+
+    private PlayerMeleeAttackData[] GetComboAttacks()
+    {
+        return loadout != null ? loadout.MeleeComboAttacks : null;
     }
 }

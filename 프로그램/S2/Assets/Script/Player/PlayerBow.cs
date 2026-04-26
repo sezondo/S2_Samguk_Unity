@@ -4,6 +4,7 @@ using UnityEngine;
 [RequireComponent(typeof(PlayerInput))]
 [RequireComponent(typeof(PlayerFSMManager))]
 [RequireComponent(typeof(PlayerAim))]
+[RequireComponent(typeof(PlayerLoadout))]
 public class PlayerBow : MonoBehaviour
 {
     [Serializable]
@@ -15,7 +16,6 @@ public class PlayerBow : MonoBehaviour
     }
 
     [Header("References")]
-    [SerializeField] private PlayerData playerData;
     [SerializeField] private Transform defaultFirePoint;
     [SerializeField] private FirePointEntry[] firePoints;
 
@@ -28,6 +28,7 @@ public class PlayerBow : MonoBehaviour
     private PlayerInput input;
     private PlayerFSMManager fsm;
     private PlayerAim aim;
+    private PlayerLoadout loadout;
 
     private float currentChargeTime;
     private float bowShootTimer;
@@ -37,8 +38,9 @@ public class PlayerBow : MonoBehaviour
         input = GetComponent<PlayerInput>();
         fsm = GetComponent<PlayerFSMManager>();
         aim = GetComponent<PlayerAim>();
+        loadout = GetComponent<PlayerLoadout>();
 
-        if (input == null || fsm == null || aim == null)
+        if (input == null || fsm == null || aim == null || loadout == null)
         {
             Debug.LogError($"{nameof(PlayerBow)} on {name} is missing a required component.", this);
             enabled = false;
@@ -147,7 +149,7 @@ public class PlayerBow : MonoBehaviour
         // 실제 이동/수명/충돌 처리는 Arrow 쪽으로 넘긴다.
         Vector2 finalDirection = GetShotDirection();
         Transform selectedFirePoint = ResolveFirePoint(aim.AimSide);
-        ArrowData arrowData = playerData != null ? playerData.GetEquippedArrowData() : null;
+        ArrowData arrowData = loadout != null ? loadout.EquippedArrow : null;
 
         if (arrowData != null && arrowData.arrowPrefab != null)
         {

@@ -11,6 +11,8 @@ public class PlayerInput : MonoBehaviour
     public bool BowHeld { get; private set; } // 활 홀드
     public bool BowPressedThisFrame { get; private set; } // 활 공격 때기
     public bool BowReleasedThisFrame { get; private set; } // 활 공격 사출
+    public bool PreviousArrowPressedThisFrame { get; private set; } // 이전 화살 선택
+    public bool NextArrowPressedThisFrame { get; private set; } // 다음 화살 선택
     public bool DodgePressedThisFrame { get; private set; } // 회피
     public bool InteractPressedThisFrame { get; private set; } // 상호작용
 
@@ -89,6 +91,8 @@ public class PlayerInput : MonoBehaviour
         BowHeld = bowAction != null && bowAction.IsPressed();
         BowPressedThisFrame = bowAction != null && bowAction.WasPressedThisFrame();
         BowReleasedThisFrame = bowAction != null && bowAction.WasReleasedThisFrame();
+        PreviousArrowPressedThisFrame = Keyboard.current != null && Keyboard.current.qKey.wasPressedThisFrame;
+        NextArrowPressedThisFrame = Keyboard.current != null && Keyboard.current.eKey.wasPressedThisFrame;
         DodgePressedThisFrame = dodgeAction != null && dodgeAction.WasPressedThisFrame();
         InteractPressedThisFrame = interactAction != null && interactAction.WasPressedThisFrame();
 #else
@@ -100,6 +104,8 @@ public class PlayerInput : MonoBehaviour
         BowHeld = Input.GetButton("Fire2");
         BowPressedThisFrame = Input.GetButtonDown("Fire2");
         BowReleasedThisFrame = Input.GetButtonUp("Fire2");
+        PreviousArrowPressedThisFrame = Input.GetKeyDown(KeyCode.Q);
+        NextArrowPressedThisFrame = Input.GetKeyDown(KeyCode.E);
         DodgePressedThisFrame = Input.GetKeyDown(KeyCode.LeftShift);
         InteractPressedThisFrame = false;
 #endif

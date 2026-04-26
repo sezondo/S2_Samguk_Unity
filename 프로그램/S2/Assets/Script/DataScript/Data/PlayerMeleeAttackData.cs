@@ -1,7 +1,7 @@
 using UnityEngine;
 
-[CreateAssetMenu(menuName = "Scriptable/MeleeAttackData", fileName = "MeleeAttackData")]
-public class MeleeAttackData : ScriptableObject
+[CreateAssetMenu(menuName = "Scriptable/PlayerMeleeAttackData", fileName = "PlayerMeleeAttackData")]
+public class PlayerMeleeAttackData : ScriptableObject
 {
     [Header("Damage")]
     // 이 공격이 EnemyHealthTest 같은 피해 대상에게 줄 기본 데미지.

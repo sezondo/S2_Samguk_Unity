@@ -2,11 +2,9 @@ using System;
 using UnityEngine;
 
 [RequireComponent(typeof(PlayerFSMManager))]
+[RequireComponent(typeof(PlayerLoadout))]
 public class PlayerHealth : MonoBehaviour, IDamageable
 {
-    [Header("References")]
-    [SerializeField] private PlayerData playerData;
-
     [Header("Health")]
     // PlayerData가 없거나 maxHp가 비어 있을 때 테스트용으로 사용할 기본 HP.
     [SerializeField] private int fallbackMaxHp = 5;
@@ -14,6 +12,7 @@ public class PlayerHealth : MonoBehaviour, IDamageable
     [SerializeField] private float fallbackInvincibleDuration = 0.6f;
 
     private PlayerFSMManager fsm;
+    private PlayerLoadout loadout;
     private int currentHp;
     private float hitTimer;
 
@@ -30,9 +29,10 @@ public class PlayerHealth : MonoBehaviour, IDamageable
     private void Awake()
     {
         fsm = GetComponent<PlayerFSMManager>();
-        if (fsm == null)
+        loadout = GetComponent<PlayerLoadout>();
+        if (fsm == null || loadout == null)
         {
-            Debug.LogError($"{nameof(PlayerHealth)} on {name} requires {nameof(PlayerFSMManager)}.", this);
+            Debug.LogError($"{nameof(PlayerHealth)} on {name} is missing a required component.", this);
             enabled = false;
             return;
         }
@@ -102,6 +102,7 @@ public class PlayerHealth : MonoBehaviour, IDamageable
     private int ResolveMaxHp()
     {
         // 실제 밸런스 값은 PlayerData를 우선하고, 없을 때만 fallback 값을 쓴다.
+        PlayerData playerData = loadout != null ? loadout.PlayerData : null;
         if (playerData != null && playerData.maxHp > 0)
         {
             return playerData.maxHp;
@@ -113,6 +114,7 @@ public class PlayerHealth : MonoBehaviour, IDamageable
     private float ResolveInvincibleDuration()
     {
         // 실제 밸런스 값은 PlayerData를 우선하고, 없을 때만 fallback 값을 쓴다.
+        PlayerData playerData = loadout != null ? loadout.PlayerData : null;
         if (playerData != null && playerData.invincibleDuration > 0f)
         {
             return playerData.invincibleDuration;
