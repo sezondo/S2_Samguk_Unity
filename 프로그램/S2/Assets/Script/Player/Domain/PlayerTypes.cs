@@ -2,8 +2,9 @@ public enum PlayerState
 {
     Idle,
     MeleeAttack,
-    BowCharge,
-    BowShoot,
+    WeaponAiming,
+    WeaponThrowing,
+    WeaponReceiving,
     Dodge,
     Dead,
 }

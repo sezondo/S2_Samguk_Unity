@@ -24,7 +24,7 @@ public class PlayerMeleeAttack : MonoBehaviour
     // 현재 실행 중인 공격 데이터와, 공격 시작 순간에 고정한 방향.
     // 공격 중 마우스를 움직여도 이미 시작한 공격의 방향이 흔들리지 않게 한다.
     private PlayerMeleeAttackData currentAttackData;
-    private PlayerSide8 currentAttackSide;
+    private Vector2 currentAttackDirection = Vector2.down;
 
     // attackTimer는 현재 공격의 진행 시간, meleeInputBufferTimer는 미리 입력된 공격 입력의 남은 시간이다.
     private float attackTimer;
@@ -200,8 +200,8 @@ public class PlayerMeleeAttack : MonoBehaviour
         }
 
         currentAttackData = attackData;
-        // 공격 방향은 자유 각도가 아니라 PlayerSide8 기준 8방향으로 고정한다.
-        currentAttackSide = aim.AimSide;
+        // 공격 방향 계산은 PlayerAim이 담당하고, 공격은 시작 순간의 AimDirection만 고정해서 쓴다.
+        currentAttackDirection = aim.AimDirection;
         PlayerMeleeAttackData[] comboAttacks = GetComboAttacks();
         comboIndex = Mathf.Clamp(nextComboIndex, 0, comboAttacks.Length - 1);
         comboExpireTimer = 0f;
@@ -326,8 +326,8 @@ public class PlayerMeleeAttack : MonoBehaviour
 
     private Vector2 GetAttackDirection()
     {
-        // 공격 자체의 방향은 공격 시작 순간에 고정한 currentAttackSide를 기준으로 계산한다.
-        return PlayerFacingUtil.Side8ToDir(currentAttackSide);
+        // PlayerAim에서 받은 공격 시작 순간의 조준 방향을 그대로 사용한다.
+        return currentAttackDirection;
     }
 
     private Vector2 GetAttackAdvanceDirection()
@@ -434,6 +434,7 @@ public class PlayerMeleeAttack : MonoBehaviour
         comboTimerPaused = false;
         currentAttackData = null;
         advancedDistance = 0f;
+        currentAttackDirection = Vector2.down;
     }
 
     private bool HasBufferedMeleeInput()

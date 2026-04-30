@@ -29,6 +29,17 @@ public class PlayerFSMManager : MonoBehaviour
         ChangeState(PlayerState.Dead);
     }
 
+    public bool CompleteWeaponReceiving()
+    {
+        if (CurrentState != PlayerState.WeaponReceiving)
+        {
+            return false;
+        }
+
+        ChangeState(PlayerState.Idle);
+        return true;
+    }
+
     public bool IsState(PlayerState state)// 상태 확인용 헬퍼
     {
         return CurrentState == state;
@@ -50,8 +61,9 @@ public class PlayerFSMManager : MonoBehaviour
         {
             PlayerState.Idle => CanEnterIdle(from),
             PlayerState.Dodge => CanEnterDodge(from),
-            PlayerState.BowCharge => CanEnterBowCharge(from),
-            PlayerState.BowShoot => CanEnterBowShoot(from),
+            PlayerState.WeaponAiming => CanEnterWeaponAiming(from),
+            PlayerState.WeaponThrowing => CanEnterWeaponThrowing(from),
+            PlayerState.WeaponReceiving => CanEnterWeaponReceiving(from),
             PlayerState.MeleeAttack => CanEnterMeleeAttack(from),
             _ => false,
         };
@@ -63,8 +75,9 @@ public class PlayerFSMManager : MonoBehaviour
         {
             PlayerState.Dead => 6,
             PlayerState.Dodge => 5,
-            PlayerState.BowShoot => 4,
-            PlayerState.BowCharge => 3,
+            PlayerState.WeaponReceiving => 4,
+            PlayerState.WeaponThrowing => 3,
+            PlayerState.WeaponAiming => 3,
             PlayerState.MeleeAttack => 2,
             _ => 1,
         };
@@ -73,16 +86,16 @@ public class PlayerFSMManager : MonoBehaviour
     public bool CanMoveInMainState() //Move 가능 여부 헬퍼
     {
         return CurrentState == PlayerState.Idle 
-        || CurrentState == PlayerState.BowCharge 
-        || CurrentState == PlayerState.BowShoot;
+        || CurrentState == PlayerState.WeaponAiming 
+        || CurrentState == PlayerState.WeaponThrowing
+        || CurrentState == PlayerState.WeaponReceiving;
     }
 
     private static bool CanEnterIdle(PlayerState from)
     {
         return from == PlayerState.Idle
             || from == PlayerState.Dodge
-            || from == PlayerState.BowCharge
-            || from == PlayerState.BowShoot
+            || from == PlayerState.WeaponAiming
             || from == PlayerState.MeleeAttack;
     }
 
@@ -91,14 +104,19 @@ public class PlayerFSMManager : MonoBehaviour
         return from != PlayerState.Dead;
     }
 
-    private static bool CanEnterBowCharge(PlayerState from)
+    private static bool CanEnterWeaponAiming(PlayerState from)
     {
         return from == PlayerState.Idle;
     }
 
-    private static bool CanEnterBowShoot(PlayerState from)
+    private static bool CanEnterWeaponThrowing(PlayerState from)
     {
-        return from == PlayerState.BowCharge;
+        return from == PlayerState.WeaponAiming;
+    }
+
+    private static bool CanEnterWeaponReceiving(PlayerState from)
+    {
+        return from == PlayerState.WeaponThrowing || from == PlayerState.Dodge;
     }
 
     private static bool CanEnterMeleeAttack(PlayerState from)

@@ -12,6 +12,7 @@ public class PlayerDodge : MonoBehaviour
     private Rigidbody2D rb;
     private PlayerInput input;
     private PlayerFSMManager fsm;
+    private PlayerWeaponThrow weaponThrow;
 
     private Vector2 lastMoveDirection = Vector2.down;
     private Vector2 dodgeDirection = Vector2.down;
@@ -22,6 +23,7 @@ public class PlayerDodge : MonoBehaviour
         rb = GetComponent<Rigidbody2D>();
         input = GetComponent<PlayerInput>();
         fsm = GetComponent<PlayerFSMManager>();
+        weaponThrow = GetComponent<PlayerWeaponThrow>();
 
         if (rb == null || input == null || fsm == null)
         {
@@ -67,7 +69,7 @@ public class PlayerDodge : MonoBehaviour
         dodgeTimer -= Time.deltaTime;
         if (dodgeTimer <= 0f)
         {
-            fsm.RequestState(PlayerState.Idle);
+            RequestStateAfterDodge();
         }
     }
 
@@ -107,5 +109,16 @@ public class PlayerDodge : MonoBehaviour
         }
 
         return defaultDodgeDirection.normalized;
+    }
+
+    private void RequestStateAfterDodge()
+    {
+        if (weaponThrow != null && !weaponThrow.HasWeapon)
+        {
+            fsm.RequestState(PlayerState.WeaponReceiving);
+            return;
+        }
+
+        fsm.RequestState(PlayerState.Idle);
     }
 }
