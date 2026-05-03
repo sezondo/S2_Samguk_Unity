@@ -14,6 +14,9 @@ public class PlayerData : ScriptableObject
     [Header("Weapon Throw")]
     public PlayerWeaponThrowData weaponThrow = new();
 
+    [Header("Dodge")]
+    public PlayerDodgeData dodge = new();
+
     public float attackIntersection;
     public float moveSpeed;
     public float attackSpeed;
@@ -42,4 +45,11 @@ public class PlayerWeaponThrowData
     public float returnSpeed = 16f;
     public float maxDistance = 6f;
     public int damage = 1;
+}
+
+[Serializable]
+public class PlayerDodgeData
+{
+    public float duration = 0.18f;
+    public float speed = 10f;
 }

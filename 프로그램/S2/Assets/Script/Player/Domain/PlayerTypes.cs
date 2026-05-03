@@ -52,11 +52,34 @@ public enum PlayerSide8
     UpLeft,
 }
 
-public enum PlayerAnimDir5
+public enum PlayerAnimDir3
 {
     Front,      // Down
     Back,       // Up
     Side,       // Right (좌측은 flip으로 처리)
-    SideUp,     // UpRight (좌상은 flip)
-    SideDown,   // DownRight (좌하는 flip)
+}
+
+public enum PlayerAnimState
+{
+    IdleFront = 0,
+    IdleSide = 1,
+    IdleBack = 2,
+    RunFront = 3,
+    RunSide = 4,
+    RunBack = 5,
+    AttackFront = 6,
+    AttackSide = 7,
+    AttackBack = 8,
+    DodgeFront = 9,
+    DodgeSide = 10,
+    DodgeBack = 11,
+    DeadFront = 12,
+    DeadSide = 13,
+    DeadBack = 14,
+    WeaponThrowReadyFront = 15,
+    WeaponThrowReadySide = 16,
+    WeaponThrowReadyBack = 17,
+    WeaponThrowFront = 18,
+    WeaponThrowSide = 19,
+    WeaponThrowBack = 20,
 }
