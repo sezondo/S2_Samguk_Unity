@@ -87,7 +87,6 @@ public class PlayerFSMManager : MonoBehaviour
     {
         return CurrentState == PlayerState.Idle 
         || CurrentState == PlayerState.WeaponAiming 
-        || CurrentState == PlayerState.WeaponThrowing
         || CurrentState == PlayerState.WeaponReceiving;
     }
 
