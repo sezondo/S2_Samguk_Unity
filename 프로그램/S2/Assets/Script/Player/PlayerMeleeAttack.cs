@@ -43,6 +43,32 @@ public class PlayerMeleeAttack : MonoBehaviour
     // Dodge 중 콤보 유예 시간을 멈출 수 있게 남겨둔 확장 지점이다.
     private bool comboTimerPaused;
 
+    // 현재 실행 중인 근접 공격 데이터다.
+    // 검 연출 같은 외부 표현 컴포넌트가 읽기만 하며, 실제 공격 선택과 진행은 PlayerMeleeAttack이 소유한다.
+    public PlayerMeleeAttackData CurrentAttackData => currentAttackData;
+
+    // 현재 공격이 0~1 사이에서 얼마나 진행됐는지 알려주는 연출용 진행률이다.
+    // attackDuration을 기준으로 계산하므로 HeldWeaponMotion은 공격별 휘두르는 시간을 따로 추측하지 않는다.
+    public float AttackNormalizedTime
+    {
+        get
+        {
+            if (currentAttackData == null || currentAttackData.attackDuration <= 0f)
+            {
+                return 0f;
+            }
+
+            return Mathf.Clamp01(attackTimer / currentAttackData.attackDuration);
+        }
+    }
+
+    // 공격 시작 순간에 고정된 마우스 기준 방향이다.
+    // 공격 도중 마우스를 움직여도 실제 판정과 검 연출 방향이 함께 흔들리지 않게 한다.
+    public Vector2 CurrentAttackDirection => currentAttackDirection;
+
+    // 현재 콤보 인덱스다. 디버그 표시나 연출 분기용으로만 읽게 둔다.
+    public int CurrentComboIndex => comboIndex;
+
     private void Awake()
     {
         input = GetComponent<PlayerInput>();

@@ -18,6 +18,10 @@ public class PlayerAnim : MonoBehaviour
     private PlayerSide8 lockedActionSide = PlayerSide8.Down;
     private PlayerAnimState? currentAnimState;
 
+    // 외부 연출 컴포넌트가 현재 캐릭터가 어느 방향으로 표시되는지만 읽을 수 있게 여는 값이다.
+    // HeldWeaponMotion 같은 시각 연출은 이 값을 참조하지만, 표시 방향 결정 자체는 PlayerAnim이 계속 담당한다.
+    public PlayerSide8 CurrentDisplaySide { get; private set; } = PlayerSide8.Down;
+
     private static readonly int AnimStateHash = Animator.StringToHash("AnimState");
     private static readonly int RestartAnimationHash = Animator.StringToHash("RestartAnimation");
 
@@ -152,6 +156,7 @@ public class PlayerAnim : MonoBehaviour
 
         spriteRenderer.flipX = flipX;
         lastDisplaySide = side;
+        CurrentDisplaySide = side;
     }
 
     private PlayerSide8 GetMoveSideOrLast()
