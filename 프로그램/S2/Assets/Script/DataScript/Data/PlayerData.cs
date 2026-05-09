@@ -31,6 +31,8 @@ public class PlayerWeaponThrowData
 {
     // 우클릭 조준을 최대로 인정하는 시간.
     public float maxChargeTime = 1.2f;
+    // 이 시간 전에 우클릭을 떼면 투척하지 않고 취소한다.
+    public float minAimHoldTime = 0.15f;
     // WeaponAiming 상태에 진입했을 때 최소로 유지할 짧은 실행 시간.
     [FormerlySerializedAs("throwStateDuration")]
     public float aimingStateDuration = 0.08f;

@@ -10,6 +10,9 @@ public class ThrownWeapon : MonoBehaviour
     }
 
     [SerializeField] private float recoverDistance = 0.25f;
+    // 새 연출 구조에서는 PlayerWeaponVisualFSM이 보이는 검을 담당하고,
+    // 이 투척체는 충돌/데미지/회수 판정만 맡는다.
+    [SerializeField] private bool hideVisualOnInitialize = true;
 
     private Rigidbody2D rb;
     private PlayerWeaponThrow owner;
@@ -19,6 +22,8 @@ public class ThrownWeapon : MonoBehaviour
     private float maxDistance;
     private int damage;
     private ThrowPhase phase;
+
+    public bool IsReturning => phase == ThrowPhase.Returning;
 
     private void Awake()
     {
@@ -37,6 +42,7 @@ public class ThrownWeapon : MonoBehaviour
         maxDistance = throwData != null ? Mathf.Max(0f, throwData.maxDistance) : 0f;
         damage = throwData != null ? Mathf.Max(0, throwData.damage) : 0;
         phase = ThrowPhase.Outbound;
+        ApplyVisualVisibility(!hideVisualOnInitialize);
 
         Vector2 normalizedDirection = direction.sqrMagnitude > 0.0001f
             ? direction.normalized
@@ -124,6 +130,15 @@ public class ThrownWeapon : MonoBehaviour
         }
 
         phase = ThrowPhase.Returning;
+    }
+
+    private void ApplyVisualVisibility(bool visible)
+    {
+        Renderer[] renderers = GetComponentsInChildren<Renderer>(true);
+        foreach (Renderer targetRenderer in renderers)
+        {
+            targetRenderer.enabled = visible;
+        }
     }
 
     private void TryDamage(GameObject target)

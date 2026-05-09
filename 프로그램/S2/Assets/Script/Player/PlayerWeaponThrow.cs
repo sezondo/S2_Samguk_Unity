@@ -9,6 +9,9 @@ public class PlayerWeaponThrow : MonoBehaviour
     [Header("References")]
     [SerializeField] private Transform throwPoint;
     [SerializeField] private ThrownWeapon thrownWeaponPrefab;
+    // 예전 방식처럼 검 오브젝트를 hasWeapon에 맞춰 켜고 끌지 정한다.
+    // 새 PlayerWeaponVisualFSM 구조에서는 검 본체가 투척체를 따라가야 하므로 기본값은 false다.
+    [SerializeField] private bool syncHeldWeaponObjectWithHasWeapon = false;
     [SerializeField] private GameObject heldWeaponObject;
 
     private PlayerInput input;
@@ -23,6 +26,17 @@ public class PlayerWeaponThrow : MonoBehaviour
     private readonly PlayerWeaponThrowData fallbackThrowData = new();
 
     public bool HasWeapon => hasWeapon;
+    public ThrownWeapon ActiveThrownWeapon => activeThrownWeapon;
+    public float ChargeTime => chargeTime;
+    public bool IsMinAimHoldComplete => chargeTime >= GetThrowData().minAimHoldTime;
+    public float AimChargeRatio
+    {
+        get
+        {
+            PlayerWeaponThrowData throwData = GetThrowData();
+            return throwData.maxChargeTime <= 0f ? 1f : Mathf.Clamp01(chargeTime / throwData.maxChargeTime);
+        }
+    }
 
     private void Awake()
     {
@@ -103,6 +117,15 @@ public class PlayerWeaponThrow : MonoBehaviour
 
         if (input.WeaponThrowReleasedThisFrame)
         {
+            // 최소 조준 시간이 되기 전에 우클릭을 떼면 투척을 취소하고 Idle로 복귀한다.
+            // 검 비주얼은 PlayerWeaponVisualFSM이 PlayerState.Idle을 보고 Orbit으로 돌아간다.
+            if (!IsMinAimHoldComplete)
+            {
+                chargeTime = 0f;
+                fsm.RequestState(PlayerState.Idle);
+                return;
+            }
+
             if (ThrowWeapon())
             {
                 fsm.RequestState(PlayerState.WeaponThrowing);
@@ -200,7 +223,7 @@ public class PlayerWeaponThrow : MonoBehaviour
     private void SetHasWeapon(bool nextHasWeapon)
     {
         hasWeapon = nextHasWeapon;
-        if (heldWeaponObject != null)
+        if (syncHeldWeaponObjectWithHasWeapon && heldWeaponObject != null)
         {
             heldWeaponObject.SetActive(hasWeapon);
         }

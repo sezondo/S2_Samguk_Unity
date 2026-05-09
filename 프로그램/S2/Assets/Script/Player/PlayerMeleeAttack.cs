@@ -48,7 +48,7 @@ public class PlayerMeleeAttack : MonoBehaviour
     public PlayerMeleeAttackData CurrentAttackData => currentAttackData;
 
     // 현재 공격이 0~1 사이에서 얼마나 진행됐는지 알려주는 연출용 진행률이다.
-    // attackDuration을 기준으로 계산하므로 HeldWeaponMotion은 공격별 휘두르는 시간을 따로 추측하지 않는다.
+    // attackDuration을 기준으로 계산하므로 PlayerWeaponVisualFSM은 공격별 휘두르는 시간을 따로 추측하지 않는다.
     public float AttackNormalizedTime
     {
         get
