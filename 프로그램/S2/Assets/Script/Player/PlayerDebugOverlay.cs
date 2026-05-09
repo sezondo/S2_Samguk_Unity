@@ -1,6 +1,7 @@
 using UnityEngine;
 
 [DisallowMultipleComponent]
+[RequireComponent(typeof(PlayerContext))]
 public class PlayerDebugOverlay : MonoBehaviour
 {
     [SerializeField] private bool showOverlay = true;
@@ -15,9 +16,12 @@ public class PlayerDebugOverlay : MonoBehaviour
 
     private void Awake()
     {
-        fsm = GetComponent<PlayerFSMManager>();
-        weaponThrow = GetComponent<PlayerWeaponThrow>();
-        health = GetComponent<PlayerHealth>();
+        PlayerContext context = GetComponent<PlayerContext>();
+        context.ResolveReferences();
+
+        fsm = context.Fsm;
+        weaponThrow = context.WeaponThrow;
+        health = context.Health;
     }
 
     private void OnGUI()

@@ -3,6 +3,7 @@ using UnityEngine;
 [RequireComponent(typeof(PlayerInput))]
 [RequireComponent(typeof(PlayerFSMManager))]
 [RequireComponent(typeof(PlayerAim))]
+[RequireComponent(typeof(PlayerContext))]
 public class PlayerAnim : MonoBehaviour
 {
     [Header("References")]
@@ -27,9 +28,12 @@ public class PlayerAnim : MonoBehaviour
 
     private void Awake()
     {
-        input = GetComponent<PlayerInput>();
-        fsm = GetComponent<PlayerFSMManager>();
-        aim = GetComponent<PlayerAim>();
+        PlayerContext context = GetComponent<PlayerContext>();
+        context.ResolveReferences();
+
+        input = context.Input;
+        fsm = context.Fsm;
+        aim = context.Aim;
 
         if (animator == null)
         {

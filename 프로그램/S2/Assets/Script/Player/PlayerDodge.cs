@@ -4,6 +4,7 @@ using UnityEngine;
 [RequireComponent(typeof(PlayerInput))]
 [RequireComponent(typeof(PlayerFSMManager))]
 [RequireComponent(typeof(PlayerLoadout))]
+[RequireComponent(typeof(PlayerContext))]
 public class PlayerDodge : MonoBehaviour
 {
     [SerializeField] private float fallbackDodgeDuration = 0.18f;
@@ -22,11 +23,14 @@ public class PlayerDodge : MonoBehaviour
 
     private void Awake()
     {
-        rb = GetComponent<Rigidbody2D>();
-        input = GetComponent<PlayerInput>();
-        fsm = GetComponent<PlayerFSMManager>();
-        loadout = GetComponent<PlayerLoadout>();
-        weaponThrow = GetComponent<PlayerWeaponThrow>();
+        PlayerContext context = GetComponent<PlayerContext>();
+        context.ResolveReferences();
+
+        rb = context.Body;
+        input = context.Input;
+        fsm = context.Fsm;
+        loadout = context.Loadout;
+        weaponThrow = context.WeaponThrow;
 
         if (rb == null || input == null || fsm == null || loadout == null)
         {

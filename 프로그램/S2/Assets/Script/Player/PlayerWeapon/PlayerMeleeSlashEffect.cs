@@ -3,6 +3,7 @@ using UnityEngine;
 
 [RequireComponent(typeof(PlayerMeleeAttack))]
 [RequireComponent(typeof(PlayerFSMManager))]
+[RequireComponent(typeof(PlayerContext))]
 public class PlayerMeleeSlashEffect : MonoBehaviour
 {
     [Serializable]
@@ -44,8 +45,11 @@ public class PlayerMeleeSlashEffect : MonoBehaviour
 
     private void Awake() // 필요한 플레이어 참조를 찾는다. 실제 이펙트 생성/풀링은 VfxManager가 담당한다.
     {
-        meleeAttack = GetComponent<PlayerMeleeAttack>();
-        fsm = GetComponent<PlayerFSMManager>();
+        PlayerContext context = GetComponent<PlayerContext>();
+        context.ResolveReferences();
+
+        meleeAttack = context.MeleeAttack;
+        fsm = context.Fsm;
 
         if (meleeAttack == null || fsm == null)
         {

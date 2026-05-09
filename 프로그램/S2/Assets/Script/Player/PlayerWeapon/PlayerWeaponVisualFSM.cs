@@ -3,13 +3,13 @@ using UnityEngine;
 
 public enum WeaponVisualState
 {
-    Orbit,
-    AimingMove,
-    AimingCharged,
-    FlyingOut,
-    Returning,
-    MeleeMove,
-    HiddenBySlash,
+    Orbit, // 평소에 플레이어 주변을 떠다님
+    AimingMove, // 투척 조준 중, 아직 최소 조준 시간이 안 됨
+    AimingCharged, // 투척 조준 완료됨
+    FlyingOut, // 검이 날아가는 투척체를 따라가는 중
+    Returning, // 검이 돌아오는 투척체를 따라가는 중
+    MeleeMove, // 근접 공격 위치로 이동
+    HiddenBySlash, // 참격 이펙트가 켜져서 검 본체 숨김
 }
 
 public enum WeaponAnimState
@@ -23,108 +23,109 @@ public enum WeaponAnimState
     HiddenBySlash = 6,
 }
 
+[RequireComponent(typeof(PlayerWeaponContext))]
 public class PlayerWeaponVisualFSM : MonoBehaviour
 {
-    [Header("References")]
-    // 이 도깨비 환도를 소유한 플레이어 루트다. 비워두면 transform.root에서 자동으로 찾는다.
-    [SerializeField] private Transform playerRoot;
-    // 검 본체를 숨길 때 끌 시각 자식 오브젝트다. 자기 자신을 넣으면 스크립트까지 꺼지므로 사용하지 않는다.
-    [SerializeField] private GameObject visualRoot;
-    // 검 전용 애니메이터다. AnimState int와 RestartAnimation trigger를 PlayerAnim과 같은 방식으로 사용한다.
-    [SerializeField] private Animator animator;
-    // 정렬 순서 조정과 자동 참조 검색에 사용할 검 스프라이트 렌더러다.
-    [SerializeField] private SpriteRenderer weaponRenderer;
+    [Header("Context")]
+    // PlayerWeapon 계열 참조는 이 Context에서만 꺼내 쓴다.
+    // 자동 탐색하지 않으므로 Unity 인스펙터에서 직접 연결한다.
+    [SerializeField] private PlayerWeaponContext weaponContext;
+
+    [Header("Visual Data")]
+    // 검 비주얼 튜닝 데이터다. 연결되어 있으면 아래 레거시 인스펙터 값보다 이 데이터를 우선 사용한다.
+    // 나중에는 이 데이터 에셋을 기준으로 무기별/캐릭터별 검 연출을 조정한다.
+    [SerializeField] private PlayerWeaponVisualData visualData;
+
+    [Header("Legacy Fallback Settings")]
+    // 아래 값들은 visualData를 아직 연결하지 않은 기존 씬을 위한 fallback이다.
+    // 새 작업에서는 PlayerWeaponVisualData 에셋을 만들어 그쪽에서 수치를 조정한다.
+    [SerializeField] private Vector2 weaponAnchorOffset = new(0f, 0.48f);
 
     [Header("Orbit")]
-    // 평소 검이 플레이어 주변에서 도는 기준 위치다. x는 좌우, y는 높이다.
+    // 아래 Orbit 값들은 PlayerWeaponVisualMotion이 없을 때 런타임에 넘겨주는 초기 설정이다.
+    // 평소 검이 플레이어 뒤통수/등 뒤 기준으로 떠다니는 위치와 작은 흔들림을 조정한다.
+    // x는 등 뒤 기준 좌우 보정, y는 플레이어가 바라보는 방향의 반대쪽으로 떨어지는 거리다.
     [SerializeField] private Vector2 orbitCenterOffset = new(-0.22f, 0.48f);
-    // 검이 기준 위치 주변을 도는 반지름이다.
+    // 기준 위치 주변에서 작게 흔들리는 폭이다.
     [SerializeField] private float orbitRadius = 0.12f;
-    // 초당 몇 도 회전할지 정한다. 값이 클수록 검이 빠르게 돈다.
+    // 작은 흔들림의 속도다. 기존 데이터 호환을 위해 이름은 유지한다.
     [SerializeField] private float orbitDegreesPerSecond = 65f;
-    // 이동 중 검이 이동 방향 반대로 얼마나 뒤처져 보일지 정한다.
+    // 이동 중 검이 이동 방향 반대로 살짝 밀리는 거리다. 이동감/부유감을 만들기 위한 값이다.
     [SerializeField] private float moveLagDistance = 0.12f;
-    // 기본 부유 상태에서 좌우로 기울어지는 각도 폭이다.
+    // 평소 검이 좌우로 기울어지는 각도 폭이다.
     [SerializeField] private float floatTiltAmount = 5f;
-    // 기본 부유 상태에서 좌우 기울어짐이 반복되는 속도다.
+    // 평소 좌우 기울어짐이 반복되는 속도다.
     [SerializeField] private float floatTiltSpeed = 2.4f;
 
     [Header("Aiming")]
-    // WeaponAiming 상태에서 검이 마우스 반대 방향으로 얼마나 물러나 장전 자세를 잡을지 정한다.
+    // 아래 Aiming 값들은 우클릭 조준 상태에서 검이 어디에 놓이고 어떤 이펙트를 낼지 정한다.
+    // 조준 방향의 반대쪽으로 검을 얼마나 당겨서 장전 자세처럼 보이게 할지 정한다.
     [SerializeField] private float aimingPullBackDistance = 0.48f;
-    // WeaponAiming 상태에서 마우스 방향의 수직 방향으로 살짝 밀어주는 값이다.
+    // 조준선과 완전히 겹치지 않게 수직 방향으로 살짝 밀어주는 거리다.
     [SerializeField] private float aimingSideOffset = 0.08f;
-    // 최소 장전 시간이 끝났을 때 한 번 재생할 충전 완료 VFX다.
+    // 최소 조준 시간이 채워져 AimingCharged 상태로 들어갈 때 한 번 재생할 VFX ID다.
     [SerializeField] private VfxId aimingChargedVfxId = VfxId.None;
 
     [Header("Melee")]
-    // 근접 공격 시작 시 검이 이동할 공격 위치다. x는 공격 방향 앞쪽, y는 공격 방향의 수직 오프셋이다.
+    // 아래 Melee 값들은 근접 공격 중 검이 공격 방향 앞쪽으로 이동하는 연출에 쓰인다.
+    // x는 공격 방향 앞쪽 거리, y는 공격 방향 기준 수직 오프셋이다.
     [SerializeField] private Vector2 meleeMoveOffset = new(0.55f, 0f);
-    // 근접 공격 위치로 이동할 때 한 번 재생할 검 반짝임 VFX다.
+    // MeleeMove 상태에 들어갈 때 한 번 재생할 검 반짝임/이동 시작 VFX ID다.
     [SerializeField] private VfxId meleeMoveVfxId = VfxId.None;
     // 참격 이펙트가 켜진 동안 검 본체를 숨길지 정한다.
     [SerializeField] private bool hideVisualDuringSlash = true;
 
     [Header("Throw")]
-    // 투척 시작 순간에 한 번 재생할 VFX다. 실제 투척 판정은 ThrownWeapon이 담당한다.
+    // 아래 Throw 값들은 투척 판정체와 보이는 검 본체를 맞춰 보이게 하는 데 쓰인다.
+    // FlyingOut 상태에 들어갈 때 한 번 재생할 투척 시작 VFX ID다.
     [SerializeField] private VfxId throwStartVfxId = VfxId.None;
-    // 투척체 위치를 따라갈 때 이 값 이상 멀면 보간하지 않고 즉시 붙인다.
+    // 보이는 검과 판정용 투척체가 이 거리 이상 벌어지면 보간하지 않고 즉시 투척체 위치로 붙인다.
     [SerializeField] private float thrownSnapDistance = 1.5f;
 
     [Header("Visibility VFX")]
-    // 검 본체가 숨겨지는 순간 호출할 전역 VFX ID다.
+    // 검 본체가 숨겨지거나 다시 나타날 때 쓰는 VFX ID다.
+    // 예: 참격 이펙트가 켜져 HiddenBySlash로 들어가면 vanishVfxId, 다시 보이면 reappearVfxId를 재생한다.
     [SerializeField] private VfxId vanishVfxId = VfxId.WeaponVanish;
-    // 검 본체가 다시 보이는 순간 호출할 전역 VFX ID다.
     [SerializeField] private VfxId reappearVfxId = VfxId.WeaponReappear;
 
     [Header("Motion")]
-    [SerializeField] private float followSharpness = 18f; // 검 위치가 목표점을 따라가는 속도.
-    [SerializeField] private float fastFollowSharpness = 55f; // 조준/근접처럼 순간 이동감이 필요한 상태의 추적 속도.
-    [SerializeField] private float rotateSharpness = 24f; // 검 회전이 목표 각도를 따라가는 속도.
-    // 이미지가 왼쪽을 기준으로 만들어졌을 때 보정하는 각도다.
+    // 아래 Motion 값들은 위치/회전 보간 속도와 스프라이트 방향 보정을 조정한다.
+    // Orbit, FlyingOut, Returning 같은 일반 상태에서 목표 위치를 따라가는 속도다.
+    [SerializeField] private float followSharpness = 18f;
+    // Aiming/Melee처럼 즉각 반응해야 하는 상태에서 목표 위치를 따라가는 속도다.
+    [SerializeField] private float fastFollowSharpness = 55f;
+    // 검 회전이 목표 각도를 따라가는 속도다.
+    [SerializeField] private float rotateSharpness = 24f;
+    // 검 이미지의 기본 칼날 방향을 공격 방향에 맞추기 위한 보정 각도다.
+    // 오른쪽이 손잡이, 왼쪽이 칼날인 스프라이트면 보통 180이 맞다.
     [SerializeField] private float baseAngleOffset = 180f;
-    // WeaponAiming 상태에서 마우스 반대 방향 기준으로 검을 얼마나 수직 보정할지 정한다.
+    // 조준 중 검을 조준 반대 방향으로 눕힐 때 추가로 더하는 회전 보정값이다.
     [SerializeField] private float aimingPerpendicularAngle = 90f;
 
     public WeaponVisualState CurrentVisualState { get; private set; } = WeaponVisualState.Orbit;
+    public event Action<WeaponVisualState, WeaponVisualState> OnVisualStateChanged;
 
-    // 입력 이동값을 읽어서 이동 중 부유 검의 뒤처짐을 만든다.
-    private PlayerInput input;
-    // 마우스 기준 조준 방향을 읽어서 조준/근접/투척 연출에 사용한다.
-    private PlayerAim aim;
-    // 현재 플레이어 메인 상태를 읽어서 검 비주얼 상태를 결정한다.
-    private PlayerFSMManager fsm;
-    // 현재 캐릭터 표시 방향을 읽어서 기본 부유 위치와 정렬 순서를 정한다.
-    private PlayerAnim playerAnim;
-    // 투척 조준 시간, 투척체 위치, 회수 상태를 읽는다. 판정 처리는 이 스크립트가 하지 않는다.
-    private PlayerWeaponThrow weaponThrow;
-    // 근접 공격 방향과 진행률을 읽어서 검을 공격 위치로 보낸다.
-    private PlayerMeleeAttack meleeAttack;
-    // 참격 이펙트가 실제로 켜져 있는지 읽어서 검 본체를 숨긴다.
-    private PlayerMeleeSlashEffect slashEffect;
-
-    private Vector3 positionVelocity;
-    private bool wasVisualVisible;
-    private float orbitAngle;
-    private WeaponAnimState? currentAnimState;
-    private WeaponVisualState previousVisualState;
-
-    private static readonly int AnimStateHash = Animator.StringToHash("AnimState");
-    private static readonly int RestartAnimationHash = Animator.StringToHash("RestartAnimation");
+    private PlayerContext playerContext;
+    private PlayerWeaponVisualMotion motion;
+    private PlayerWeaponVisualPresentation presentation;
 
     private void Awake()
     {
-        ResolveReferences();
-        if (!ValidateReferences())
+        ResolveContexts();
+        if (!ValidateContexts())
         {
             enabled = false;
             return;
         }
 
-        orbitAngle = UnityEngine.Random.Range(0f, 360f);
-        wasVisualVisible = IsWeaponVisible();
-        previousVisualState = CurrentVisualState;
+        ResolveWorkerComponents();
+        SubscribeWorkers();
         EnterVisualState(WeaponVisualState.Orbit);
+    }
+
+    private void OnDestroy()
+    {
+        UnsubscribeWorkers();
     }
 
     private void LateUpdate()
@@ -135,67 +136,108 @@ public class PlayerWeaponVisualFSM : MonoBehaviour
             EnterVisualState(nextState);
         }
 
-        UpdateVisibilityForState();
-
-        if (!IsWeaponVisible())
+        // 표시/숨김을 먼저 처리한다. HiddenBySlash 상태에서는 검 본체가 움직일 필요가 없다.
+        presentation.UpdateVisibility(CurrentVisualState);
+        if (!presentation.IsWeaponVisible)
         {
             return;
         }
 
-        ApplyMotionForState();
-        UpdateSorting();
+        motion.ApplyMotion(CurrentVisualState);
+        presentation.UpdateSorting();
     }
 
-    private void ResolveReferences()
+    private void ResolveContexts()
     {
-        if (playerRoot == null)
-        {
-            playerRoot = transform.root;
-        }
-
-        if (weaponRenderer == null)
-        {
-            weaponRenderer = GetComponentInChildren<SpriteRenderer>(true);
-        }
-
-        if (visualRoot == null && weaponRenderer != null && weaponRenderer.gameObject != gameObject)
-        {
-            visualRoot = weaponRenderer.gameObject;
-        }
-
-        if (animator == null)
-        {
-            animator = GetComponentInChildren<Animator>(true);
-        }
-
-        input = playerRoot != null ? playerRoot.GetComponent<PlayerInput>() : null;
-        aim = playerRoot != null ? playerRoot.GetComponent<PlayerAim>() : null;
-        fsm = playerRoot != null ? playerRoot.GetComponent<PlayerFSMManager>() : null;
-        playerAnim = playerRoot != null ? playerRoot.GetComponent<PlayerAnim>() : null;
-        weaponThrow = playerRoot != null ? playerRoot.GetComponent<PlayerWeaponThrow>() : null;
-        meleeAttack = playerRoot != null ? playerRoot.GetComponent<PlayerMeleeAttack>() : null;
-        slashEffect = playerRoot != null ? playerRoot.GetComponent<PlayerMeleeSlashEffect>() : null;
+        playerContext = weaponContext != null ? weaponContext.Player : null;
     }
 
-    private bool ValidateReferences()
+    private bool ValidateContexts()
     {
-        if (playerRoot != null && input != null && aim != null && fsm != null && playerAnim != null && weaponThrow != null)
+        if (weaponContext != null && weaponContext.HasWeaponVisualRequiredReferences())
         {
             return true;
         }
 
-        Debug.LogError($"{nameof(PlayerWeaponVisualFSM)} on {name} could not find required player references.", this);
+        Debug.LogError($"{nameof(PlayerWeaponVisualFSM)} on {name} could not find required player context references.", this);
         return false;
+    }
+
+    private void ResolveWorkerComponents()
+    {
+        motion = weaponContext.Motion;
+        presentation = weaponContext.Presentation;
+
+        if (visualData != null)
+        {
+            motion.ApplyData(visualData);
+        }
+        else
+        {
+            motion.ApplyLegacySettings(
+                weaponAnchorOffset,
+                orbitCenterOffset,
+                orbitRadius,
+                orbitDegreesPerSecond,
+                moveLagDistance,
+                floatTiltAmount,
+                floatTiltSpeed,
+                aimingPullBackDistance,
+                aimingSideOffset,
+                meleeMoveOffset,
+                thrownSnapDistance,
+                followSharpness,
+                fastFollowSharpness,
+                rotateSharpness,
+                baseAngleOffset,
+                aimingPerpendicularAngle);
+        }
+
+        if (visualData != null)
+        {
+            presentation.ApplyData(visualData);
+        }
+        else
+        {
+            presentation.ApplyLegacySettings(
+                aimingChargedVfxId,
+                meleeMoveVfxId,
+                throwStartVfxId,
+                vanishVfxId,
+                reappearVfxId);
+        }
+
+        motion.Initialize(weaponContext);
+        presentation.Initialize(weaponContext);
+    }
+
+    private void SubscribeWorkers()
+    {
+        OnVisualStateChanged += motion.HandleVisualStateChanged;
+        OnVisualStateChanged += presentation.HandleVisualStateChanged;
+    }
+
+    private void UnsubscribeWorkers()
+    {
+        if (motion != null)
+        {
+            OnVisualStateChanged -= motion.HandleVisualStateChanged;
+        }
+
+        if (presentation != null)
+        {
+            OnVisualStateChanged -= presentation.HandleVisualStateChanged;
+        }
     }
 
     private WeaponVisualState ResolveVisualState()
     {
         // 플레이어 FSM은 큰 행동 흐름만 말해준다. 검은 그 안에서 실제 연출 단계로 다시 쪼갠다.
-        return fsm.CurrentState switch
+        return playerContext.Fsm.CurrentState switch
         {
-            PlayerState.WeaponAiming => weaponThrow.IsMinAimHoldComplete
-                ? WeaponVisualState.AimingCharged
-                : WeaponVisualState.AimingMove,
+            PlayerState.WeaponAiming => playerContext.WeaponThrow.IsMinAimHoldComplete
+                ? WeaponVisualState.AimingCharged //검 투척 준비 완료
+                : WeaponVisualState.AimingMove, // 검투척 준비중
             PlayerState.WeaponThrowing => ResolveThrownState(),
             PlayerState.WeaponReceiving => ResolveThrownState(),
             PlayerState.MeleeAttack => ResolveMeleeState(),
@@ -205,7 +247,7 @@ public class PlayerWeaponVisualFSM : MonoBehaviour
 
     private WeaponVisualState ResolveThrownState()
     {
-        ThrownWeapon thrownWeapon = weaponThrow.ActiveThrownWeapon;
+        ThrownWeapon thrownWeapon = playerContext.WeaponThrow.ActiveThrownWeapon;
         if (thrownWeapon == null)
         {
             return WeaponVisualState.Orbit;
@@ -216,7 +258,7 @@ public class PlayerWeaponVisualFSM : MonoBehaviour
 
     private WeaponVisualState ResolveMeleeState()
     {
-        if (hideVisualDuringSlash && slashEffect != null && slashEffect.IsSlashVisible)
+        if (hideVisualDuringSlash && playerContext.MeleeSlashEffect != null && playerContext.MeleeSlashEffect.IsSlashVisible)
         {
             return WeaponVisualState.HiddenBySlash;
         }
@@ -226,333 +268,9 @@ public class PlayerWeaponVisualFSM : MonoBehaviour
 
     private void EnterVisualState(WeaponVisualState nextState)
     {
-        previousVisualState = CurrentVisualState;
+        WeaponVisualState previousState = CurrentVisualState;
         CurrentVisualState = nextState;
-        positionVelocity = Vector3.zero;
 
-        PlayAnimation(ToAnimState(nextState));
-        PlayEnterVfx(nextState);
-
-        if (nextState == WeaponVisualState.Orbit && previousVisualState != WeaponVisualState.Orbit)
-        {
-            // 다른 연출에서 돌아올 때 궤도 각도를 현재 위치 기준으로 재계산해서 복귀가 튀지 않게 한다.
-            orbitAngle = ResolveCurrentOrbitAngle();
-        }
-    }
-
-    private void PlayEnterVfx(WeaponVisualState state)
-    {
-        // 상태 진입 순간에만 호출해야 하는 이펙트를 이곳에 모아둔다.
-        // 위치/회전은 현재 검 Transform을 사용하므로, 실제 프리팹 배치는 VfxManager 쪽 테이블에서만 관리하면 된다.
-        VfxId vfxId = state switch
-        {
-            WeaponVisualState.AimingCharged => aimingChargedVfxId,
-            WeaponVisualState.FlyingOut => throwStartVfxId,
-            WeaponVisualState.MeleeMove => meleeMoveVfxId,
-            _ => VfxId.None,
-        };
-
-        if (vfxId != VfxId.None)
-        {
-            VfxManager.TryPlay(vfxId, transform.position, transform.rotation);
-        }
-    }
-
-    private void UpdateVisibilityForState()
-    {
-        bool shouldShow = CurrentVisualState != WeaponVisualState.HiddenBySlash;
-        if (IsWeaponVisible() == shouldShow)
-        {
-            return;
-        }
-
-        SetWeaponVisible(shouldShow);
-        PlayVisibilityEffect(shouldShow);
-    }
-
-    private void ApplyMotionForState()
-    {
-        Vector3 targetPosition = ResolveTargetPosition();
-        float targetAngle = ResolveTargetAngle();
-        float sharpness = ResolveFollowSharpness();
-
-        if (CurrentVisualState is WeaponVisualState.FlyingOut or WeaponVisualState.Returning
-            && Vector2.Distance(transform.position, targetPosition) >= thrownSnapDistance)
-        {
-            // 판정용 투척체와 시각 검이 너무 벌어지면 한 번 붙여서 충돌 위치와 연출 위치가 어긋나지 않게 한다.
-            transform.position = targetPosition;
-            positionVelocity = Vector3.zero;
-        }
-        else
-        {
-            transform.position = Vector3.SmoothDamp(
-                transform.position,
-                targetPosition,
-                ref positionVelocity,
-                1f / Mathf.Max(1f, sharpness));
-        }
-
-        Quaternion targetRotation = Quaternion.Euler(0f, 0f, targetAngle);
-        transform.rotation = Quaternion.Lerp(
-            transform.rotation,
-            targetRotation,
-            1f - Mathf.Exp(-rotateSharpness * Time.deltaTime));
-    }
-
-    private Vector3 ResolveTargetPosition()
-    {
-        return CurrentVisualState switch
-        {
-            WeaponVisualState.AimingMove => ResolveAimingPosition(),
-            WeaponVisualState.AimingCharged => ResolveAimingPosition(),
-            WeaponVisualState.FlyingOut => ResolveThrownPosition(),
-            WeaponVisualState.Returning => ResolveThrownPosition(),
-            WeaponVisualState.MeleeMove => ResolveMeleePosition(),
-            _ => ResolveOrbitPosition(),
-        };
-    }
-
-    private float ResolveTargetAngle()
-    {
-        return CurrentVisualState switch
-        {
-            WeaponVisualState.AimingMove => ResolveAimingAngle(),
-            WeaponVisualState.AimingCharged => ResolveAimingAngle(),
-            WeaponVisualState.FlyingOut => ResolveThrownAngle(),
-            WeaponVisualState.Returning => ResolveThrownAngle(),
-            WeaponVisualState.MeleeMove => ResolveMeleeAngle(),
-            _ => ResolveOrbitAngle(),
-        };
-    }
-
-    private float ResolveFollowSharpness()
-    {
-        return CurrentVisualState is WeaponVisualState.AimingMove or WeaponVisualState.AimingCharged or WeaponVisualState.MeleeMove
-            ? fastFollowSharpness
-            : followSharpness;
-    }
-
-    private Vector3 ResolveOrbitPosition()
-    {
-        orbitAngle += orbitDegreesPerSecond * Time.deltaTime;
-        if (orbitAngle >= 360f)
-        {
-            orbitAngle -= 360f;
-        }
-
-        Vector2 anchor = ResolveOrbitAnchorOffset();
-        Vector2 orbitOffset = AngleToVector(orbitAngle) * orbitRadius;
-        Vector2 localPosition = anchor + orbitOffset;
-
-        if (input.Move.sqrMagnitude > 0.0001f && fsm.CanMoveInMainState())
-        {
-            localPosition -= input.Move.normalized * moveLagDistance;
-        }
-
-        return (Vector2)playerRoot.position + localPosition;
-    }
-
-    private Vector2 ResolveOrbitAnchorOffset()
-    {
-        PlayerSide8 displaySide = playerAnim != null ? playerAnim.CurrentDisplaySide : PlayerSide8.Down;
-        Vector2 offset = orbitCenterOffset;
-
-        if (IsLeftSide(displaySide))
-        {
-            offset.x = -Mathf.Abs(offset.x);
-        }
-        else if (IsRightSide(displaySide))
-        {
-            offset.x = Mathf.Abs(offset.x);
-        }
-
-        return offset;
-    }
-
-    private Vector3 ResolveAimingPosition()
-    {
-        Vector2 aimDirection = ResolveAimDirection();
-        Vector2 perpendicular = new(-aimDirection.y, aimDirection.x);
-        Vector2 localPosition = -aimDirection * aimingPullBackDistance
-            + perpendicular * aimingSideOffset
-            + Vector2.up * orbitCenterOffset.y;
-
-        return (Vector2)playerRoot.position + localPosition;
-    }
-
-    private Vector3 ResolveThrownPosition()
-    {
-        ThrownWeapon thrownWeapon = weaponThrow.ActiveThrownWeapon;
-        return thrownWeapon != null ? thrownWeapon.transform.position : ResolveOrbitPosition();
-    }
-
-    private Vector3 ResolveMeleePosition()
-    {
-        Vector2 attackDirection = meleeAttack != null
-            ? NormalizeOrDefault(meleeAttack.CurrentAttackDirection, ResolveAimDirection())
-            : ResolveAimDirection();
-        Vector2 perpendicular = new(-attackDirection.y, attackDirection.x);
-        Vector2 localPosition = attackDirection * meleeMoveOffset.x + perpendicular * meleeMoveOffset.y;
-
-        return (Vector2)playerRoot.position + localPosition;
-    }
-
-    private float ResolveOrbitAngle()
-    {
-        float sideSign = ResolveDisplaySideSign();
-        float tilt = Mathf.Sin(Time.time * floatTiltSpeed) * floatTiltAmount;
-        return 90f * sideSign + baseAngleOffset + tilt;
-    }
-
-    private float ResolveAimingAngle()
-    {
-        Vector2 aimDirection = ResolveAimDirection();
-        return DirectionToAngle(-aimDirection) + aimingPerpendicularAngle + baseAngleOffset;
-    }
-
-    private float ResolveThrownAngle()
-    {
-        ThrownWeapon thrownWeapon = weaponThrow.ActiveThrownWeapon;
-        if (thrownWeapon != null)
-        {
-            return thrownWeapon.transform.eulerAngles.z;
-        }
-
-        return DirectionToAngle(ResolveAimDirection()) + baseAngleOffset;
-    }
-
-    private float ResolveMeleeAngle()
-    {
-        Vector2 attackDirection = meleeAttack != null
-            ? NormalizeOrDefault(meleeAttack.CurrentAttackDirection, ResolveAimDirection())
-            : ResolveAimDirection();
-
-        return DirectionToAngle(attackDirection) + baseAngleOffset;
-    }
-
-    private float ResolveCurrentOrbitAngle()
-    {
-        Vector2 anchorWorldPosition = (Vector2)playerRoot.position + ResolveOrbitAnchorOffset();
-        Vector2 fromAnchor = (Vector2)transform.position - anchorWorldPosition;
-        if (fromAnchor.sqrMagnitude <= 0.0001f)
-        {
-            return orbitAngle;
-        }
-
-        return DirectionToAngle(fromAnchor);
-    }
-
-    private void PlayAnimation(WeaponAnimState animState)
-    {
-        if (animator == null || currentAnimState == animState)
-        {
-            return;
-        }
-
-        animator.SetInteger(AnimStateHash, (int)animState);
-        animator.SetTrigger(RestartAnimationHash);
-        currentAnimState = animState;
-    }
-
-    private bool IsWeaponVisible()
-    {
-        if (visualRoot != null && visualRoot != gameObject)
-        {
-            return visualRoot.activeSelf;
-        }
-
-        return weaponRenderer == null || weaponRenderer.enabled;
-    }
-
-    private void SetWeaponVisible(bool visible)
-    {
-        if (visualRoot != null && visualRoot != gameObject)
-        {
-            visualRoot.SetActive(visible);
-        }
-
-        if (weaponRenderer != null)
-        {
-            weaponRenderer.enabled = visible;
-        }
-    }
-
-    private void PlayVisibilityEffect(bool appearing)
-    {
-        if (wasVisualVisible == appearing)
-        {
-            return;
-        }
-
-        wasVisualVisible = appearing;
-        VfxId vfxId = appearing ? reappearVfxId : vanishVfxId;
-        if (vfxId != VfxId.None)
-        {
-            VfxManager.TryPlay(vfxId, transform.position, transform.rotation);
-        }
-    }
-
-    private Vector2 ResolveAimDirection()
-    {
-        Vector2 direction = aim != null ? aim.AimDirection : Vector2.right;
-        return NormalizeOrDefault(direction, Vector2.right);
-    }
-
-    private float ResolveDisplaySideSign()
-    {
-        PlayerSide8 displaySide = playerAnim != null ? playerAnim.CurrentDisplaySide : PlayerSide8.Down;
-        return IsLeftSide(displaySide) ? -1f : 1f;
-    }
-
-    private void UpdateSorting()
-    {
-        if (weaponRenderer == null || playerAnim == null)
-        {
-            return;
-        }
-
-        PlayerSide8 displaySide = playerAnim.CurrentDisplaySide;
-        weaponRenderer.sortingOrder = displaySide is PlayerSide8.Up or PlayerSide8.UpLeft or PlayerSide8.UpRight ? -1 : 1;
-    }
-
-    private static WeaponAnimState ToAnimState(WeaponVisualState visualState)
-    {
-        return visualState switch
-        {
-            WeaponVisualState.AimingMove => WeaponAnimState.AimingMove,
-            WeaponVisualState.AimingCharged => WeaponAnimState.AimingCharged,
-            WeaponVisualState.FlyingOut => WeaponAnimState.FlyingOut,
-            WeaponVisualState.Returning => WeaponAnimState.Returning,
-            WeaponVisualState.MeleeMove => WeaponAnimState.MeleeMove,
-            WeaponVisualState.HiddenBySlash => WeaponAnimState.HiddenBySlash,
-            _ => WeaponAnimState.Orbit,
-        };
-    }
-
-    private static bool IsLeftSide(PlayerSide8 side)
-    {
-        return side is PlayerSide8.Left or PlayerSide8.DownLeft or PlayerSide8.UpLeft;
-    }
-
-    private static bool IsRightSide(PlayerSide8 side)
-    {
-        return side is PlayerSide8.Right or PlayerSide8.DownRight or PlayerSide8.UpRight;
-    }
-
-    private static Vector2 AngleToVector(float angleDegrees)
-    {
-        float radians = angleDegrees * Mathf.Deg2Rad;
-        return new Vector2(Mathf.Cos(radians), Mathf.Sin(radians));
-    }
-
-    private static float DirectionToAngle(Vector2 direction)
-    {
-        Vector2 normalizedDirection = NormalizeOrDefault(direction, Vector2.right);
-        return Mathf.Atan2(normalizedDirection.y, normalizedDirection.x) * Mathf.Rad2Deg;
-    }
-
-    private static Vector2 NormalizeOrDefault(Vector2 direction, Vector2 fallback)
-    {
-        return direction.sqrMagnitude > 0.0001f ? direction.normalized : fallback.normalized;
+        OnVisualStateChanged?.Invoke(previousState, nextState);
     }
 }

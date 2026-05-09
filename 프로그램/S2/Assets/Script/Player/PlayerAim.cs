@@ -4,6 +4,7 @@ using UnityEngine.InputSystem;
 #endif
 
 [RequireComponent(typeof(PlayerInput))]
+[RequireComponent(typeof(PlayerContext))]
 public class PlayerAim : MonoBehaviour
 {
     // 아무 입력/마우스 기준도 없을 때 사용할 기본 방향.
@@ -18,7 +19,10 @@ public class PlayerAim : MonoBehaviour
 
     private void Awake()
     {
-        input = GetComponent<PlayerInput>();
+        PlayerContext context = GetComponent<PlayerContext>();
+        context.ResolveReferences();
+
+        input = context.Input;
         if (input == null)
         {
             Debug.LogError($"{nameof(PlayerAim)} on {name} requires {nameof(PlayerInput)}.", this);

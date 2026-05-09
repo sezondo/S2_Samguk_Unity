@@ -5,6 +5,7 @@ using UnityEngine;
 [RequireComponent(typeof(PlayerFSMManager))]
 [RequireComponent(typeof(PlayerAim))]
 [RequireComponent(typeof(PlayerLoadout))]
+[RequireComponent(typeof(PlayerContext))]
 public class PlayerMeleeAttack : MonoBehaviour
 {
     [Header("References")]
@@ -71,11 +72,14 @@ public class PlayerMeleeAttack : MonoBehaviour
 
     private void Awake()
     {
-        input = GetComponent<PlayerInput>();
-        fsm = GetComponent<PlayerFSMManager>();
-        aim = GetComponent<PlayerAim>();
-        loadout = GetComponent<PlayerLoadout>();
-        rb = GetComponent<Rigidbody2D>();
+        PlayerContext context = GetComponent<PlayerContext>();
+        context.ResolveReferences();
+
+        input = context.Input;
+        fsm = context.Fsm;
+        aim = context.Aim;
+        loadout = context.Loadout;
+        rb = context.Body;
 
         // 인스펙터에 직접 연결하지 않아도 자식 오브젝트에서 한 번 찾아본다.
         if (meleeHitbox == null)

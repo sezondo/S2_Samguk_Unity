@@ -3,6 +3,7 @@ using UnityEngine;
 
 [RequireComponent(typeof(PlayerFSMManager))]
 [RequireComponent(typeof(PlayerLoadout))]
+[RequireComponent(typeof(PlayerContext))]
 public class PlayerHealth : MonoBehaviour, IDamageable
 {
     [Header("Health")]
@@ -28,8 +29,11 @@ public class PlayerHealth : MonoBehaviour, IDamageable
 
     private void Awake()
     {
-        fsm = GetComponent<PlayerFSMManager>();
-        loadout = GetComponent<PlayerLoadout>();
+        PlayerContext context = GetComponent<PlayerContext>();
+        context.ResolveReferences();
+
+        fsm = context.Fsm;
+        loadout = context.Loadout;
         if (fsm == null || loadout == null)
         {
             Debug.LogError($"{nameof(PlayerHealth)} on {name} is missing a required component.", this);

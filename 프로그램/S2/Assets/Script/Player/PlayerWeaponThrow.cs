@@ -4,15 +4,12 @@ using UnityEngine;
 [RequireComponent(typeof(PlayerFSMManager))]
 [RequireComponent(typeof(PlayerAim))]
 [RequireComponent(typeof(PlayerLoadout))]
+[RequireComponent(typeof(PlayerContext))]
 public class PlayerWeaponThrow : MonoBehaviour
 {
     [Header("References")]
     [SerializeField] private Transform throwPoint;
     [SerializeField] private ThrownWeapon thrownWeaponPrefab;
-    // 예전 방식처럼 검 오브젝트를 hasWeapon에 맞춰 켜고 끌지 정한다.
-    // 새 PlayerWeaponVisualFSM 구조에서는 검 본체가 투척체를 따라가야 하므로 기본값은 false다.
-    [SerializeField] private bool syncHeldWeaponObjectWithHasWeapon = false;
-    [SerializeField] private GameObject heldWeaponObject;
 
     private PlayerInput input;
     private PlayerFSMManager fsm;
@@ -40,10 +37,13 @@ public class PlayerWeaponThrow : MonoBehaviour
 
     private void Awake()
     {
-        input = GetComponent<PlayerInput>();
-        fsm = GetComponent<PlayerFSMManager>();
-        aim = GetComponent<PlayerAim>();
-        loadout = GetComponent<PlayerLoadout>();
+        PlayerContext context = GetComponent<PlayerContext>();
+        context.ResolveReferences();
+
+        input = context.Input;
+        fsm = context.Fsm;
+        aim = context.Aim;
+        loadout = context.Loadout;
 
         if (input == null || fsm == null || aim == null || loadout == null)
         {
@@ -222,11 +222,9 @@ public class PlayerWeaponThrow : MonoBehaviour
 
     private void SetHasWeapon(bool nextHasWeapon)
     {
+        // hasWeapon은 투척 가능 여부와 회수 완료 여부만 나타낸다.
+        // 검 본체의 표시/숨김과 투척체 추적은 PlayerWeaponVisualFSM이 담당한다.
         hasWeapon = nextHasWeapon;
-        if (syncHeldWeaponObjectWithHasWeapon && heldWeaponObject != null)
-        {
-            heldWeaponObject.SetActive(hasWeapon);
-        }
     }
 
     private Vector2 GetThrowDirection()

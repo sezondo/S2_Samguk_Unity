@@ -3,6 +3,7 @@ using UnityEngine;
 [RequireComponent(typeof(Rigidbody2D))]
 [RequireComponent(typeof(PlayerInput))]
 [RequireComponent(typeof(PlayerFSMManager))]
+[RequireComponent(typeof(PlayerContext))]
 public class PlayerMovement : MonoBehaviour
 {
     [SerializeField] private float moveSpeed = 5f;
@@ -13,9 +14,12 @@ public class PlayerMovement : MonoBehaviour
 
     private void Awake()
     {
-        rb = GetComponent<Rigidbody2D>();
-        input = GetComponent<PlayerInput>();
-        fsm = GetComponent<PlayerFSMManager>();
+        PlayerContext context = GetComponent<PlayerContext>();
+        context.ResolveReferences();
+
+        rb = context.Body;
+        input = context.Input;
+        fsm = context.Fsm;
 
         if (rb == null || input == null || fsm == null)
         {

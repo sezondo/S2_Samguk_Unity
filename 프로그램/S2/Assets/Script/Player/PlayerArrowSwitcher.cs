@@ -2,6 +2,7 @@ using UnityEngine;
 
 [RequireComponent(typeof(PlayerInput))]
 [RequireComponent(typeof(PlayerLoadout))]
+[RequireComponent(typeof(PlayerContext))]
 public class PlayerArrowSwitcher : MonoBehaviour
 {
     private PlayerInput input;
@@ -9,8 +10,11 @@ public class PlayerArrowSwitcher : MonoBehaviour
 
     private void Awake()
     {
-        input = GetComponent<PlayerInput>();
-        loadout = GetComponent<PlayerLoadout>();
+        PlayerContext context = GetComponent<PlayerContext>();
+        context.ResolveReferences();
+
+        input = context.Input;
+        loadout = context.Loadout;
 
         if (input == null || loadout == null)
         {
