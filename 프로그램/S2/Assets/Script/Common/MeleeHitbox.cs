@@ -78,10 +78,7 @@ public class MeleeHitbox : MonoBehaviour
         Vector2 normalizedDirection = attackDirection.sqrMagnitude > 0.0001f
             ? attackDirection.normalized
             : Vector2.down;
-        // y 오프셋을 공격 방향 기준 좌우 축으로 적용하기 위한 수직 벡터.
-        Vector2 perpendicular = new(-normalizedDirection.y, normalizedDirection.x);
-        Vector2 offset = normalizedDirection * attackData.hitboxOffset.x
-            + perpendicular * attackData.hitboxOffset.y;
+        Vector2 offset = PlayerMeleeAttack.ResolveAttackOffset(attackData, normalizedDirection);
 
         // Hitbox 오브젝트는 플레이어 자식이라는 전제라 localPosition을 쓴다.
         transform.localPosition = offset;

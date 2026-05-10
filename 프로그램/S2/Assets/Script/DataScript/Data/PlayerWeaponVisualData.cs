@@ -1,5 +1,6 @@
 using System;
 using UnityEngine;
+using UnityEngine.Serialization;
 
 [CreateAssetMenu(menuName = "Scriptable/PlayerWeaponVisualData", fileName = "PlayerWeaponVisualData")]
 public class PlayerWeaponVisualData : ScriptableObject
@@ -58,8 +59,10 @@ public class WeaponAimingVisualData
 [Serializable]
 public class WeaponMeleeVisualData
 {
-    // x는 공격 방향 앞쪽, y는 공격 방향 기준 수직 오프셋이다.
-    public Vector2 moveOffset = new(0.55f, 0f);
+    // PlayerMeleeAttackData.hitboxOffset 기준에서 검 비주얼만 살짝 보정하는 값이다.
+    // x는 공격 방향 앞/뒤, y는 공격 방향 기준 좌/우 보정이다.
+    [FormerlySerializedAs("moveOffset")]
+    public Vector2 visualOffset = Vector2.zero;
     public VfxId moveVfxId = VfxId.None;
 }
 

@@ -1,5 +1,6 @@
 using System;
 using UnityEngine;
+using UnityEngine.Serialization;
 
 public enum WeaponVisualState
 {
@@ -67,9 +68,10 @@ public class PlayerWeaponVisualFSM : MonoBehaviour
     [SerializeField] private VfxId aimingChargedVfxId = VfxId.None;
 
     [Header("Melee")]
-    // 아래 Melee 값들은 근접 공격 중 검이 공격 방향 앞쪽으로 이동하는 연출에 쓰인다.
-    // x는 공격 방향 앞쪽 거리, y는 공격 방향 기준 수직 오프셋이다.
-    [SerializeField] private Vector2 meleeMoveOffset = new(0.55f, 0f);
+    // 아래 Melee 값은 PlayerMeleeAttackData.hitboxOffset 기준에서 검 비주얼만 살짝 보정한다.
+    // x는 공격 방향 앞/뒤, y는 공격 방향 기준 좌/우 보정이다.
+    [FormerlySerializedAs("meleeMoveOffset")]
+    [SerializeField] private Vector2 meleeVisualOffset = Vector2.zero;
     // MeleeMove 상태에 들어갈 때 한 번 재생할 검 반짝임/이동 시작 VFX ID다.
     [SerializeField] private VfxId meleeMoveVfxId = VfxId.None;
     // 참격 이펙트가 켜진 동안 검 본체를 숨길지 정한다.
@@ -92,7 +94,8 @@ public class PlayerWeaponVisualFSM : MonoBehaviour
     // 아래 Motion 값들은 위치/회전 보간 속도와 스프라이트 방향 보정을 조정한다.
     // Orbit, FlyingOut, Returning 같은 일반 상태에서 목표 위치를 따라가는 속도다.
     [SerializeField] private float followSharpness = 18f;
-    // Aiming/Melee처럼 즉각 반응해야 하는 상태에서 목표 위치를 따라가는 속도다.
+    // Aiming처럼 즉각 반응해야 하는 상태에서 목표 위치를 따라가는 속도다.
+    // Melee 이동은 PlayerMeleeAttackData.hitboxStartTime 기준 타임라인을 사용하므로 이 값을 쓰지 않는다.
     [SerializeField] private float fastFollowSharpness = 55f;
     // 검 회전이 목표 각도를 따라가는 속도다.
     [SerializeField] private float rotateSharpness = 24f;
@@ -136,10 +139,12 @@ public class PlayerWeaponVisualFSM : MonoBehaviour
             EnterVisualState(nextState);
         }
 
-        // 표시/숨김을 먼저 처리한다. HiddenBySlash 상태에서는 검 본체가 움직일 필요가 없다.
+        // 표시/숨김을 먼저 처리한다.
+        // HiddenBySlash 상태에서도 Motion은 계속 돌려서, 다시 보일 때 이미 자연스러운 위치에 있게 한다.
         presentation.UpdateVisibility(CurrentVisualState);
         if (!presentation.IsWeaponVisible)
         {
+            motion.ApplyMotion(CurrentVisualState);
             return;
         }
 
@@ -184,7 +189,7 @@ public class PlayerWeaponVisualFSM : MonoBehaviour
                 floatTiltSpeed,
                 aimingPullBackDistance,
                 aimingSideOffset,
-                meleeMoveOffset,
+                meleeVisualOffset,
                 thrownSnapDistance,
                 followSharpness,
                 fastFollowSharpness,
@@ -233,6 +238,11 @@ public class PlayerWeaponVisualFSM : MonoBehaviour
     private WeaponVisualState ResolveVisualState()
     {
         // 플레이어 FSM은 큰 행동 흐름만 말해준다. 검은 그 안에서 실제 연출 단계로 다시 쪼갠다.
+        if (ShouldHideWeaponVisual())
+        {
+            return WeaponVisualState.HiddenBySlash;
+        }
+
         return playerContext.Fsm.CurrentState switch
         {
             PlayerState.WeaponAiming => playerContext.WeaponThrow.IsMinAimHoldComplete
@@ -258,12 +268,23 @@ public class PlayerWeaponVisualFSM : MonoBehaviour
 
     private WeaponVisualState ResolveMeleeState()
     {
-        if (hideVisualDuringSlash && playerContext.MeleeSlashEffect != null && playerContext.MeleeSlashEffect.IsSlashVisible)
+        return WeaponVisualState.MeleeMove;
+    }
+
+    private bool ShouldHideWeaponVisual()
+    {
+        if (!hideVisualDuringSlash || playerContext.MeleeSlashEffect == null)
         {
-            return WeaponVisualState.HiddenBySlash;
+            return false;
         }
 
-        return WeaponVisualState.MeleeMove;
+        PlayerState currentState = playerContext.Fsm.CurrentState;
+        if (currentState is PlayerState.WeaponAiming or PlayerState.WeaponThrowing or PlayerState.WeaponReceiving or PlayerState.Dead)
+        {
+            return false;
+        }
+
+        return playerContext.MeleeSlashEffect.ShouldHideWeaponVisual;
     }
 
     private void EnterVisualState(WeaponVisualState nextState)

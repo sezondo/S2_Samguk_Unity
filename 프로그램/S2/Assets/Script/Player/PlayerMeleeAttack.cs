@@ -38,6 +38,8 @@ public class PlayerMeleeAttack : MonoBehaviour
 
     // 지금은 1타만 써도 되지만, comboAttacks 배열이 늘어나면 이 인덱스로 다음 공격 데이터를 고른다.
     private int comboIndex;
+    // 같은 FSM 상태 안에서 콤보가 이어져도 새 공격 시작을 외부 연출이 구분할 수 있게 하는 번호다.
+    private int attackSequenceId;
     // 한 공격에서 Hitbox가 중복으로 켜지거나 꺼지는 것을 막는 플래그.
     private bool hitboxActivated;
     private bool hitboxDeactivated;
@@ -63,12 +65,36 @@ public class PlayerMeleeAttack : MonoBehaviour
         }
     }
 
+    // 현재 공격이 시작된 뒤 흐른 실제 시간이다.
+    // 참격 이펙트와 검 이동은 이 값을 기준으로 PlayerMeleeAttackData의 판정 시간에 맞춘다.
+    public float AttackElapsedTime => attackTimer;
+
     // 공격 시작 순간에 고정된 마우스 기준 방향이다.
     // 공격 도중 마우스를 움직여도 실제 판정과 검 연출 방향이 함께 흔들리지 않게 한다.
     public Vector2 CurrentAttackDirection => currentAttackDirection;
 
     // 현재 콤보 인덱스다. 디버그 표시나 연출 분기용으로만 읽게 둔다.
     public int CurrentComboIndex => comboIndex;
+
+    // 현재 실행 중인 공격을 식별하는 번호다.
+    // 같은 콤보 번호를 반복해도 공격이 새로 시작되면 값이 바뀐다.
+    public int AttackSequenceId => attackSequenceId;
+
+    // 공격 종료 후 다음 콤보 입력을 기다리는 중인지 알려준다.
+    // 검 비주얼은 이 시간 동안 본체가 잠깐 나타나는 것을 막는 데 사용한다.
+    public bool IsComboWindowOpenForVisual => IsComboWindowOpen() && currentAttackData != null;
+
+    public bool TryGetCurrentHitboxCenter(out Vector3 worldPosition)
+    {
+        if (currentAttackData == null)
+        {
+            worldPosition = transform.position;
+            return false;
+        }
+
+        worldPosition = (Vector2)transform.position + ResolveAttackOffset(currentAttackData, currentAttackDirection);
+        return true;
+    }
 
     private void Awake()
     {
@@ -238,6 +264,7 @@ public class PlayerMeleeAttack : MonoBehaviour
         comboTimerPaused = false;
 
         attackTimer = 0f;
+        attackSequenceId++;
         advancedDistance = 0f;
         hitboxActivated = false;
         hitboxDeactivated = false;
@@ -503,5 +530,21 @@ public class PlayerMeleeAttack : MonoBehaviour
     private PlayerMeleeAttackData[] GetComboAttacks()
     {
         return loadout != null ? loadout.MeleeComboAttacks : null;
+    }
+
+    public static Vector2 ResolveAttackOffset(PlayerMeleeAttackData attackData, Vector2 attackDirection)
+    {
+        if (attackData == null)
+        {
+            return Vector2.zero;
+        }
+
+        Vector2 normalizedDirection = attackDirection.sqrMagnitude > 0.0001f
+            ? attackDirection.normalized
+            : Vector2.down;
+        Vector2 perpendicular = new(-normalizedDirection.y, normalizedDirection.x);
+
+        return normalizedDirection * attackData.hitboxOffset.x
+            + perpendicular * attackData.hitboxOffset.y;
     }
 }

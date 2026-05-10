@@ -1,4 +1,5 @@
 using UnityEngine;
+using UnityEngine.Serialization;
 
 // 도깨비 환도 본체의 위치와 회전만 담당한다.
 // 상태 판단은 PlayerWeaponVisualFSM, 애니메이션/VFX/표시는 PlayerWeaponVisualPresentation이 처리한다.
@@ -35,8 +36,10 @@ public class PlayerWeaponVisualMotion : MonoBehaviour
     [SerializeField] private float aimingSideOffset = 0.08f;
 
     [Header("Melee")]
-    // 근접 공격 시작 시 검이 이동할 공격 위치다. x는 공격 방향 앞쪽, y는 공격 방향의 수직 오프셋이다.
-    [SerializeField] private Vector2 meleeMoveOffset = new(0.55f, 0f);
+    // PlayerMeleeAttackData.hitboxOffset 기준에서 검 비주얼만 살짝 보정하는 값이다.
+    // x는 공격 방향 앞/뒤, y는 공격 방향 기준 좌/우 보정이다.
+    [FormerlySerializedAs("meleeMoveOffset")]
+    [SerializeField] private Vector2 meleeVisualOffset = Vector2.zero;
 
     [Header("Throw")]
     // 투척체 위치를 따라갈 때 이 값 이상 멀면 보간하지 않고 즉시 붙인다.
@@ -55,6 +58,8 @@ public class PlayerWeaponVisualMotion : MonoBehaviour
     private PlayerWeaponContext context;
     private Vector3 positionVelocity;
     private float orbitFloatPhase;
+    private int activeMeleeAttackSequenceId = -1;
+    private Vector3 meleeStartPosition;
 
     public void Initialize(PlayerWeaponContext newContext)
     {
@@ -89,7 +94,7 @@ public class PlayerWeaponVisualMotion : MonoBehaviour
         floatTiltSpeed = newFloatTiltSpeed;
         aimingPullBackDistance = newAimingPullBackDistance;
         aimingSideOffset = newAimingSideOffset;
-        meleeMoveOffset = newMeleeMoveOffset;
+        meleeVisualOffset = newMeleeMoveOffset;
         thrownSnapDistance = newThrownSnapDistance;
         followSharpness = newFollowSharpness;
         fastFollowSharpness = newFastFollowSharpness;
@@ -126,7 +131,7 @@ public class PlayerWeaponVisualMotion : MonoBehaviour
 
         if (visualData.melee != null)
         {
-            meleeMoveOffset = visualData.melee.moveOffset;
+            meleeVisualOffset = visualData.melee.visualOffset;
         }
 
         if (visualData.throwVisual != null)
@@ -149,6 +154,15 @@ public class PlayerWeaponVisualMotion : MonoBehaviour
 
         // Orbit은 뒤통수/등 뒤 기준 위치로 자연스럽게 복귀한다.
         // 예전처럼 현재 위치 기준 궤도 각도를 다시 잡지 않는다.
+        if (nextState == WeaponVisualState.MeleeMove)
+        {
+            CaptureMeleeStartPositionIfNeeded(force: true);
+        }
+
+        if (nextState != WeaponVisualState.MeleeMove && nextState != WeaponVisualState.HiddenBySlash)
+        {
+            activeMeleeAttackSequenceId = -1;
+        }
     }
 
     public void ApplyMotion(WeaponVisualState state)
@@ -162,7 +176,11 @@ public class PlayerWeaponVisualMotion : MonoBehaviour
         float targetAngle = ResolveTargetAngle(state);
         float sharpness = ResolveFollowSharpness(state);
 
-        if (state is WeaponVisualState.FlyingOut or WeaponVisualState.Returning
+        if (state == WeaponVisualState.MeleeMove)
+        {
+            transform.position = ResolveMeleeTimelinePosition(targetPosition);
+        }
+        else if (state is WeaponVisualState.FlyingOut or WeaponVisualState.Returning
             && Vector2.Distance(transform.position, targetPosition) >= thrownSnapDistance)
         {
             // 판정용 투척체와 시각 검이 너무 벌어지면 한 번 붙여서 충돌 위치와 연출 위치가 어긋나지 않게 한다.
@@ -213,7 +231,7 @@ public class PlayerWeaponVisualMotion : MonoBehaviour
 
     private float ResolveFollowSharpness(WeaponVisualState state)
     {
-        return state is WeaponVisualState.AimingMove or WeaponVisualState.AimingCharged or WeaponVisualState.MeleeMove
+        return state is WeaponVisualState.AimingMove or WeaponVisualState.AimingCharged
             ? fastFollowSharpness
             : followSharpness;
     }
@@ -282,13 +300,58 @@ public class PlayerWeaponVisualMotion : MonoBehaviour
 
     private Vector3 ResolveMeleePosition()
     {
-        Vector2 attackDirection = context.Player.MeleeAttack != null
-            ? NormalizeOrDefault(context.Player.MeleeAttack.CurrentAttackDirection, ResolveAimDirection())
-            : ResolveAimDirection();
-        Vector2 perpendicular = new(-attackDirection.y, attackDirection.x);
-        Vector2 localPosition = attackDirection * meleeMoveOffset.x + perpendicular * meleeMoveOffset.y;
+        PlayerMeleeAttack meleeAttack = context.Player.MeleeAttack;
+        if (meleeAttack == null || !meleeAttack.TryGetCurrentHitboxCenter(out Vector3 hitboxCenter))
+        {
+            return ResolveOrbitPosition();
+        }
 
-        return ResolveWeaponAnchorPosition() + localPosition;
+        Vector2 attackDirection = NormalizeOrDefault(meleeAttack.CurrentAttackDirection, ResolveAimDirection());
+        Vector2 perpendicular = new(-attackDirection.y, attackDirection.x);
+        Vector2 visualOffset = attackDirection * meleeVisualOffset.x + perpendicular * meleeVisualOffset.y;
+
+        return hitboxCenter + (Vector3)visualOffset;
+    }
+
+    private Vector3 ResolveMeleeTimelinePosition(Vector3 targetPosition)
+    {
+        PlayerMeleeAttack meleeAttack = context.Player.MeleeAttack;
+        PlayerMeleeAttackData attackData = meleeAttack != null ? meleeAttack.CurrentAttackData : null;
+        if (meleeAttack == null || attackData == null)
+        {
+            return targetPosition;
+        }
+
+        CaptureMeleeStartPositionIfNeeded(force: false);
+
+        float impactTime = Mathf.Max(0f, attackData.hitboxStartTime);
+        if (impactTime <= 0.0001f)
+        {
+            return targetPosition;
+        }
+
+        // 공격 시작부터 실제 판정 시작 시점까지의 시간을 0~1로 바꿔 검 이동 타임라인으로 사용한다.
+        float timeline = Mathf.Clamp01(meleeAttack.AttackElapsedTime / impactTime);
+        return Vector3.Lerp(meleeStartPosition, targetPosition, timeline);
+    }
+
+    private void CaptureMeleeStartPositionIfNeeded(bool force)
+    {
+        PlayerMeleeAttack meleeAttack = context?.Player?.MeleeAttack;
+        if (meleeAttack == null)
+        {
+            return;
+        }
+
+        int attackSequenceId = meleeAttack.AttackSequenceId;
+        if (!force && activeMeleeAttackSequenceId == attackSequenceId)
+        {
+            return;
+        }
+
+        activeMeleeAttackSequenceId = attackSequenceId;
+        meleeStartPosition = transform.position;
+        positionVelocity = Vector3.zero;
     }
 
     private float ResolveOrbitAngle()

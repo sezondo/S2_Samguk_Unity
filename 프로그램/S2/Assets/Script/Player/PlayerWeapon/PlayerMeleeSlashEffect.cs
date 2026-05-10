@@ -13,15 +13,7 @@ public class PlayerMeleeSlashEffect : MonoBehaviour
         // 이 콤보 단계에서 호출할 전역 VFX ID다.
         public VfxId vfxId = VfxId.None;
 
-        [Header("Timing")]
-        // AttackNormalizedTime 기준으로 이 값 이상일 때 이펙트를 켠다.
-        [Range(0f, 1f)] public float startNormalizedTime = 0f;
-        // AttackNormalizedTime 기준으로 이 값 이후에는 이펙트를 끈다.
-        [Range(0f, 1f)] public float endNormalizedTime = 0.35f;
-
         [Header("Transform")]
-        // x는 공격 방향 앞쪽 거리, y는 공격 방향의 수직 오프셋이다.
-        public Vector2 offset = new(0.65f, 0f);
         // 프리팹 기본 크기에 곱할 로컬 스케일이다.
         public Vector2 scale = Vector2.one;
         // 마우스 공격 방향 기준 회전 보정값이다.
@@ -38,10 +30,12 @@ public class PlayerMeleeSlashEffect : MonoBehaviour
     // 참격은 공격 진행률 동안 유지되어야 하므로 VfxManager.Play가 아니라 Acquire/Release로 직접 수명을 관리한다.
     private VfxHandle activeEffect;
     private int activeEffectIndex = -1;
-    private float previousNormalizedTime;
+    private int activeEffectAttackSequenceId = -1;
 
     // PlayerWeaponVisualFSM이 이 값을 읽어서 참격이 켜져 있는 동안 검 본체를 숨긴다.
-    public bool IsSlashVisible => activeEffect != null && activeEffect.IsValid;
+    public bool IsSlashVisible => ShouldShowSlashNow();
+    // 참격 이펙트 자체는 짧게 끝나도, 콤보가 이어질 수 있는 동안에는 검 본체를 숨긴다.
+    public bool ShouldHideWeaponVisual => ShouldHideWeaponNow();
 
     private void Awake() // 필요한 플레이어 참조를 찾는다. 실제 이펙트 생성/풀링은 VfxManager가 담당한다.
     {
@@ -71,7 +65,6 @@ public class PlayerMeleeSlashEffect : MonoBehaviour
             // 근접 공격 상태가 아니면 참격은 절대 남아 있으면 안 된다.
             // 상태가 Dodge/Dead 등으로 끊겨도 여기서 반납한다.
             DeactivateActiveEffect();
-            previousNormalizedTime = 0f;
             return;
         }
 
@@ -83,19 +76,9 @@ public class PlayerMeleeSlashEffect : MonoBehaviour
             return;
         }
 
-        float normalizedTime = meleeAttack.AttackNormalizedTime;
-        if (normalizedTime < previousNormalizedTime)
+        if (!ShouldShowSlashNow())
         {
-            // 같은 FSM 상태 안에서 다음 콤보가 바로 시작되면 진행률이 0으로 되돌아온다.
-            // 이때 이전 콤보 참격을 반납하지 않으면 1타 이펙트가 2타 위치까지 따라오는 문제가 생긴다.
-            DeactivateActiveEffect();
-        }
-
-        previousNormalizedTime = normalizedTime;
-
-        if (!ShouldShowEffect(entry, normalizedTime))
-        {
-            // 공격 중이어도 현재 콤보의 참격 표시 구간 밖이면 이펙트를 꺼둔다.
+            // 공격 중이어도 실제 판정 시간 밖이면 이펙트를 꺼둔다.
             // 검 본체는 PlayerWeaponVisualFSM이 이 타이밍을 보고 다시 표시한다.
             DeactivateActiveEffect();
             return;
@@ -121,34 +104,74 @@ public class PlayerMeleeSlashEffect : MonoBehaviour
         return entry != null && entry.vfxId != VfxId.None ? entry : null;
     }
 
-    private bool ShouldShowEffect(SlashEffectEntry entry, float normalizedTime) // 현재 공격 진행률이 이펙트 표시 구간 안인지 확인한다.
+    private bool ShouldShowSlashNow() // 현재 공격 시간이 실제 판정 시간 안인지 확인한다.
     {
-        float startTime = Mathf.Clamp01(entry.startNormalizedTime);
-        float endTime = Mathf.Clamp01(entry.endNormalizedTime);
-        if (endTime < startTime)
+        if (meleeAttack == null || fsm == null || !fsm.IsState(PlayerState.MeleeAttack))
         {
-            (startTime, endTime) = (endTime, startTime);
+            return false;
         }
 
-        return normalizedTime >= startTime && normalizedTime <= endTime;
+        if (GetEntry(meleeAttack.CurrentComboIndex) == null)
+        {
+            return false;
+        }
+
+        PlayerMeleeAttackData attackData = meleeAttack.CurrentAttackData;
+        if (attackData == null)
+        {
+            return false;
+        }
+
+        float startTime = Mathf.Max(0f, attackData.hitboxStartTime);
+        float endTime = startTime + Mathf.Max(0f, attackData.hitboxActiveTime);
+        float elapsedTime = meleeAttack.AttackElapsedTime;
+
+        return elapsedTime >= startTime && elapsedTime <= endTime;
+    }
+
+    private bool ShouldHideWeaponNow()
+    {
+        if (meleeAttack == null || fsm == null)
+        {
+            return false;
+        }
+
+        if (fsm.IsState(PlayerState.MeleeAttack))
+        {
+            PlayerMeleeAttackData attackData = meleeAttack.CurrentAttackData;
+            if (attackData == null)
+            {
+                return false;
+            }
+
+            // 검은 실제 판정 시점에 도착한 뒤부터 숨긴다.
+            // 참격 VFX가 먼저 끝나도 공격 동작이 끝날 때까지 중간에 드러나지 않게 한다.
+            return meleeAttack.AttackElapsedTime >= Mathf.Max(0f, attackData.hitboxStartTime);
+        }
+
+        // 공격이 끝난 뒤 콤보 입력을 기다리는 시간에도 검이 튀어나오지 않게 한다.
+        return meleeAttack.IsComboWindowOpenForVisual;
     }
 
     private VfxHandle ActivateEffect(int comboIndex, SlashEffectEntry entry) // VfxManager에서 현재 콤보 이펙트를 빌려온다.
     {
-        if (activeEffectIndex != comboIndex)
+        int attackSequenceId = meleeAttack.AttackSequenceId;
+        if (activeEffectIndex != comboIndex || activeEffectAttackSequenceId != attackSequenceId)
         {
-            // 콤보 번호가 바뀌면 이전 참격은 반납하고 새 참격을 빌린다.
-            // 같은 콤보가 계속 유지되는 동안에는 아래에서 Transform만 갱신한다.
+            // 콤보 번호나 공격 시작 번호가 바뀌면 이전 참격은 반납하고 새 참격을 빌린다.
+            // 같은 콤보를 반복해도 공격마다 새 이펙트를 사용해야 한다.
             DeactivateActiveEffect();
             activeEffect = VfxManager.TryAcquire(entry.vfxId);
             if (activeEffect == null || !activeEffect.IsValid)
             {
                 activeEffect = null;
                 activeEffectIndex = -1;
+                activeEffectAttackSequenceId = -1;
                 return null;
             }
 
             activeEffectIndex = comboIndex;
+            activeEffectAttackSequenceId = attackSequenceId;
         }
 
         return activeEffect;
@@ -163,16 +186,19 @@ public class PlayerMeleeSlashEffect : MonoBehaviour
         }
 
         activeEffectIndex = -1;
+        activeEffectAttackSequenceId = -1;
     }
 
     private void ApplyEffectTransform(VfxHandle effect, SlashEffectEntry entry) // 공격 방향과 오프셋을 기준으로 참격 위치/회전/크기를 적용한다.
     {
         Vector2 attackDirection = NormalizeOrDefault(meleeAttack.CurrentAttackDirection, Vector2.right);
-        // y 오프셋을 공격 방향의 좌우 축으로 적용하기 위한 수직 벡터다.
-        Vector2 perpendicular = new(-attackDirection.y, attackDirection.x);
-        Vector2 worldOffset = attackDirection * entry.offset.x + perpendicular * entry.offset.y;
+        Vector3 position = transform.position;
+        if (meleeAttack.TryGetCurrentHitboxCenter(out Vector3 hitboxCenter))
+        {
+            // 참격은 실제 판정 중심을 기준으로 표시한다.
+            position = hitboxCenter;
+        }
 
-        Vector3 position = (Vector2)transform.position + worldOffset;
         Quaternion rotation = Quaternion.Euler(0f, 0f, DirectionToAngle(attackDirection) + entry.angleOffset);
         Vector3 scale = new(entry.scale.x, entry.scale.y, 1f);
         effect.SetTransform(position, rotation, scale);
