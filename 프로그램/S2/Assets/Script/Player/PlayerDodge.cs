@@ -16,9 +16,11 @@ public class PlayerDodge : MonoBehaviour
     private PlayerFSMManager fsm;
     private PlayerLoadout loadout;
     private PlayerWeaponThrow weaponThrow;
+    private PlayerHackController hackController;
 
     private Vector2 lastMoveDirection = Vector2.down;
     private Vector2 dodgeDirection = Vector2.down;
+    private PlayerState stateBeforeDodge = PlayerState.Idle;
     private float dodgeTimer;
 
     private void Awake()
@@ -31,6 +33,7 @@ public class PlayerDodge : MonoBehaviour
         fsm = context.Fsm;
         loadout = context.Loadout;
         weaponThrow = context.WeaponThrow;
+        hackController = context.HackController;
 
         if (rb == null || input == null || fsm == null || loadout == null)
         {
@@ -99,6 +102,7 @@ public class PlayerDodge : MonoBehaviour
         }
 
         // 실제 회피 시작은 상태가 승인되어 Dodge로 바뀐 뒤에만 일어난다.
+        stateBeforeDodge = previousState;
         dodgeTimer = ResolveDodgeDuration();
         dodgeDirection = ResolveDodgeDirection();
     }
@@ -142,6 +146,12 @@ public class PlayerDodge : MonoBehaviour
 
     private void RequestStateAfterDodge()
     {
+        if (stateBeforeDodge == PlayerState.Hacking && hackController != null && hackController.IsHackSessionActive)
+        {
+            fsm.RequestState(PlayerState.Hacking);
+            return;
+        }
+
         if (weaponThrow != null && !weaponThrow.HasWeapon)
         {
             fsm.RequestState(PlayerState.WeaponReceiving);

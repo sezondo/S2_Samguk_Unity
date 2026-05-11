@@ -176,7 +176,13 @@ public class PlayerWeaponVisualMotion : MonoBehaviour
         float targetAngle = ResolveTargetAngle(state);
         float sharpness = ResolveFollowSharpness(state);
 
-        if (state == WeaponVisualState.MeleeMove)
+        if (state == WeaponVisualState.EmbeddedForHack)
+        {
+            // 해킹 대상에 박힌 검은 플레이어 이동/회피 보간을 타지 않고 투척체 위치에 고정한다.
+            transform.position = targetPosition;
+            positionVelocity = Vector3.zero;
+        }
+        else if (state == WeaponVisualState.MeleeMove)
         {
             transform.position = ResolveMeleeTimelinePosition(targetPosition);
         }
@@ -211,6 +217,7 @@ public class PlayerWeaponVisualMotion : MonoBehaviour
             WeaponVisualState.AimingCharged => ResolveAimingPosition(),
             WeaponVisualState.FlyingOut => ResolveThrownPosition(),
             WeaponVisualState.Returning => ResolveThrownPosition(),
+            WeaponVisualState.EmbeddedForHack => ResolveThrownPosition(),
             WeaponVisualState.MeleeMove => ResolveMeleePosition(),
             _ => ResolveOrbitPosition(),
         };
@@ -224,6 +231,7 @@ public class PlayerWeaponVisualMotion : MonoBehaviour
             WeaponVisualState.AimingCharged => ResolveAimingAngle(),
             WeaponVisualState.FlyingOut => ResolveThrownAngle(),
             WeaponVisualState.Returning => ResolveThrownAngle(),
+            WeaponVisualState.EmbeddedForHack => ResolveThrownAngle(),
             WeaponVisualState.MeleeMove => ResolveMeleeAngle(),
             _ => ResolveOrbitAngle(),
         };

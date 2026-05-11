@@ -11,10 +11,9 @@ public class PlayerInput : MonoBehaviour
     public bool WeaponThrowHeld { get; private set; } // 무기 투척 조준 유지
     public bool WeaponThrowPressedThisFrame { get; private set; } // 무기 투척 조준 시작
     public bool WeaponThrowReleasedThisFrame { get; private set; } // 무기 투척 발사
-    public bool PreviousArrowPressedThisFrame { get; private set; } // 이전 화살 선택
-    public bool NextArrowPressedThisFrame { get; private set; } // 다음 화살 선택
     public bool DodgePressedThisFrame { get; private set; } // 회피
-    public bool InteractPressedThisFrame { get; private set; } // 상호작용
+    public bool HackPressedThisFrame { get; private set; } // 해킹 시작
+    public bool InteractPressedThisFrame { get; private set; } // 일반 상호작용
 
 #if ENABLE_INPUT_SYSTEM
     [Header("Input Actions")]
@@ -26,6 +25,7 @@ public class PlayerInput : MonoBehaviour
     [SerializeField] private string weaponThrowActionName = "WeaponThrow";
     [SerializeField] private string legacyBowActionName = "Bow";
     [SerializeField] private string dodgeActionName = "Dodge";
+    [SerializeField] private string hackActionName = "Hack";
     [SerializeField] private string interactActionName = "Interact";
 
     private InputAction moveAction;
@@ -33,6 +33,7 @@ public class PlayerInput : MonoBehaviour
     private InputAction meleeAttackAction;
     private InputAction weaponThrowAction;
     private InputAction dodgeAction;
+    private InputAction hackAction;
     private InputAction interactAction;
 #endif
 
@@ -63,6 +64,7 @@ public class PlayerInput : MonoBehaviour
             weaponThrowAction = playerMap.FindAction(legacyBowActionName, throwIfNotFound: false);
         }
         dodgeAction = playerMap.FindAction(dodgeActionName, throwIfNotFound: false);
+        hackAction = playerMap.FindAction(hackActionName, throwIfNotFound: false);
         interactAction = playerMap.FindAction(interactActionName, throwIfNotFound: false);
 
         if (moveAction == null)
@@ -96,10 +98,11 @@ public class PlayerInput : MonoBehaviour
         WeaponThrowHeld = weaponThrowAction != null && weaponThrowAction.IsPressed();
         WeaponThrowPressedThisFrame = weaponThrowAction != null && weaponThrowAction.WasPressedThisFrame();
         WeaponThrowReleasedThisFrame = weaponThrowAction != null && weaponThrowAction.WasReleasedThisFrame();
-        PreviousArrowPressedThisFrame = Keyboard.current != null && Keyboard.current.qKey.wasPressedThisFrame;
-        NextArrowPressedThisFrame = Keyboard.current != null && Keyboard.current.eKey.wasPressedThisFrame;
         DodgePressedThisFrame = dodgeAction != null && dodgeAction.WasPressedThisFrame();
-        InteractPressedThisFrame = interactAction != null && interactAction.WasPressedThisFrame();
+        HackPressedThisFrame = (hackAction != null && hackAction.WasPressedThisFrame())
+            || (Keyboard.current != null && Keyboard.current.eKey.wasPressedThisFrame);
+        InteractPressedThisFrame = (interactAction != null && interactAction.WasPressedThisFrame())
+            || (Keyboard.current != null && Keyboard.current.fKey.wasPressedThisFrame);
 #else
         float horizontal = Input.GetAxisRaw("Horizontal");
         float vertical = Input.GetAxisRaw("Vertical");
@@ -109,10 +112,9 @@ public class PlayerInput : MonoBehaviour
         WeaponThrowHeld = Input.GetButton("Fire2");
         WeaponThrowPressedThisFrame = Input.GetButtonDown("Fire2");
         WeaponThrowReleasedThisFrame = Input.GetButtonUp("Fire2");
-        PreviousArrowPressedThisFrame = Input.GetKeyDown(KeyCode.Q);
-        NextArrowPressedThisFrame = Input.GetKeyDown(KeyCode.E);
         DodgePressedThisFrame = Input.GetKeyDown(KeyCode.LeftShift);
-        InteractPressedThisFrame = false;
+        HackPressedThisFrame = Input.GetKeyDown(KeyCode.E);
+        InteractPressedThisFrame = Input.GetKeyDown(KeyCode.F);
 #endif
     }
 

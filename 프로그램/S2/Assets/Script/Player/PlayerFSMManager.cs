@@ -40,6 +40,17 @@ public class PlayerFSMManager : MonoBehaviour
         return true;
     }
 
+    public bool CompleteHacking()
+    {
+        if (CurrentState != PlayerState.Hacking)
+        {
+            return false;
+        }
+
+        ChangeState(PlayerState.Idle);
+        return true;
+    }
+
     public bool IsState(PlayerState state)// 상태 확인용 헬퍼
     {
         return CurrentState == state;
@@ -64,6 +75,7 @@ public class PlayerFSMManager : MonoBehaviour
             PlayerState.WeaponAiming => CanEnterWeaponAiming(from),
             PlayerState.WeaponThrowing => CanEnterWeaponThrowing(from),
             PlayerState.WeaponReceiving => CanEnterWeaponReceiving(from),
+            PlayerState.Hacking => CanEnterHacking(from),
             PlayerState.MeleeAttack => CanEnterMeleeAttack(from),
             _ => false,
         };
@@ -75,6 +87,7 @@ public class PlayerFSMManager : MonoBehaviour
         {
             PlayerState.Dead => 6,
             PlayerState.Dodge => 5,
+            PlayerState.Hacking => 4,
             PlayerState.WeaponReceiving => 4,
             PlayerState.WeaponThrowing => 3,
             PlayerState.WeaponAiming => 3,
@@ -87,7 +100,8 @@ public class PlayerFSMManager : MonoBehaviour
     {
         return CurrentState == PlayerState.Idle 
         || CurrentState == PlayerState.WeaponAiming 
-        || CurrentState == PlayerState.WeaponReceiving;
+        || CurrentState == PlayerState.WeaponReceiving
+        || CurrentState == PlayerState.Hacking;
     }
 
     private static bool CanEnterIdle(PlayerState from)
@@ -95,7 +109,8 @@ public class PlayerFSMManager : MonoBehaviour
         return from == PlayerState.Idle
             || from == PlayerState.Dodge
             || from == PlayerState.WeaponAiming
-            || from == PlayerState.MeleeAttack;
+            || from == PlayerState.MeleeAttack
+            || from == PlayerState.Hacking;
     }
 
     private static bool CanEnterDodge(PlayerState from)
@@ -116,6 +131,11 @@ public class PlayerFSMManager : MonoBehaviour
     private static bool CanEnterWeaponReceiving(PlayerState from)
     {
         return from == PlayerState.WeaponThrowing || from == PlayerState.Dodge;
+    }
+
+    private static bool CanEnterHacking(PlayerState from)
+    {
+        return from == PlayerState.WeaponReceiving || from == PlayerState.Dodge;
     }
 
     private static bool CanEnterMeleeAttack(PlayerState from)

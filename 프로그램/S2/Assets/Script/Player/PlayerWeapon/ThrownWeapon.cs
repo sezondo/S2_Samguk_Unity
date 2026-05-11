@@ -6,6 +6,7 @@ public class ThrownWeapon : MonoBehaviour
     private enum ThrowPhase
     {
         Outbound,
+        Embedded,
         Returning,
     }
 
@@ -24,6 +25,7 @@ public class ThrownWeapon : MonoBehaviour
     private ThrowPhase phase;
 
     public bool IsReturning => phase == ThrowPhase.Returning;
+    public bool IsEmbeddedForHack => phase == ThrowPhase.Embedded;
 
     private void Awake()
     {
@@ -70,6 +72,13 @@ public class ThrownWeapon : MonoBehaviour
             return;
         }
 
+        if (phase == ThrowPhase.Embedded)
+        {
+            rb.linearVelocity = Vector2.zero;
+            return;
+        }
+
+        // Returning일때
         Vector2 ownerPosition = owner.transform.position;
         Vector2 toOwner = ownerPosition - rb.position;
         if (toOwner.magnitude <= recoverDistance)
@@ -107,6 +116,18 @@ public class ThrownWeapon : MonoBehaviour
             return;
         }
 
+        // 공격 판정은 날아가는 중에만 처리한다.
+        // 해킹 대상으로 박힌 상태와 회수 중에는 추가 충돌/데미지/해킹 감지를 모두 무시한다.
+        if (phase != ThrowPhase.Outbound)
+        {
+            return;
+        }
+
+        if (TryEmbedForHack(target))
+        {
+            return;
+        }
+
         TryDamage(target);
         BeginReturn();
     }
@@ -122,6 +143,20 @@ public class ThrownWeapon : MonoBehaviour
         Destroy(gameObject);
     }
 
+    private bool TryEmbedForHack(GameObject target)
+    {
+        IHackable hackable = target.GetComponentInParent<IHackable>();
+        if (hackable == null || owner == null)
+        {
+            return false;
+        }
+
+        phase = ThrowPhase.Embedded;
+        rb.linearVelocity = Vector2.zero;
+        owner.RegisterEmbeddedHackWeapon(this, hackable);
+        return true;
+    }
+
     private void BeginReturn()
     {
         if (phase == ThrowPhase.Returning)
@@ -130,6 +165,11 @@ public class ThrownWeapon : MonoBehaviour
         }
 
         phase = ThrowPhase.Returning;
+    }
+
+    public void BeginReturnFromHack()
+    {
+        BeginReturn();
     }
 
     private void ApplyVisualVisibility(bool visible)

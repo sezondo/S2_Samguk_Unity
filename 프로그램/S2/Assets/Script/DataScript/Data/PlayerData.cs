@@ -17,6 +17,9 @@ public class PlayerData : ScriptableObject
     [Header("Dodge")]
     public PlayerDodgeData dodge = new();
 
+    [Header("Hack")]
+    public PlayerHackData hack = new();
+
     public float attackIntersection;
     public float moveSpeed;
     public float attackSpeed;
@@ -54,4 +57,11 @@ public class PlayerDodgeData
 {
     public float duration = 0.18f;
     public float speed = 10f;
+}
+
+[Serializable]
+public class PlayerHackData
+{
+    // 이 거리보다 해킹 대상에 박힌 검과 멀어지면 해킹을 취소한다.
+    public float maxHackDistance = 5f;
 }

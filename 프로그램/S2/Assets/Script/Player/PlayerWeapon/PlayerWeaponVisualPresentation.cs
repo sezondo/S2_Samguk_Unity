@@ -189,6 +189,7 @@ public class PlayerWeaponVisualPresentation : MonoBehaviour
             WeaponVisualState.AimingCharged => WeaponAnimState.AimingCharged,
             WeaponVisualState.FlyingOut => WeaponAnimState.FlyingOut,
             WeaponVisualState.Returning => WeaponAnimState.Returning,
+            WeaponVisualState.EmbeddedForHack => WeaponAnimState.EmbeddedForHack,
             WeaponVisualState.MeleeMove => WeaponAnimState.MeleeMove,
             WeaponVisualState.HiddenBySlash => WeaponAnimState.HiddenBySlash,
             _ => WeaponAnimState.Orbit,

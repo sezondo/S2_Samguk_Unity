@@ -9,6 +9,7 @@ public enum WeaponVisualState
     AimingCharged, // 투척 조준 완료됨
     FlyingOut, // 검이 날아가는 투척체를 따라가는 중
     Returning, // 검이 돌아오는 투척체를 따라가는 중
+    EmbeddedForHack, // 해킹 대상에 박혀 전자 부적 삽입 대기/진행 중
     MeleeMove, // 근접 공격 위치로 이동
     HiddenBySlash, // 참격 이펙트가 켜져서 검 본체 숨김
 }
@@ -20,8 +21,9 @@ public enum WeaponAnimState
     AimingCharged = 2,
     FlyingOut = 3,
     Returning = 4,
-    MeleeMove = 5,
-    HiddenBySlash = 6,
+    EmbeddedForHack = 5,
+    MeleeMove = 6,
+    HiddenBySlash = 7,
 }
 
 [RequireComponent(typeof(PlayerWeaponContext))]
@@ -243,6 +245,13 @@ public class PlayerWeaponVisualFSM : MonoBehaviour
             return WeaponVisualState.HiddenBySlash;
         }
 
+        // 해킹 대상으로 박힌 검은 플레이어가 이동하거나 Dodge 중이어도 월드 위치에 고정되어야 한다.
+        // 플레이어 FSM의 일시 상태보다 투척체의 Embedded 상태를 우선한다.
+        if (TryResolveEmbeddedHackState(out WeaponVisualState embeddedState))
+        {
+            return embeddedState;
+        }
+
         return playerContext.Fsm.CurrentState switch
         {
             PlayerState.WeaponAiming => playerContext.WeaponThrow.IsMinAimHoldComplete
@@ -250,9 +259,23 @@ public class PlayerWeaponVisualFSM : MonoBehaviour
                 : WeaponVisualState.AimingMove, // 검투척 준비중
             PlayerState.WeaponThrowing => ResolveThrownState(),
             PlayerState.WeaponReceiving => ResolveThrownState(),
+            PlayerState.Hacking => ResolveThrownState(),
             PlayerState.MeleeAttack => ResolveMeleeState(),
             _ => WeaponVisualState.Orbit,
         };
+    }
+
+    private bool TryResolveEmbeddedHackState(out WeaponVisualState visualState)
+    {
+        ThrownWeapon thrownWeapon = playerContext.WeaponThrow.ActiveThrownWeapon;
+        if (thrownWeapon != null && thrownWeapon.IsEmbeddedForHack)
+        {
+            visualState = WeaponVisualState.EmbeddedForHack;
+            return true;
+        }
+
+        visualState = WeaponVisualState.Orbit;
+        return false;
     }
 
     private WeaponVisualState ResolveThrownState()
@@ -261,6 +284,11 @@ public class PlayerWeaponVisualFSM : MonoBehaviour
         if (thrownWeapon == null)
         {
             return WeaponVisualState.Orbit;
+        }
+
+        if (thrownWeapon.IsEmbeddedForHack)
+        {
+            return WeaponVisualState.EmbeddedForHack;
         }
 
         return thrownWeapon.IsReturning ? WeaponVisualState.Returning : WeaponVisualState.FlyingOut;
@@ -279,7 +307,8 @@ public class PlayerWeaponVisualFSM : MonoBehaviour
         }
 
         PlayerState currentState = playerContext.Fsm.CurrentState;
-        if (currentState is PlayerState.WeaponAiming or PlayerState.WeaponThrowing or PlayerState.WeaponReceiving or PlayerState.Dead)
+        if (currentState is PlayerState.WeaponAiming or PlayerState.WeaponThrowing or PlayerState.WeaponReceiving
+            or PlayerState.Hacking or PlayerState.Dead)
         {
             return false;
         }

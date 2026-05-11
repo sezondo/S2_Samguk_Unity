@@ -10,6 +10,7 @@ public class PlayerDebugOverlay : MonoBehaviour
 
     private PlayerFSMManager fsm;
     private PlayerWeaponThrow weaponThrow;
+    private PlayerHackController hackController;
     private PlayerHealth health;
 
     private GUIStyle labelStyle;
@@ -21,6 +22,7 @@ public class PlayerDebugOverlay : MonoBehaviour
 
         fsm = context.Fsm;
         weaponThrow = context.WeaponThrow;
+        hackController = context.HackController;
         health = context.Health;
     }
 
@@ -33,9 +35,10 @@ public class PlayerDebugOverlay : MonoBehaviour
 
         EnsureStyle();
 
-        Rect area = new(screenPosition.x, screenPosition.y, 500f, 200f);
+        Rect area = new(screenPosition.x, screenPosition.y, 600f, 300f);
         GUILayout.BeginArea(area, GUI.skin.box);
         GUILayout.Label($"State: {GetStateText()}", labelStyle);
+        GUILayout.Label($"Hack: {GetHackText()}", labelStyle);
         GUILayout.Label($"Has Weapon: {GetHasWeaponText()}", labelStyle);
         GUILayout.Label($"HP: {GetHealthText()}", labelStyle);
         GUILayout.EndArea();
@@ -66,6 +69,11 @@ public class PlayerDebugOverlay : MonoBehaviour
     private string GetHasWeaponText()
     {
         return weaponThrow != null ? weaponThrow.HasWeapon.ToString() : "None";
+    }
+
+    private string GetHackText()
+    {
+        return hackController != null ? hackController.CurrentProgressState.ToString() : "None";
     }
 
     private string GetHealthText()

@@ -5,6 +5,7 @@ public enum PlayerState
     WeaponAiming,
     WeaponThrowing,
     WeaponReceiving,
+    Hacking,
     Dodge,
     Dead,
 }

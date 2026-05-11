@@ -24,6 +24,7 @@ public class PlayerWeaponThrow : MonoBehaviour
 
     public bool HasWeapon => hasWeapon;
     public ThrownWeapon ActiveThrownWeapon => activeThrownWeapon;
+    public bool HasEmbeddedHackWeapon => activeThrownWeapon != null && activeThrownWeapon.IsEmbeddedForHack;
     public float ChargeTime => chargeTime;
     public bool IsMinAimHoldComplete => chargeTime >= GetThrowData().minAimHoldTime;
     public float AimChargeRatio
@@ -34,6 +35,9 @@ public class PlayerWeaponThrow : MonoBehaviour
             return throwData.maxChargeTime <= 0f ? 1f : Mathf.Clamp01(chargeTime / throwData.maxChargeTime);
         }
     }
+
+    public event System.Action<ThrownWeapon, IHackable> EmbeddedHackWeaponRegistered;
+    public event System.Action<ThrownWeapon> WeaponRecovered;
 
     private void Awake()
     {
@@ -211,13 +215,30 @@ public class PlayerWeaponThrow : MonoBehaviour
             return;
         }
 
+        WeaponRecovered?.Invoke(weapon);
         activeThrownWeapon = null;
         SetHasWeapon(true);
 
         if (fsm.IsState(PlayerState.WeaponReceiving))
         {
             fsm.CompleteWeaponReceiving();
+            return;
         }
+
+        if (fsm.IsState(PlayerState.Hacking))
+        {
+            fsm.CompleteHacking();
+        }
+    }
+
+    public void RegisterEmbeddedHackWeapon(ThrownWeapon weapon, IHackable hackable)
+    {
+        if (weapon == null || weapon != activeThrownWeapon)
+        {
+            return;
+        }
+
+        EmbeddedHackWeaponRegistered?.Invoke(weapon, hackable);
     }
 
     private void SetHasWeapon(bool nextHasWeapon)

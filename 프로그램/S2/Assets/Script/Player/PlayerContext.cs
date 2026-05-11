@@ -18,6 +18,7 @@ public class PlayerContext : MonoBehaviour
     [SerializeField] private PlayerArrowSwitcher arrowSwitcher;
     [SerializeField] private PlayerMeleeAttack meleeAttack;
     [SerializeField] private PlayerMeleeSlashEffect meleeSlashEffect;
+    [SerializeField] private PlayerHackController hackController;
 
     public Transform Root => transform;
     public PlayerInput Input => input;
@@ -33,6 +34,7 @@ public class PlayerContext : MonoBehaviour
     public PlayerArrowSwitcher ArrowSwitcher => arrowSwitcher;
     public PlayerMeleeAttack MeleeAttack => meleeAttack;
     public PlayerMeleeSlashEffect MeleeSlashEffect => meleeSlashEffect;
+    public PlayerHackController HackController => hackController;
 
     private void Awake()
     {
@@ -104,6 +106,11 @@ public class PlayerContext : MonoBehaviour
         if (meleeSlashEffect == null)
         {
             meleeSlashEffect = GetComponent<PlayerMeleeSlashEffect>();
+        }
+
+        if (hackController == null)
+        {
+            hackController = GetComponent<PlayerHackController>();
         }
     }
 
