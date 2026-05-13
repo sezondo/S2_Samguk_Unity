@@ -23,7 +23,6 @@ public class PlayerInput : MonoBehaviour
     [SerializeField] private string lookActionName = "Look";
     [SerializeField] private string meleeAttackActionName = "MeleeAttack";
     [SerializeField] private string weaponThrowActionName = "WeaponThrow";
-    [SerializeField] private string legacyBowActionName = "Bow";
     [SerializeField] private string dodgeActionName = "Dodge";
     [SerializeField] private string hackActionName = "Hack";
     [SerializeField] private string interactActionName = "Interact";
@@ -59,10 +58,6 @@ public class PlayerInput : MonoBehaviour
         lookAction = playerMap.FindAction(lookActionName, throwIfNotFound: false);
         meleeAttackAction = playerMap.FindAction(meleeAttackActionName, throwIfNotFound: false);
         weaponThrowAction = playerMap.FindAction(weaponThrowActionName, throwIfNotFound: false);
-        if (weaponThrowAction == null)
-        {
-            weaponThrowAction = playerMap.FindAction(legacyBowActionName, throwIfNotFound: false);
-        }
         dodgeAction = playerMap.FindAction(dodgeActionName, throwIfNotFound: false);
         hackAction = playerMap.FindAction(hackActionName, throwIfNotFound: false);
         interactAction = playerMap.FindAction(interactActionName, throwIfNotFound: false);

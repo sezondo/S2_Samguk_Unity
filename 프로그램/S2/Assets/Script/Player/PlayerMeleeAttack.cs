@@ -125,9 +125,10 @@ public class PlayerMeleeAttack : MonoBehaviour
             Debug.LogWarning($"{nameof(PlayerMeleeAttack)} on {name} has no melee hitbox assigned.", this);
         }
 
-        if (!HasAttackData())
+        if (!HasValidData())
         {
-            Debug.LogWarning($"{nameof(PlayerMeleeAttack)} on {name} has no melee attack data.", this);
+            enabled = false;
+            return;
         }
     }
 
@@ -215,7 +216,7 @@ public class PlayerMeleeAttack : MonoBehaviour
         PlayerMeleeAttackData attackData = currentAttackData != null ? currentAttackData : 
         GetCurrentComboAttackData();
 
-        float bufferDuration = attackData != null ? attackData.inputBufferDuration : 0f;
+        float bufferDuration = attackData.inputBufferDuration;
         meleeInputBufferTimer = Mathf.Max(meleeInputBufferTimer, bufferDuration);
     }
 
@@ -251,6 +252,7 @@ public class PlayerMeleeAttack : MonoBehaviour
     {
         if (attackData == null)
         {
+            Debug.LogError($"{nameof(PlayerMeleeAttack)} on {name} tried to start without attack data.", this);
             fsm.RequestState(PlayerState.Idle);
             return;
         }
@@ -525,6 +527,17 @@ public class PlayerMeleeAttack : MonoBehaviour
     {
         PlayerMeleeAttackData[] comboAttacks = GetComboAttacks();
         return comboAttacks != null && comboAttacks.Length > 0 && comboAttacks[0] != null;
+    }
+
+    private bool HasValidData()
+    {
+        if (!HasAttackData())
+        {
+            Debug.LogError($"{nameof(PlayerMeleeAttack)} on {name} requires melee combo attack data.", this);
+            return false;
+        }
+
+        return true;
     }
 
     private PlayerMeleeAttackData[] GetComboAttacks()

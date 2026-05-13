@@ -7,9 +7,7 @@ using UnityEngine;
 [RequireComponent(typeof(PlayerContext))]
 public class PlayerDodge : MonoBehaviour
 {
-    [SerializeField] private float fallbackDodgeDuration = 0.18f;
-    [SerializeField] private float fallbackDodgeSpeed = 10f;
-    [SerializeField] private Vector2 defaultDodgeDirection = Vector2.down;
+    private static readonly Vector2 DefaultDodgeDirection = Vector2.down;
 
     private Rigidbody2D rb;
     private PlayerInput input;
@@ -39,6 +37,13 @@ public class PlayerDodge : MonoBehaviour
         {
             Debug.LogError($"{nameof(PlayerDodge)} on {name} is missing a required component.", this);
             enabled = false;
+            return;
+        }
+
+        if (!HasValidData())
+        {
+            enabled = false;
+            return;
         }
     }
 
@@ -119,29 +124,52 @@ public class PlayerDodge : MonoBehaviour
             return lastMoveDirection.normalized;
         }
 
-        return defaultDodgeDirection.normalized;
+        return DefaultDodgeDirection;
     }
 
     private float ResolveDodgeDuration()
     {
-        PlayerDodgeData dodgeData = ResolveDodgeData();
-        return dodgeData != null && dodgeData.duration > 0f
-            ? dodgeData.duration
-            : Mathf.Max(0f, fallbackDodgeDuration);
+        return ResolveDodgeData().duration;
     }
 
     private float ResolveDodgeSpeed()
     {
-        PlayerDodgeData dodgeData = ResolveDodgeData();
-        return dodgeData != null && dodgeData.speed > 0f
-            ? dodgeData.speed
-            : Mathf.Max(0f, fallbackDodgeSpeed);
+        return ResolveDodgeData().speed;
     }
 
     private PlayerDodgeData ResolveDodgeData()
     {
-        PlayerData playerData = loadout != null ? loadout.PlayerData : null;
-        return playerData != null ? playerData.dodge : null;
+        return loadout.PlayerData.dodge;
+    }
+
+    private bool HasValidData()
+    {
+        PlayerData playerData = loadout.PlayerData;
+        if (playerData == null)
+        {
+            Debug.LogError($"{nameof(PlayerDodge)} on {name} requires {nameof(PlayerData)}.", this);
+            return false;
+        }
+
+        if (playerData.dodge == null)
+        {
+            Debug.LogError($"{nameof(PlayerDodge)} on {name} requires {nameof(PlayerDodgeData)} in {playerData.name}.", this);
+            return false;
+        }
+
+        if (playerData.dodge.duration <= 0f)
+        {
+            Debug.LogError($"{nameof(PlayerDodge)} on {name} requires dodge duration greater than 0 in {playerData.name}.", this);
+            return false;
+        }
+
+        if (playerData.dodge.speed <= 0f)
+        {
+            Debug.LogError($"{nameof(PlayerDodge)} on {name} requires dodge speed greater than 0 in {playerData.name}.", this);
+            return false;
+        }
+
+        return true;
     }
 
     private void RequestStateAfterDodge()

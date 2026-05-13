@@ -4,19 +4,17 @@ using UnityEngine;
 // 위치/회전은 Motion에 맡기고, 여기서는 Animator, VFX, 표시/숨김, 정렬 순서만 처리한다.
 public class PlayerWeaponVisualPresentation : MonoBehaviour
 {
-    [Header("Enter VFX")]
     // 최소 장전 시간이 끝났을 때 한 번 재생할 충전 완료 VFX다.
-    [SerializeField] private VfxId aimingChargedVfxId = VfxId.None;
+    private VfxId aimingChargedVfxId = VfxId.None;
     // 근접 공격 위치로 이동할 때 한 번 재생할 검 반짝임 VFX다.
-    [SerializeField] private VfxId meleeMoveVfxId = VfxId.None;
+    private VfxId meleeMoveVfxId = VfxId.None;
     // 투척 시작 순간에 한 번 재생할 VFX다. 실제 투척 판정은 ThrownWeapon이 담당한다.
-    [SerializeField] private VfxId throwStartVfxId = VfxId.None;
+    private VfxId throwStartVfxId = VfxId.None;
 
-    [Header("Visibility VFX")]
     // 검 본체가 숨겨지는 순간 호출할 전역 VFX ID다.
-    [SerializeField] private VfxId vanishVfxId = VfxId.WeaponVanish;
+    private VfxId vanishVfxId = VfxId.WeaponVanish;
     // 검 본체가 다시 보이는 순간 호출할 전역 VFX ID다.
-    [SerializeField] private VfxId reappearVfxId = VfxId.WeaponReappear;
+    private VfxId reappearVfxId = VfxId.WeaponReappear;
 
     private PlayerWeaponContext context;
     private bool wasVisualVisible;
@@ -33,47 +31,13 @@ public class PlayerWeaponVisualPresentation : MonoBehaviour
         wasVisualVisible = ResolveWeaponVisible();
     }
 
-    public void ApplyLegacySettings(
-        VfxId newAimingChargedVfxId,
-        VfxId newMeleeMoveVfxId,
-        VfxId newThrowStartVfxId,
-        VfxId newVanishVfxId,
-        VfxId newReappearVfxId)
-    {
-        aimingChargedVfxId = newAimingChargedVfxId;
-        meleeMoveVfxId = newMeleeMoveVfxId;
-        throwStartVfxId = newThrowStartVfxId;
-        vanishVfxId = newVanishVfxId;
-        reappearVfxId = newReappearVfxId;
-    }
-
     public void ApplyData(PlayerWeaponVisualData visualData)
     {
-        if (visualData == null)
-        {
-            return;
-        }
-
-        if (visualData.aiming != null)
-        {
-            aimingChargedVfxId = visualData.aiming.chargedVfxId;
-        }
-
-        if (visualData.melee != null)
-        {
-            meleeMoveVfxId = visualData.melee.moveVfxId;
-        }
-
-        if (visualData.throwVisual != null)
-        {
-            throwStartVfxId = visualData.throwVisual.startVfxId;
-        }
-
-        if (visualData.presentation != null)
-        {
-            vanishVfxId = visualData.presentation.vanishVfxId;
-            reappearVfxId = visualData.presentation.reappearVfxId;
-        }
+        aimingChargedVfxId = visualData.aiming.chargedVfxId;
+        meleeMoveVfxId = visualData.melee.moveVfxId;
+        throwStartVfxId = visualData.throwVisual.startVfxId;
+        vanishVfxId = visualData.presentation.vanishVfxId;
+        reappearVfxId = visualData.presentation.reappearVfxId;
     }
 
     public void HandleVisualStateChanged(WeaponVisualState previousState, WeaponVisualState nextState)

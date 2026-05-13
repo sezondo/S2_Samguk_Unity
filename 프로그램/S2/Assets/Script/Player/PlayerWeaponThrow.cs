@@ -20,7 +20,6 @@ public class PlayerWeaponThrow : MonoBehaviour
     private float chargeTime;
     private float stateTimer;
     private bool hasWeapon = true;
-    private readonly PlayerWeaponThrowData fallbackThrowData = new();
 
     public bool HasWeapon => hasWeapon;
     public ThrownWeapon ActiveThrownWeapon => activeThrownWeapon;
@@ -52,6 +51,12 @@ public class PlayerWeaponThrow : MonoBehaviour
         if (input == null || fsm == null || aim == null || loadout == null)
         {
             Debug.LogError($"{nameof(PlayerWeaponThrow)} on {name} is missing a required component.", this);
+            enabled = false;
+            return;
+        }
+
+        if (!HasValidData())
+        {
             enabled = false;
             return;
         }
@@ -265,10 +270,56 @@ public class PlayerWeaponThrow : MonoBehaviour
 
     private PlayerWeaponThrowData GetThrowData()
     {
-        PlayerData playerData = loadout != null ? loadout.PlayerData : null;
-        return playerData != null && playerData.weaponThrow != null
-            ? playerData.weaponThrow
-            : fallbackThrowData;
+        return loadout.PlayerData.weaponThrow;
+    }
+
+    private bool HasValidData()
+    {
+        PlayerData playerData = loadout.PlayerData;
+        if (playerData == null)
+        {
+            Debug.LogError($"{nameof(PlayerWeaponThrow)} on {name} requires {nameof(PlayerData)}.", this);
+            return false;
+        }
+
+        PlayerWeaponThrowData throwData = playerData.weaponThrow;
+        if (throwData == null)
+        {
+            Debug.LogError($"{nameof(PlayerWeaponThrow)} on {name} requires {nameof(PlayerWeaponThrowData)} in {playerData.name}.", this);
+            return false;
+        }
+
+        if (throwData.maxChargeTime <= 0f)
+        {
+            Debug.LogError($"{nameof(PlayerWeaponThrow)} on {name} requires maxChargeTime greater than 0 in {playerData.name}.", this);
+            return false;
+        }
+
+        if (throwData.minAimHoldTime < 0f)
+        {
+            Debug.LogError($"{nameof(PlayerWeaponThrow)} on {name} requires minAimHoldTime greater than or equal to 0 in {playerData.name}.", this);
+            return false;
+        }
+
+        if (throwData.aimingStateDuration < 0f || throwData.throwingStateDuration < 0f)
+        {
+            Debug.LogError($"{nameof(PlayerWeaponThrow)} on {name} requires non-negative throw state durations in {playerData.name}.", this);
+            return false;
+        }
+
+        if (throwData.throwSpeed <= 0f || throwData.returnSpeed <= 0f || throwData.maxDistance <= 0f)
+        {
+            Debug.LogError($"{nameof(PlayerWeaponThrow)} on {name} requires positive throwSpeed, returnSpeed, and maxDistance in {playerData.name}.", this);
+            return false;
+        }
+
+        if (throwData.damage < 0)
+        {
+            Debug.LogError($"{nameof(PlayerWeaponThrow)} on {name} requires damage greater than or equal to 0 in {playerData.name}.", this);
+            return false;
+        }
+
+        return true;
     }
 
     private static Vector2 Rotate(Vector2 direction, float angleDegrees)

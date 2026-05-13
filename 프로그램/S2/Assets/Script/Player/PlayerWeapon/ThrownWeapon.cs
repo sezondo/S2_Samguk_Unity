@@ -37,12 +37,19 @@ public class ThrownWeapon : MonoBehaviour
         Vector2 direction,
         PlayerWeaponThrowData throwData)
     {
+        if (throwData == null)
+        {
+            Debug.LogError($"{nameof(ThrownWeapon)} on {name} requires {nameof(PlayerWeaponThrowData)}.", this);
+            Destroy(gameObject);
+            return;
+        }
+
         owner = newOwner;
         startPosition = transform.position;
-        throwSpeed = throwData != null ? Mathf.Max(0f, throwData.throwSpeed) : 0f;
-        returnSpeed = throwData != null ? Mathf.Max(0f, throwData.returnSpeed) : 0f;
-        maxDistance = throwData != null ? Mathf.Max(0f, throwData.maxDistance) : 0f;
-        damage = throwData != null ? Mathf.Max(0, throwData.damage) : 0;
+        throwSpeed = throwData.throwSpeed;
+        returnSpeed = throwData.returnSpeed;
+        maxDistance = throwData.maxDistance;
+        damage = throwData.damage;
         phase = ThrowPhase.Outbound;
         ApplyVisualVisibility(!hideVisualOnInitialize);
 

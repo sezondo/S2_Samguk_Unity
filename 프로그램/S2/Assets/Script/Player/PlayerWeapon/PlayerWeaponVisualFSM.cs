@@ -35,77 +35,12 @@ public class PlayerWeaponVisualFSM : MonoBehaviour
     [SerializeField] private PlayerWeaponContext weaponContext;
 
     [Header("Visual Data")]
-    // 검 비주얼 튜닝 데이터다. 연결되어 있으면 아래 레거시 인스펙터 값보다 이 데이터를 우선 사용한다.
-    // 나중에는 이 데이터 에셋을 기준으로 무기별/캐릭터별 검 연출을 조정한다.
+    // 검 비주얼 튜닝 데이터다. 연결되지 않으면 비주얼 FSM을 실행하지 않는다.
     [SerializeField] private PlayerWeaponVisualData visualData;
 
-    [Header("Legacy Fallback Settings")]
-    // 아래 값들은 visualData를 아직 연결하지 않은 기존 씬을 위한 fallback이다.
-    // 새 작업에서는 PlayerWeaponVisualData 에셋을 만들어 그쪽에서 수치를 조정한다.
-    [SerializeField] private Vector2 weaponAnchorOffset = new(0f, 0.48f);
-
-    [Header("Orbit")]
-    // 아래 Orbit 값들은 PlayerWeaponVisualMotion이 없을 때 런타임에 넘겨주는 초기 설정이다.
-    // 평소 검이 플레이어 뒤통수/등 뒤 기준으로 떠다니는 위치와 작은 흔들림을 조정한다.
-    // x는 등 뒤 기준 좌우 보정, y는 플레이어가 바라보는 방향의 반대쪽으로 떨어지는 거리다.
-    [SerializeField] private Vector2 orbitCenterOffset = new(-0.22f, 0.48f);
-    // 기준 위치 주변에서 작게 흔들리는 폭이다.
-    [SerializeField] private float orbitRadius = 0.12f;
-    // 작은 흔들림의 속도다. 기존 데이터 호환을 위해 이름은 유지한다.
-    [SerializeField] private float orbitDegreesPerSecond = 65f;
-    // 이동 중 검이 이동 방향 반대로 살짝 밀리는 거리다. 이동감/부유감을 만들기 위한 값이다.
-    [SerializeField] private float moveLagDistance = 0.12f;
-    // 평소 검이 좌우로 기울어지는 각도 폭이다.
-    [SerializeField] private float floatTiltAmount = 5f;
-    // 평소 좌우 기울어짐이 반복되는 속도다.
-    [SerializeField] private float floatTiltSpeed = 2.4f;
-
-    [Header("Aiming")]
-    // 아래 Aiming 값들은 우클릭 조준 상태에서 검이 어디에 놓이고 어떤 이펙트를 낼지 정한다.
-    // 조준 방향의 반대쪽으로 검을 얼마나 당겨서 장전 자세처럼 보이게 할지 정한다.
-    [SerializeField] private float aimingPullBackDistance = 0.48f;
-    // 조준선과 완전히 겹치지 않게 수직 방향으로 살짝 밀어주는 거리다.
-    [SerializeField] private float aimingSideOffset = 0.08f;
-    // 최소 조준 시간이 채워져 AimingCharged 상태로 들어갈 때 한 번 재생할 VFX ID다.
-    [SerializeField] private VfxId aimingChargedVfxId = VfxId.None;
-
     [Header("Melee")]
-    // 아래 Melee 값은 PlayerMeleeAttackData.hitboxOffset 기준에서 검 비주얼만 살짝 보정한다.
-    // x는 공격 방향 앞/뒤, y는 공격 방향 기준 좌/우 보정이다.
-    [FormerlySerializedAs("meleeMoveOffset")]
-    [SerializeField] private Vector2 meleeVisualOffset = Vector2.zero;
-    // MeleeMove 상태에 들어갈 때 한 번 재생할 검 반짝임/이동 시작 VFX ID다.
-    [SerializeField] private VfxId meleeMoveVfxId = VfxId.None;
     // 참격 이펙트가 켜진 동안 검 본체를 숨길지 정한다.
     [SerializeField] private bool hideVisualDuringSlash = true;
-
-    [Header("Throw")]
-    // 아래 Throw 값들은 투척 판정체와 보이는 검 본체를 맞춰 보이게 하는 데 쓰인다.
-    // FlyingOut 상태에 들어갈 때 한 번 재생할 투척 시작 VFX ID다.
-    [SerializeField] private VfxId throwStartVfxId = VfxId.None;
-    // 보이는 검과 판정용 투척체가 이 거리 이상 벌어지면 보간하지 않고 즉시 투척체 위치로 붙인다.
-    [SerializeField] private float thrownSnapDistance = 1.5f;
-
-    [Header("Visibility VFX")]
-    // 검 본체가 숨겨지거나 다시 나타날 때 쓰는 VFX ID다.
-    // 예: 참격 이펙트가 켜져 HiddenBySlash로 들어가면 vanishVfxId, 다시 보이면 reappearVfxId를 재생한다.
-    [SerializeField] private VfxId vanishVfxId = VfxId.WeaponVanish;
-    [SerializeField] private VfxId reappearVfxId = VfxId.WeaponReappear;
-
-    [Header("Motion")]
-    // 아래 Motion 값들은 위치/회전 보간 속도와 스프라이트 방향 보정을 조정한다.
-    // Orbit, FlyingOut, Returning 같은 일반 상태에서 목표 위치를 따라가는 속도다.
-    [SerializeField] private float followSharpness = 18f;
-    // Aiming처럼 즉각 반응해야 하는 상태에서 목표 위치를 따라가는 속도다.
-    // Melee 이동은 PlayerMeleeAttackData.hitboxStartTime 기준 타임라인을 사용하므로 이 값을 쓰지 않는다.
-    [SerializeField] private float fastFollowSharpness = 55f;
-    // 검 회전이 목표 각도를 따라가는 속도다.
-    [SerializeField] private float rotateSharpness = 24f;
-    // 검 이미지의 기본 칼날 방향을 공격 방향에 맞추기 위한 보정 각도다.
-    // 오른쪽이 손잡이, 왼쪽이 칼날인 스프라이트면 보통 180이 맞다.
-    [SerializeField] private float baseAngleOffset = 180f;
-    // 조준 중 검을 조준 반대 방향으로 눕힐 때 추가로 더하는 회전 보정값이다.
-    [SerializeField] private float aimingPerpendicularAngle = 90f;
 
     public WeaponVisualState CurrentVisualState { get; private set; } = WeaponVisualState.Orbit;
     public event Action<WeaponVisualState, WeaponVisualState> OnVisualStateChanged;
@@ -118,6 +53,12 @@ public class PlayerWeaponVisualFSM : MonoBehaviour
     {
         ResolveContexts();
         if (!ValidateContexts())
+        {
+            enabled = false;
+            return;
+        }
+
+        if (!HasValidData())
         {
             enabled = false;
             return;
@@ -175,47 +116,40 @@ public class PlayerWeaponVisualFSM : MonoBehaviour
         motion = weaponContext.Motion;
         presentation = weaponContext.Presentation;
 
-        if (visualData != null)
-        {
-            motion.ApplyData(visualData);
-        }
-        else
-        {
-            motion.ApplyLegacySettings(
-                weaponAnchorOffset,
-                orbitCenterOffset,
-                orbitRadius,
-                orbitDegreesPerSecond,
-                moveLagDistance,
-                floatTiltAmount,
-                floatTiltSpeed,
-                aimingPullBackDistance,
-                aimingSideOffset,
-                meleeVisualOffset,
-                thrownSnapDistance,
-                followSharpness,
-                fastFollowSharpness,
-                rotateSharpness,
-                baseAngleOffset,
-                aimingPerpendicularAngle);
-        }
-
-        if (visualData != null)
-        {
-            presentation.ApplyData(visualData);
-        }
-        else
-        {
-            presentation.ApplyLegacySettings(
-                aimingChargedVfxId,
-                meleeMoveVfxId,
-                throwStartVfxId,
-                vanishVfxId,
-                reappearVfxId);
-        }
+        motion.ApplyData(visualData);
+        presentation.ApplyData(visualData);
 
         motion.Initialize(weaponContext);
         presentation.Initialize(weaponContext);
+    }
+
+    private bool HasValidData()
+    {
+        if (visualData == null)
+        {
+            Debug.LogError($"{nameof(PlayerWeaponVisualFSM)} on {name} requires {nameof(PlayerWeaponVisualData)}.", this);
+            return false;
+        }
+
+        bool valid = true;
+        valid &= RequireVisualSection(visualData.orbit, nameof(visualData.orbit));
+        valid &= RequireVisualSection(visualData.aiming, nameof(visualData.aiming));
+        valid &= RequireVisualSection(visualData.melee, nameof(visualData.melee));
+        valid &= RequireVisualSection(visualData.throwVisual, nameof(visualData.throwVisual));
+        valid &= RequireVisualSection(visualData.presentation, nameof(visualData.presentation));
+        valid &= RequireVisualSection(visualData.motion, nameof(visualData.motion));
+        return valid;
+    }
+
+    private bool RequireVisualSection(object section, string sectionName)
+    {
+        if (section != null)
+        {
+            return true;
+        }
+
+        Debug.LogError($"{nameof(PlayerWeaponVisualFSM)} on {name} requires {sectionName} in {visualData.name}.", this);
+        return false;
     }
 
     private void SubscribeWorkers()

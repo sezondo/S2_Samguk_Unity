@@ -47,6 +47,12 @@ public class PlayerHackController : MonoBehaviour
         {
             Debug.LogError($"{nameof(PlayerHackController)} on {name} is missing a required component.", this);
             enabled = false;
+            return;
+        }
+
+        if (!HasValidData())
+        {
+            enabled = false;
         }
     }
 
@@ -115,6 +121,11 @@ public class PlayerHackController : MonoBehaviour
     private void HandleEmbeddedHackWeaponRegistered(ThrownWeapon weapon, IHackable hackable)
     {
         if (weapon == null || hackable == null)
+        {
+            return;
+        }
+
+        if (!HasValidHackableData(hackable))
         {
             return;
         }
@@ -213,14 +224,54 @@ public class PlayerHackController : MonoBehaviour
 
     private float ResolveHackDuration()
     {
-        HackableData hackData = currentHackable?.HackData;
-        return hackData != null ? Mathf.Max(0f, hackData.hackDuration) : 0f;
+        return currentHackable.HackData.hackDuration;
     }
 
     private float ResolveMaxHackDistance()
     {
-        PlayerData playerData = loadout != null ? loadout.PlayerData : null;
-        return playerData != null && playerData.hack != null ? Mathf.Max(0f, playerData.hack.maxHackDistance) : 0f;
+        return loadout.PlayerData.hack.maxHackDistance;
+    }
+
+    private bool HasValidData()
+    {
+        PlayerData playerData = loadout.PlayerData;
+        if (playerData == null)
+        {
+            Debug.LogError($"{nameof(PlayerHackController)} on {name} requires {nameof(PlayerData)}.", this);
+            return false;
+        }
+
+        if (playerData.hack == null)
+        {
+            Debug.LogError($"{nameof(PlayerHackController)} on {name} requires {nameof(PlayerHackData)} in {playerData.name}.", this);
+            return false;
+        }
+
+        if (playerData.hack.maxHackDistance <= 0f)
+        {
+            Debug.LogError($"{nameof(PlayerHackController)} on {name} requires maxHackDistance greater than 0 in {playerData.name}.", this);
+            return false;
+        }
+
+        return true;
+    }
+
+    private bool HasValidHackableData(IHackable hackable)
+    {
+        HackableData hackData = hackable.HackData;
+        if (hackData == null)
+        {
+            Debug.LogError($"{nameof(PlayerHackController)} on {name} received a hackable target without {nameof(HackableData)}.", this);
+            return false;
+        }
+
+        if (hackData.hackDuration <= 0f)
+        {
+            Debug.LogError($"{nameof(PlayerHackController)} on {name} requires hackDuration greater than 0 in {hackData.name}.", this);
+            return false;
+        }
+
+        return true;
     }
 
     private void ClearSessionWithoutReturn()

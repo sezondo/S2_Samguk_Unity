@@ -6,12 +6,6 @@ using UnityEngine;
 [RequireComponent(typeof(PlayerContext))]
 public class PlayerHealth : MonoBehaviour, IDamageable
 {
-    [Header("Health")]
-    // PlayerData가 없거나 maxHp가 비어 있을 때 테스트용으로 사용할 기본 HP.
-    [SerializeField] private int fallbackMaxHp = 5;
-    // PlayerData가 없거나 invincibleDuration이 비어 있을 때 테스트용으로 사용할 기본 무적 시간.
-    [SerializeField] private float fallbackInvincibleDuration = 0.6f;
-
     private PlayerFSMManager fsm;
     private PlayerLoadout loadout;
     private int currentHp;
@@ -37,6 +31,12 @@ public class PlayerHealth : MonoBehaviour, IDamageable
         if (fsm == null || loadout == null)
         {
             Debug.LogError($"{nameof(PlayerHealth)} on {name} is missing a required component.", this);
+            enabled = false;
+            return;
+        }
+
+        if (!HasValidData())
+        {
             enabled = false;
             return;
         }
@@ -105,26 +105,36 @@ public class PlayerHealth : MonoBehaviour, IDamageable
 
     private int ResolveMaxHp()
     {
-        // 실제 밸런스 값은 PlayerData를 우선하고, 없을 때만 fallback 값을 쓴다.
-        PlayerData playerData = loadout != null ? loadout.PlayerData : null;
-        if (playerData != null && playerData.maxHp > 0)
-        {
-            return playerData.maxHp;
-        }
-
-        return Mathf.Max(1, fallbackMaxHp);
+        return loadout.PlayerData.maxHp;
     }
 
     private float ResolveInvincibleDuration()
     {
-        // 실제 밸런스 값은 PlayerData를 우선하고, 없을 때만 fallback 값을 쓴다.
-        PlayerData playerData = loadout != null ? loadout.PlayerData : null;
-        if (playerData != null && playerData.invincibleDuration > 0f)
+        return loadout.PlayerData.invincibleDuration;
+    }
+
+    private bool HasValidData()
+    {
+        PlayerData playerData = loadout.PlayerData;
+        if (playerData == null)
         {
-            return playerData.invincibleDuration;
+            Debug.LogError($"{nameof(PlayerHealth)} on {name} requires {nameof(PlayerData)}.", this);
+            return false;
         }
 
-        return Mathf.Max(0f, fallbackInvincibleDuration);
+        if (playerData.maxHp <= 0)
+        {
+            Debug.LogError($"{nameof(PlayerHealth)} on {name} requires maxHp greater than 0 in {playerData.name}.", this);
+            return false;
+        }
+
+        if (playerData.invincibleDuration <= 0f)
+        {
+            Debug.LogError($"{nameof(PlayerHealth)} on {name} requires invincibleDuration greater than 0 in {playerData.name}.", this);
+            return false;
+        }
+
+        return true;
     }
 
     private bool CanTakeDamage()

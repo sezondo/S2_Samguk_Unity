@@ -15,7 +15,6 @@ public class PlayerContext : MonoBehaviour
     [SerializeField] private PlayerLoadout loadout;
     [SerializeField] private Rigidbody2D body;
     [SerializeField] private PlayerWeaponThrow weaponThrow;
-    [SerializeField] private PlayerArrowSwitcher arrowSwitcher;
     [SerializeField] private PlayerMeleeAttack meleeAttack;
     [SerializeField] private PlayerMeleeSlashEffect meleeSlashEffect;
     [SerializeField] private PlayerHackController hackController;
@@ -31,7 +30,6 @@ public class PlayerContext : MonoBehaviour
     public PlayerLoadout Loadout => loadout;
     public Rigidbody2D Body => body;
     public PlayerWeaponThrow WeaponThrow => weaponThrow;
-    public PlayerArrowSwitcher ArrowSwitcher => arrowSwitcher;
     public PlayerMeleeAttack MeleeAttack => meleeAttack;
     public PlayerMeleeSlashEffect MeleeSlashEffect => meleeSlashEffect;
     public PlayerHackController HackController => hackController;
@@ -91,11 +89,6 @@ public class PlayerContext : MonoBehaviour
         if (weaponThrow == null)
         {
             weaponThrow = GetComponent<PlayerWeaponThrow>();
-        }
-
-        if (arrowSwitcher == null)
-        {
-            arrowSwitcher = GetComponent<PlayerArrowSwitcher>();
         }
 
         if (meleeAttack == null)

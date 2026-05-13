@@ -1,5 +1,4 @@
 using UnityEngine;
-using UnityEngine.Serialization;
 
 // 도깨비 환도 본체의 위치와 회전만 담당한다.
 // 상태 판단은 PlayerWeaponVisualFSM, 애니메이션/VFX/표시는 PlayerWeaponVisualPresentation이 처리한다.
@@ -7,53 +6,46 @@ public class PlayerWeaponVisualMotion : MonoBehaviour
 {
     private const float DefaultBackHoverDistance = 0.35f;
 
-    [Header("Anchor")]
     // 기준 Transform에서 한 번 더 밀어주는 보정값이다.
     // PlayerWeaponContext.weaponAnchorRoot가 연결되어 있으면 그 빈 오브젝트 위치를 기준으로 쓰고,
     // 연결되어 있지 않으면 PlayerWeaponContext.PlayerRoot.position을 기준으로 fallback 처리한다.
-    [SerializeField] private Vector2 weaponAnchorOffset = new(0f, 0.48f);
+    private Vector2 weaponAnchorOffset = new(0f, 0.48f);
 
-    [Header("Orbit")]
     // weaponAnchorOffset 기준으로 평소 검이 머무를 위치다.
     // x는 등 뒤 기준 좌우 보정, y는 플레이어가 바라보는 방향의 반대쪽으로 떨어지는 거리다.
     // y가 0이면 기존 데이터 호환을 위해 DefaultBackHoverDistance를 사용한다.
-    [SerializeField] private Vector2 orbitCenterOffset = Vector2.zero;
+    private Vector2 orbitCenterOffset = Vector2.zero;
     // 기준 위치 주변에서 작게 흔들리는 폭이다.
-    [SerializeField] private float orbitRadius = 0.12f;
+    private float orbitRadius = 0.12f;
     // 작은 흔들림의 속도다. 기존 데이터 호환을 위해 이름은 유지한다.
-    [SerializeField] private float orbitDegreesPerSecond = 65f;
+    private float orbitDegreesPerSecond = 65f;
     // 이동 중 검이 이동 방향 반대로 얼마나 뒤처져 보일지 정한다.
-    [SerializeField] private float moveLagDistance = 0.12f;
+    private float moveLagDistance = 0.12f;
     // 기본 부유 상태에서 좌우로 기울어지는 각도 폭이다.
-    [SerializeField] private float floatTiltAmount = 5f;
+    private float floatTiltAmount = 5f;
     // 기본 부유 상태에서 좌우 기울어짐이 반복되는 속도다.
-    [SerializeField] private float floatTiltSpeed = 2.4f;
+    private float floatTiltSpeed = 2.4f;
 
-    [Header("Aiming")]
     // WeaponAiming 상태에서 검이 마우스 반대 방향으로 얼마나 물러나 장전 자세를 잡을지 정한다.
-    [SerializeField] private float aimingPullBackDistance = 0.48f;
+    private float aimingPullBackDistance = 0.48f;
     // WeaponAiming 상태에서 마우스 방향의 수직 방향으로 살짝 밀어주는 값이다.
-    [SerializeField] private float aimingSideOffset = 0.08f;
+    private float aimingSideOffset = 0.08f;
 
-    [Header("Melee")]
     // PlayerMeleeAttackData.hitboxOffset 기준에서 검 비주얼만 살짝 보정하는 값이다.
     // x는 공격 방향 앞/뒤, y는 공격 방향 기준 좌/우 보정이다.
-    [FormerlySerializedAs("meleeMoveOffset")]
-    [SerializeField] private Vector2 meleeVisualOffset = Vector2.zero;
+    private Vector2 meleeVisualOffset = Vector2.zero;
 
-    [Header("Throw")]
     // 투척체 위치를 따라갈 때 이 값 이상 멀면 보간하지 않고 즉시 붙인다.
-    [SerializeField] private float thrownSnapDistance = 1.5f;
+    private float thrownSnapDistance = 1.5f;
 
-    [Header("Motion")]
-    [SerializeField] private float followSharpness = 18f; // 검 위치가 목표점을 따라가는 속도.
-    [SerializeField] private float fastFollowSharpness = 55f; // 조준/근접처럼 순간 이동감이 필요한 상태의 추적 속도.
-    [SerializeField] private float rotateSharpness = 24f; // 검 회전이 목표 각도를 따라가는 속도.
+    private float followSharpness = 18f; // 검 위치가 목표점을 따라가는 속도.
+    private float fastFollowSharpness = 55f; // 조준/근접처럼 순간 이동감이 필요한 상태의 추적 속도.
+    private float rotateSharpness = 24f; // 검 회전이 목표 각도를 따라가는 속도.
     // 검 이미지의 기본 칼날 방향을 공격 방향에 맞추기 위한 보정 각도다.
     // 오른쪽이 손잡이, 왼쪽이 칼날인 스프라이트면 보통 180이 맞다.
-    [SerializeField] private float baseAngleOffset = 180f;
+    private float baseAngleOffset = 180f;
     // WeaponAiming 상태에서 마우스 반대 방향 기준으로 검을 얼마나 수직 보정할지 정한다.
-    [SerializeField] private float aimingPerpendicularAngle = 90f;
+    private float aimingPerpendicularAngle = 90f;
 
     private PlayerWeaponContext context;
     private Vector3 positionVelocity;
@@ -67,85 +59,24 @@ public class PlayerWeaponVisualMotion : MonoBehaviour
         orbitFloatPhase = Random.Range(0f, Mathf.PI * 2f);
     }
 
-    public void ApplyLegacySettings(
-        Vector2 newWeaponAnchorOffset,
-        Vector2 newOrbitCenterOffset,
-        float newOrbitRadius,
-        float newOrbitDegreesPerSecond,
-        float newMoveLagDistance,
-        float newFloatTiltAmount,
-        float newFloatTiltSpeed,
-        float newAimingPullBackDistance,
-        float newAimingSideOffset,
-        Vector2 newMeleeMoveOffset,
-        float newThrownSnapDistance,
-        float newFollowSharpness,
-        float newFastFollowSharpness,
-        float newRotateSharpness,
-        float newBaseAngleOffset,
-        float newAimingPerpendicularAngle)
-    {
-        weaponAnchorOffset = newWeaponAnchorOffset;
-        orbitCenterOffset = newOrbitCenterOffset;
-        orbitRadius = newOrbitRadius;
-        orbitDegreesPerSecond = newOrbitDegreesPerSecond;
-        moveLagDistance = newMoveLagDistance;
-        floatTiltAmount = newFloatTiltAmount;
-        floatTiltSpeed = newFloatTiltSpeed;
-        aimingPullBackDistance = newAimingPullBackDistance;
-        aimingSideOffset = newAimingSideOffset;
-        meleeVisualOffset = newMeleeMoveOffset;
-        thrownSnapDistance = newThrownSnapDistance;
-        followSharpness = newFollowSharpness;
-        fastFollowSharpness = newFastFollowSharpness;
-        rotateSharpness = newRotateSharpness;
-        baseAngleOffset = newBaseAngleOffset;
-        aimingPerpendicularAngle = newAimingPerpendicularAngle;
-    }
-
     public void ApplyData(PlayerWeaponVisualData visualData)
     {
-        if (visualData == null)
-        {
-            return;
-        }
-
         weaponAnchorOffset = visualData.weaponAnchorOffset;
-
-        if (visualData.orbit != null)
-        {
-            orbitCenterOffset = visualData.orbit.centerOffset;
-            orbitRadius = visualData.orbit.radius;
-            orbitDegreesPerSecond = visualData.orbit.degreesPerSecond;
-            moveLagDistance = visualData.orbit.moveLagDistance;
-            floatTiltAmount = visualData.orbit.floatTiltAmount;
-            floatTiltSpeed = visualData.orbit.floatTiltSpeed;
-        }
-
-        if (visualData.aiming != null)
-        {
-            aimingPullBackDistance = visualData.aiming.pullBackDistance;
-            aimingSideOffset = visualData.aiming.sideOffset;
-            aimingPerpendicularAngle = visualData.aiming.perpendicularAngle;
-        }
-
-        if (visualData.melee != null)
-        {
-            meleeVisualOffset = visualData.melee.visualOffset;
-        }
-
-        if (visualData.throwVisual != null)
-        {
-            thrownSnapDistance = visualData.throwVisual.snapDistance;
-        }
-
-        if (visualData.motion != null)
-        {
-            followSharpness = visualData.motion.followSharpness;
-            fastFollowSharpness = visualData.motion.fastFollowSharpness;
-            rotateSharpness = visualData.motion.rotateSharpness;
-            baseAngleOffset = visualData.motion.baseAngleOffset;
-        }
+        orbitCenterOffset = visualData.orbit.centerOffset;
+        orbitRadius = visualData.orbit.radius;
+        orbitDegreesPerSecond = visualData.orbit.degreesPerSecond;
+        moveLagDistance = visualData.orbit.moveLagDistance;
+        floatTiltAmount = visualData.orbit.floatTiltAmount;
+        floatTiltSpeed = visualData.orbit.floatTiltSpeed;
+        aimingPullBackDistance = visualData.aiming.pullBackDistance;
+        aimingSideOffset = visualData.aiming.sideOffset;
+        aimingPerpendicularAngle = visualData.aiming.perpendicularAngle;
+        meleeVisualOffset = visualData.melee.visualOffset;
+        thrownSnapDistance = visualData.throwVisual.snapDistance;
+        followSharpness = visualData.motion.followSharpness;
+        fastFollowSharpness = visualData.motion.fastFollowSharpness;
+        rotateSharpness = visualData.motion.rotateSharpness;
+        baseAngleOffset = visualData.motion.baseAngleOffset;
     }
 
     public void HandleVisualStateChanged(WeaponVisualState previousState, WeaponVisualState nextState)
