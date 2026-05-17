@@ -10,6 +10,7 @@ public class PlayerContext : MonoBehaviour
     [SerializeField] private PlayerFSMManager fsm;
     [SerializeField] private PlayerAnim anim;
     [SerializeField] private PlayerMovement movement;
+    [SerializeField] private PlayerControlLock controlLock;
     [SerializeField] private PlayerDodge dodge;
     [SerializeField] private PlayerHealth health;
     [SerializeField] private PlayerLoadout loadout;
@@ -25,6 +26,7 @@ public class PlayerContext : MonoBehaviour
     public PlayerFSMManager Fsm => fsm;
     public PlayerAnim Anim => anim;
     public PlayerMovement Movement => movement;
+    public PlayerControlLock ControlLock => controlLock;
     public PlayerDodge Dodge => dodge;
     public PlayerHealth Health => health;
     public PlayerLoadout Loadout => loadout;
@@ -64,6 +66,11 @@ public class PlayerContext : MonoBehaviour
         if (movement == null)
         {
             movement = GetComponent<PlayerMovement>();
+        }
+
+        if (controlLock == null)
+        {
+            controlLock = GetComponent<PlayerControlLock>();
         }
 
         if (dodge == null)

@@ -135,6 +135,13 @@ public class PlayerWeaponThrow : MonoBehaviour
                 return;
             }
 
+            if (!fsm.CanTransition(fsm.CurrentState, PlayerState.WeaponThrowing))
+            {
+                chargeTime = 0f;
+                fsm.RequestState(PlayerState.Idle);
+                return;
+            }
+
             if (ThrowWeapon())
             {
                 fsm.RequestState(PlayerState.WeaponThrowing);

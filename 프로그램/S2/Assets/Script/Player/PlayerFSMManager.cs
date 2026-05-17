@@ -3,10 +3,23 @@ using UnityEngine;
 
 public class PlayerFSMManager : MonoBehaviour
 {
-    
+    private PlayerControlLock controlLock;
+
     public PlayerState CurrentState { get; private set; } = PlayerState.Idle;
 
     public event Action<PlayerState, PlayerState> OnStateChanged;
+
+    private void Awake()
+    {
+        PlayerContext context = GetComponent<PlayerContext>();
+        if (context == null)
+        {
+            return;
+        }
+
+        context.ResolveReferences();
+        controlLock = context.ControlLock;
+    }
 
     public bool RequestState(PlayerState requestedState)
     {
@@ -96,7 +109,12 @@ public class PlayerFSMManager : MonoBehaviour
         };
     }
 
-    public bool CanMoveInMainState() //Move 가능 여부 헬퍼
+    public bool CanMove() //Move 가능 여부 헬퍼
+    {
+        return CanMoveInMainState() && (controlLock == null || !controlLock.IsMovementLocked);
+    }
+
+    public bool CanMoveInMainState()
     {
         return CurrentState == PlayerState.Idle 
         || CurrentState == PlayerState.WeaponAiming 
@@ -113,19 +131,19 @@ public class PlayerFSMManager : MonoBehaviour
             || from == PlayerState.Hacking;
     }
 
-    private static bool CanEnterDodge(PlayerState from)
+    private bool CanEnterDodge(PlayerState from)
     {
-        return from != PlayerState.Dead;
+        return !IsDodgeLocked() && from != PlayerState.Dead;
     }
 
-    private static bool CanEnterWeaponAiming(PlayerState from)
+    private bool CanEnterWeaponAiming(PlayerState from)
     {
-        return from == PlayerState.Idle;
+        return !IsWeaponThrowLocked() && from == PlayerState.Idle;
     }
 
-    private static bool CanEnterWeaponThrowing(PlayerState from)
+    private bool CanEnterWeaponThrowing(PlayerState from)
     {
-        return from == PlayerState.WeaponAiming;
+        return !IsWeaponThrowLocked() && from == PlayerState.WeaponAiming;
     }
 
     private static bool CanEnterWeaponReceiving(PlayerState from)
@@ -138,9 +156,24 @@ public class PlayerFSMManager : MonoBehaviour
         return from == PlayerState.WeaponReceiving || from == PlayerState.Dodge;
     }
 
-    private static bool CanEnterMeleeAttack(PlayerState from)
+    private bool CanEnterMeleeAttack(PlayerState from)
     {
-        return from == PlayerState.Idle || from == PlayerState.MeleeAttack;
+        return !IsMeleeAttackLocked() && (from == PlayerState.Idle || from == PlayerState.MeleeAttack);
+    }
+
+    private bool IsMeleeAttackLocked()
+    {
+        return controlLock != null && controlLock.IsMeleeAttackLocked;
+    }
+
+    private bool IsWeaponThrowLocked()
+    {
+        return controlLock != null && controlLock.IsWeaponThrowLocked;
+    }
+
+    private bool IsDodgeLocked()
+    {
+        return controlLock != null && controlLock.IsDodgeLocked;
     }
 
     private void ChangeState(PlayerState nextState)

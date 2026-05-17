@@ -11,7 +11,6 @@ public class PlayerMovement : MonoBehaviour
     private PlayerInput input;
     private PlayerFSMManager fsm;
     private PlayerLoadout loadout;
-    private PlayerMovementLock movementLock;
 
     private void Awake()
     {
@@ -22,7 +21,6 @@ public class PlayerMovement : MonoBehaviour
         input = context.Input;
         fsm = context.Fsm;
         loadout = context.Loadout;
-        movementLock = GetComponent<PlayerMovementLock>();
 
         if (rb == null || input == null || fsm == null || loadout == null)
         {
@@ -43,12 +41,7 @@ public class PlayerMovement : MonoBehaviour
 
     private void FixedUpdate()
     {
-        if (!fsm.CanMoveInMainState())
-        {
-            return;
-        }
-
-        if (movementLock != null && movementLock.IsLocked)
+        if (!fsm.CanMove())
         {
             return;
         }

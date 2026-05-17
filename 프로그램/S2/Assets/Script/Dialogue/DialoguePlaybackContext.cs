@@ -11,4 +11,5 @@ public readonly struct DialoguePlaybackContext
     public DialogueSequenceData Sequence { get; }
     public DialogueEventTrigger Source { get; }
     public bool CanPlayerMoveDuringDialogue => Sequence != null && Sequence.canPlayerMoveDuringDialogue;
+    public bool CanPlayerControlDuringDialogue => Sequence != null && Sequence.canPlayerControlDuringDialogue;
 }

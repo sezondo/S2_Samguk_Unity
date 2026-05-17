@@ -5,18 +5,24 @@ public class DialogueManager : MonoBehaviour
 {
     public static DialogueManager Instance { get; private set; }
 
+    [Header("Bubble")]
+    [SerializeField] private DialogueBubblePresenter bubblePresenter;
+
     private DialoguePlaybackSession activeSession;
     private PlayerInput activeInput;
     private int nextSessionId = 1;
 
     public bool IsPlaying => activeSession != null;
-
+    
+    // 대사 시작됨
     public static event Action<DialoguePlaybackContext> GlobalDialogueStarted;
-    public static event Action<DialoguePlaybackContext, DialogueLineData, int> GlobalDialogueLineChanged;
+    // 대사 스텝 바뀜
+    public static event Action<DialoguePlaybackContext, DialogueStepData, int> GlobalDialogueStepChanged;
+    //대사 끝남
     public static event Action<DialoguePlaybackContext> GlobalDialogueFinished;
 
     public event Action<DialoguePlaybackContext> DialogueStarted;
-    public event Action<DialoguePlaybackContext, DialogueLineData, int> DialogueLineChanged;
+    public event Action<DialoguePlaybackContext, DialogueStepData, int> DialogueStepChanged;
     public event Action<DialoguePlaybackContext> DialogueFinished;
 
     private void Awake()
@@ -29,6 +35,11 @@ public class DialogueManager : MonoBehaviour
         }
 
         Instance = this;
+
+        if (bubblePresenter == null)
+        {
+            bubblePresenter = GetComponentInChildren<DialogueBubblePresenter>(true);
+        }
     }
 
     private void OnDestroy()
@@ -46,14 +57,14 @@ public class DialogueManager : MonoBehaviour
             return;
         }
 
-        DialogueLineData line = GetCurrentLine();
-        if (line == null)
+        DialogueStepData step = GetCurrentStep();
+        if (step == null)
         {
             FinishActiveSession();
             return;
         }
 
-        if (CanAdvanceByInput(line) || CanAdvanceByTime(line))
+        if (CanAdvanceByInput(step) || CanAdvanceByTime(step))
         {
             AdvanceActiveSession();
         }
@@ -89,29 +100,31 @@ public class DialogueManager : MonoBehaviour
             return;
         }
 
-        activeSession.CurrentSpeaker?.HideLine();
-        activeSession.CurrentLineIndex++;
+        activeSession.CurrentStepIndex++;
         activeSession.AutoAdvanceTimer = 0f;
 
-        DialogueLineData line = GetCurrentLine();
-        if (line == null)
+        DialogueStepData step = GetCurrentStep();
+        if (step == null)
         {
             FinishActiveSession();
             return;
         }
 
-        DialogueSpeaker speaker = ResolveSpeaker(line.speakerTag);
-        if (speaker == null)
+        if (bubblePresenter == null)
         {
-            Debug.LogError($"{nameof(DialogueManager)} could not find speakerTag '{line.speakerTag}' in dialogue '{activeSession.Context.Sequence.name}'. Dialogue stopped.", this);
+            Debug.LogError($"{nameof(DialogueManager)} requires {nameof(DialogueBubblePresenter)} to show dialogue bubbles.", this);
             FinishActiveSession();
             return;
         }
 
-        activeSession.CurrentSpeaker = speaker;
-        speaker.ShowLine(line.text);
-        DialogueLineChanged?.Invoke(activeSession.Context, line, activeSession.CurrentLineIndex);
-        GlobalDialogueLineChanged?.Invoke(activeSession.Context, line, activeSession.CurrentLineIndex);
+        if (!bubblePresenter.ShowStep(step, activeSession.Speakers, activeSession.Context.Sequence.name))
+        {
+            FinishActiveSession();
+            return;
+        }
+
+        DialogueStepChanged?.Invoke(activeSession.Context, step, activeSession.CurrentStepIndex);
+        GlobalDialogueStepChanged?.Invoke(activeSession.Context, step, activeSession.CurrentStepIndex);
     }
 
     private void FinishActiveSession()
@@ -122,7 +135,7 @@ public class DialogueManager : MonoBehaviour
         }
 
         DialoguePlaybackContext context = activeSession.Context;
-        activeSession.CurrentSpeaker?.HideLine();
+        bubblePresenter?.HideActiveBubbles();
         activeSession = null;
         activeInput = null;
 
@@ -130,9 +143,9 @@ public class DialogueManager : MonoBehaviour
         GlobalDialogueFinished?.Invoke(context);
     }
 
-    private bool CanAdvanceByInput(DialogueLineData line)
+    private bool CanAdvanceByInput(DialogueStepData step)
     {
-        if (!line.advanceByInput || activeInput == null)
+        if (!step.advanceByInput || activeInput == null)
         {
             return false;
         }
@@ -146,18 +159,18 @@ public class DialogueManager : MonoBehaviour
         return activeInput.InteractPressedThisFrame;
     }
 
-    private bool CanAdvanceByTime(DialogueLineData line)
+    private bool CanAdvanceByTime(DialogueStepData step)
     {
-        if (!line.advanceByTime)
+        if (!step.advanceByTime)
         {
             return false;
         }
 
         activeSession.AutoAdvanceTimer += Time.deltaTime;
-        return activeSession.AutoAdvanceTimer >= Mathf.Max(0f, line.autoAdvanceTime);
+        return activeSession.AutoAdvanceTimer >= Mathf.Max(0f, step.autoAdvanceTime);
     }
 
-    private DialogueLineData GetCurrentLine()
+    private DialogueStepData GetCurrentStep()
     {
         if (activeSession == null)
         {
@@ -165,32 +178,13 @@ public class DialogueManager : MonoBehaviour
         }
 
         DialogueSequenceData sequence = activeSession.Context.Sequence;
-        int index = activeSession.CurrentLineIndex;
-        if (sequence == null || sequence.lines == null || index < 0 || index >= sequence.lines.Length)
+        int index = activeSession.CurrentStepIndex;
+        if (sequence == null || sequence.steps == null || index < 0 || index >= sequence.steps.Length)
         {
             return null;
         }
 
-        return sequence.lines[index];
-    }
-
-    private DialogueSpeaker ResolveSpeaker(string speakerTag)
-    {
-        if (string.IsNullOrWhiteSpace(speakerTag) || activeSession.Speakers == null)
-        {
-            return null;
-        }
-
-        for (int i = 0; i < activeSession.Speakers.Length; i++)
-        {
-            DialogueSpeaker speaker = activeSession.Speakers[i];
-            if (speaker != null && speaker.HasTag(speakerTag))
-            {
-                return speaker;
-            }
-        }
-
-        return null;
+        return sequence.steps[index];
     }
 
     private bool HasValidRequest(DialogueSequenceData sequence, DialogueSpeaker[] speakers, PlayerInput input)
@@ -201,7 +195,7 @@ public class DialogueManager : MonoBehaviour
             return false;
         }
 
-        if (sequence.lines == null || sequence.lines.Length == 0)
+        if (sequence.steps == null || sequence.steps.Length == 0)
         {
             Debug.LogError($"{nameof(DialogueManager)} received empty dialogue sequence '{sequence.name}'.", this);
             return false;

@@ -3,6 +3,9 @@ using UnityEngine;
 
 public class SpeechBubbleView : MonoBehaviour
 {
+    private const string DefaultKoreanFontResourcePath = "Fonts/NotoSansKR-VF";
+    private static TMP_FontAsset cachedKoreanFontAsset;
+
     [Header("Root")]
     [SerializeField] private RectTransform root;
     [SerializeField] private Canvas canvas;
@@ -18,6 +21,7 @@ public class SpeechBubbleView : MonoBehaviour
 
     [Header("Text")]
     [SerializeField] private TMP_Text dialogueText;
+    [SerializeField] private Font koreanSourceFont;
     [SerializeField] private float horizontalTextPadding = 24f;
     [SerializeField] private float verticalTextPadding = 10f;
     [SerializeField] private float maxTextWidth = 360f;
@@ -35,6 +39,7 @@ public class SpeechBubbleView : MonoBehaviour
     private void Awake()
     {
         ResolveReferences();
+        ApplyKoreanFontIfAvailable();
         Hide();
     }
 
@@ -93,6 +98,42 @@ public class SpeechBubbleView : MonoBehaviour
         {
             worldCamera = Camera.main;
         }
+    }
+
+    private void ApplyKoreanFontIfAvailable()
+    {
+        if (dialogueText == null)
+        {
+            return;
+        }
+
+        TMP_FontAsset fontAsset = ResolveKoreanFontAsset();
+        if (fontAsset != null)
+        {
+            dialogueText.font = fontAsset;
+        }
+    }
+
+    private TMP_FontAsset ResolveKoreanFontAsset()
+    {
+        if (cachedKoreanFontAsset != null)
+        {
+            return cachedKoreanFontAsset;
+        }
+
+        Font sourceFont = koreanSourceFont != null
+            ? koreanSourceFont
+            : Resources.Load<Font>(DefaultKoreanFontResourcePath);
+
+        if (sourceFont == null)
+        {
+            return null;
+        }
+
+        cachedKoreanFontAsset = TMP_FontAsset.CreateFontAsset(sourceFont);
+        cachedKoreanFontAsset.atlasPopulationMode = AtlasPopulationMode.Dynamic;
+        cachedKoreanFontAsset.isMultiAtlasTexturesEnabled = true;
+        return cachedKoreanFontAsset;
     }
 
     private void RebuildLayout(string text)
