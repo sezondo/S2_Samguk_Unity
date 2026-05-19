@@ -64,7 +64,20 @@ public class DialogueManager : MonoBehaviour
             return;
         }
 
-        if (CanAdvanceByInput(step) || CanAdvanceByTime(step))
+        bool advanceInputPressed = CanAdvanceByInput(step);
+        if (bubblePresenter != null && !bubblePresenter.AreActiveBubblesComplete)
+        {
+            // 글자 출력 중 F 입력은 다음 스텝 진행이 아니라 현재 스텝의 모든 말풍선 즉시 완성으로 사용한다.
+            if (advanceInputPressed)
+            {
+                bubblePresenter.CompleteActiveBubbles();
+                activeSession.AutoAdvanceTimer = 0f;
+            }
+
+            return;
+        }
+
+        if (advanceInputPressed || CanAdvanceByTime(step))
         {
             AdvanceActiveSession();
         }
@@ -166,6 +179,7 @@ public class DialogueManager : MonoBehaviour
             return false;
         }
 
+        // 자동 진행 시간은 DialogueManager.Update에서 모든 말풍선 출력 완료를 확인한 뒤에만 누적된다.
         activeSession.AutoAdvanceTimer += Time.deltaTime;
         return activeSession.AutoAdvanceTimer >= Mathf.Max(0f, step.autoAdvanceTime);
     }

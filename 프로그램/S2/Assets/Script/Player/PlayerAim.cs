@@ -37,6 +37,11 @@ public class PlayerAim : MonoBehaviour
 
     private void Update()
     {
+        if (input.IsLookLocked)
+        {
+            return;
+        }
+
         // 조준 방향은 활뿐 아니라 근접 공격/캐릭터 방향/애니메이션에서도 재사용할 수 있다.
         AimDirection = ResolveAimDirection();
         AimSide = PlayerFacingUtil.Quantize8OrDefault(AimDirection, AimSide);

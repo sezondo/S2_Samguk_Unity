@@ -1,5 +1,6 @@
 using TMPro;
 using UnityEngine;
+using UnityEngine.UI;
 
 public class SpeechBubbleView : MonoBehaviour
 {
@@ -7,40 +8,55 @@ public class SpeechBubbleView : MonoBehaviour
     private static TMP_FontAsset cachedKoreanFontAsset;
 
     [Header("Root")]
-    [SerializeField] private RectTransform root;
-    [SerializeField] private Canvas canvas;
     [SerializeField] private Camera worldCamera;
-    [SerializeField] private Camera uiCamera;
 
-    [Header("Bubble Pieces")]
-    [SerializeField] private RectTransform leftCap;
-    [SerializeField] private RectTransform leftScale;
-    [SerializeField] private RectTransform center;
-    [SerializeField] private RectTransform rightScale;
-    [SerializeField] private RectTransform rightCap;
+    [Header("Bubble")]
+    [SerializeField] private Image bubbleImage;
 
     [Header("Text")]
     [SerializeField] private TMP_Text dialogueText;
     [SerializeField] private Font koreanSourceFont;
-    [SerializeField] private float horizontalTextPadding = 24f;
-    [SerializeField] private float verticalTextPadding = 10f;
-    [SerializeField] private float maxTextWidth = 360f;
-
-    [Header("Scale")]
-    [SerializeField] private float minScaleWidth = 0f;
-    [SerializeField] private float maxScaleWidth = 180f;
+    [SerializeField] private float horizontalOffset = 32f;
 
     [Header("Follow")]
     [SerializeField] private Vector2 screenOffset = new(0f, 42f);
 
     private Transform speakerAnchor;
+    private RectTransform root;
+    private Canvas canvas;
     private bool visible;
+    private Color defaultTextColor;
+    private float defaultFontSize;
+    private float typewriterTimer;
+    private float charactersPerSecond;
+    private int visibleCharacterCount;
+    private int totalCharacterCount;
+    private bool typewriterActive;
+
+    public bool IsTextFullyVisible => !typewriterActive || visibleCharacterCount >= totalCharacterCount;
 
     private void Awake()
     {
         ResolveReferences();
+        if (!HasRequiredLayoutReferences())
+        {
+            enabled = false;
+            return;
+        }
+
         ApplyKoreanFontIfAvailable();
+        CacheDefaultTextStyle();
         Hide();
+    }
+
+    private void Update()
+    {
+        if (!visible || !typewriterActive || IsTextFullyVisible)
+        {
+            return;
+        }
+
+        UpdateTypewriter();
     }
 
     private void LateUpdate()
@@ -53,19 +69,24 @@ public class SpeechBubbleView : MonoBehaviour
         FollowSpeakerAnchor();
     }
 
-    public void Show(Transform anchor, string text)
+    public void Show(Transform anchor, DialogueLineData line)
     {
+        if (line == null)
+        {
+            Debug.LogError($"{nameof(SpeechBubbleView)} on {name} received a null dialogue line.", this);
+            return;
+        }
+
         speakerAnchor = anchor;
         visible = true;
         gameObject.SetActive(true);
 
-        if (dialogueText != null)
-        {
-            dialogueText.text = text;
-            dialogueText.ForceMeshUpdate();
-        }
+        ApplyLineTextStyle(line);
+        dialogueText.text = line.text ?? string.Empty;
+        dialogueText.ForceMeshUpdate();
 
-        RebuildLayout(text);
+        RebuildLayout();
+        StartTypewriter(line);
         FollowSpeakerAnchor();
     }
 
@@ -77,26 +98,49 @@ public class SpeechBubbleView : MonoBehaviour
         if (dialogueText != null)
         {
             dialogueText.text = string.Empty;
+            dialogueText.maxVisibleCharacters = int.MaxValue;
         }
 
+        typewriterTimer = 0f;
+        charactersPerSecond = 0f;
+        visibleCharacterCount = 0;
+        totalCharacterCount = 0;
+        typewriterActive = false;
         gameObject.SetActive(false);
+    }
+
+    public void CompleteText()
+    {
+        visibleCharacterCount = totalCharacterCount;
+        typewriterActive = false;
+
+        if (dialogueText != null)
+        {
+            dialogueText.maxVisibleCharacters = totalCharacterCount;
+        }
     }
 
     private void ResolveReferences()
     {
-        if (root == null)
-        {
-            root = transform as RectTransform;
-        }
-
-        if (canvas == null)
-        {
-            canvas = GetComponentInParent<Canvas>();
-        }
+        root = transform as RectTransform;
+        canvas = GetComponentInParent<Canvas>();
 
         if (worldCamera == null)
         {
             worldCamera = Camera.main;
+        }
+
+        if (bubbleImage != null)
+        {
+            // 9-slice 말풍선은 Sprite Border와 Sliced Image 조합을 기준으로 사용한다.
+            bubbleImage.type = Image.Type.Sliced;
+        }
+
+        if (dialogueText != null)
+        {
+            // 대사 줄넘김은 데이터 작성 단계에서 관리한다.
+            dialogueText.textWrappingMode = TextWrappingModes.NoWrap;
+            dialogueText.overflowMode = TextOverflowModes.Overflow;
         }
     }
 
@@ -111,6 +155,54 @@ public class SpeechBubbleView : MonoBehaviour
         if (fontAsset != null)
         {
             dialogueText.font = fontAsset;
+        }
+    }
+
+    private void CacheDefaultTextStyle()
+    {
+        defaultTextColor = dialogueText.color;
+        defaultFontSize = dialogueText.fontSize;
+    }
+
+    // DialogueLineData의 override가 켜진 값만 적용하고, 나머지는 프리팹 기본 스타일로 되돌린다.
+    private void ApplyLineTextStyle(DialogueLineData line)
+    {
+        dialogueText.color = line.overrideTextColor ? line.textColor : defaultTextColor;
+        dialogueText.fontSize = line.overrideFontSize ? line.fontSize : defaultFontSize;
+    }
+
+    // 말풍선 크기는 전체 문장을 기준으로 이미 계산해두고, TMP 표시 글자 수만 줄여 타자기 효과를 만든다.
+    private void StartTypewriter(DialogueLineData line)
+    {
+        totalCharacterCount = dialogueText.textInfo.characterCount;
+        visibleCharacterCount = line.useTypewriter ? 0 : totalCharacterCount;
+        typewriterTimer = 0f;
+        charactersPerSecond = line.charactersPerSecond;
+        typewriterActive = line.useTypewriter && totalCharacterCount > 0 && charactersPerSecond > 0f;
+        dialogueText.maxVisibleCharacters = visibleCharacterCount;
+
+        if (!typewriterActive)
+        {
+            CompleteText();
+        }
+    }
+
+    // charactersPerSecond에 따라 TMP maxVisibleCharacters만 늘린다.
+    private void UpdateTypewriter()
+    {
+        typewriterTimer += Time.deltaTime * charactersPerSecond;
+        int nextVisibleCharacterCount = Mathf.Min(totalCharacterCount, Mathf.FloorToInt(typewriterTimer));
+        if (nextVisibleCharacterCount <= visibleCharacterCount)
+        {
+            return;
+        }
+
+        visibleCharacterCount = nextVisibleCharacterCount;
+        dialogueText.maxVisibleCharacters = visibleCharacterCount;
+
+        if (visibleCharacterCount >= totalCharacterCount)
+        {
+            typewriterActive = false;
         }
     }
 
@@ -136,48 +228,26 @@ public class SpeechBubbleView : MonoBehaviour
         return cachedKoreanFontAsset;
     }
 
-    private void RebuildLayout(string text)
+    private void RebuildLayout()
     {
         if (!HasRequiredLayoutReferences())
         {
             return;
         }
 
-        float leftCapWidth = leftCap.rect.width;
-        float centerWidth = center.rect.width;
-        float rightCapWidth = rightCap.rect.width;
-        float fixedWidth = leftCapWidth + centerWidth + rightCapWidth;
+        // Text와 SpeechBubble의 스케일이 다를 수 있어, 실제 화면에 보이는 폭 기준으로 본체 Width를 역산한다.
+        dialogueText.ForceMeshUpdate();
 
-        Vector2 preferredTextSize = dialogueText.GetPreferredValues(text, maxTextWidth, 0f);
-        float targetWidth = Mathf.Max(fixedWidth, preferredTextSize.x + horizontalTextPadding);
-        float scaleWidth = Mathf.Clamp((targetWidth - fixedWidth) * 0.5f, minScaleWidth, maxScaleWidth);
-        float totalWidth = fixedWidth + (scaleWidth * 2f);
-        float totalHeight = Mathf.Max(root.rect.height, preferredTextSize.y + verticalTextPadding);
-
-        SetWidth(leftScale, scaleWidth);
-        SetWidth(rightScale, scaleWidth);
-        SetWidth(root, totalWidth);
-        SetHeight(root, totalHeight);
-
-        PlacePieces(leftCapWidth, scaleWidth, centerWidth, rightCapWidth);
-        RebuildTextRect(totalWidth, totalHeight);
-    }
-
-    private void PlacePieces(float leftCapWidth, float scaleWidth, float centerWidth, float rightCapWidth)
-    {
-        SetAnchoredX(center, 0f);
-        SetAnchoredX(leftScale, -(centerWidth * 0.5f) - (scaleWidth * 0.5f));
-        SetAnchoredX(leftCap, -(centerWidth * 0.5f) - scaleWidth - (leftCapWidth * 0.5f));
-        SetAnchoredX(rightScale, (centerWidth * 0.5f) + (scaleWidth * 0.5f));
-        SetAnchoredX(rightCap, (centerWidth * 0.5f) + scaleWidth + (rightCapWidth * 0.5f));
-    }
-
-    private void RebuildTextRect(float totalWidth, float totalHeight)
-    {
         RectTransform textRect = dialogueText.rectTransform;
-        SetWidth(textRect, Mathf.Max(0f, totalWidth - horizontalTextPadding));
-        SetHeight(textRect, Mathf.Max(0f, totalHeight - verticalTextPadding));
-        textRect.anchoredPosition = Vector2.zero;
+        RectTransform bubbleRect = bubbleImage.rectTransform;
+        float textScale = ResolveHorizontalScale(textRect);
+        float bubbleScale = ResolveHorizontalScale(bubbleRect);
+
+        float textVisualWidth = dialogueText.preferredWidth * textScale;
+        float targetVisualWidth = textVisualWidth + horizontalOffset;
+        float bubbleLocalWidth = targetVisualWidth / bubbleScale;
+
+        SetWidth(bubbleRect, bubbleLocalWidth);
     }
 
     private void FollowSpeakerAnchor()
@@ -197,7 +267,7 @@ public class SpeechBubbleView : MonoBehaviour
         }
 
         RectTransform canvasRect = canvas.transform as RectTransform;
-        Camera cameraForUi = uiCamera != null ? uiCamera : canvas.worldCamera;
+        Camera cameraForUi = canvas.worldCamera;
         if (canvasRect != null && RectTransformUtility.ScreenPointToLocalPointInRectangle(canvasRect, screenPoint, cameraForUi, out Vector2 localPoint))
         {
             root.anchoredPosition = localPoint;
@@ -206,13 +276,12 @@ public class SpeechBubbleView : MonoBehaviour
 
     private bool HasRequiredLayoutReferences()
     {
-        if (root != null && leftCap != null && leftScale != null && center != null
-            && rightScale != null && rightCap != null && dialogueText != null)
+        if (root != null && canvas != null && bubbleImage != null && dialogueText != null)
         {
             return true;
         }
 
-        Debug.LogError($"{nameof(SpeechBubbleView)} on {name} requires all bubble pieces and text references.", this);
+        Debug.LogError($"{nameof(SpeechBubbleView)} on {name} requires a parent Canvas, bubbleImage, and dialogueText references.", this);
         return false;
     }
 
@@ -221,15 +290,9 @@ public class SpeechBubbleView : MonoBehaviour
         target.SetSizeWithCurrentAnchors(RectTransform.Axis.Horizontal, width);
     }
 
-    private static void SetHeight(RectTransform target, float height)
+    private static float ResolveHorizontalScale(RectTransform target)
     {
-        target.SetSizeWithCurrentAnchors(RectTransform.Axis.Vertical, height);
-    }
-
-    private static void SetAnchoredX(RectTransform target, float x)
-    {
-        Vector2 position = target.anchoredPosition;
-        position.x = x;
-        target.anchoredPosition = position;
+        float scale = Mathf.Abs(target.lossyScale.x);
+        return scale > 0.0001f ? scale : 1f;
     }
 }

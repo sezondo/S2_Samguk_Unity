@@ -9,6 +9,7 @@ public enum PlayerControlLockReason
 public enum PlayerControlLockType
 {
     Movement,
+    Look,
     MeleeAttack,
     WeaponThrow,
     Dodge,
@@ -17,11 +18,13 @@ public enum PlayerControlLockType
 public class PlayerControlLock : MonoBehaviour
 {
     private readonly HashSet<PlayerControlLockReason> movementLocks = new();
+    private readonly HashSet<PlayerControlLockReason> lookLocks = new();
     private readonly HashSet<PlayerControlLockReason> meleeAttackLocks = new();
     private readonly HashSet<PlayerControlLockReason> weaponThrowLocks = new();
     private readonly HashSet<PlayerControlLockReason> dodgeLocks = new();
 
     public bool IsMovementLocked => movementLocks.Count > 0;
+    public bool IsLookLocked => lookLocks.Count > 0;
     public bool IsMeleeAttackLocked => meleeAttackLocks.Count > 0;
     public bool IsWeaponThrowLocked => weaponThrowLocks.Count > 0;
     public bool IsDodgeLocked => dodgeLocks.Count > 0;
@@ -62,6 +65,7 @@ public class PlayerControlLock : MonoBehaviour
             Lock(PlayerControlLockType.Movement, PlayerControlLockReason.Dialogue);
         }
 
+        Lock(PlayerControlLockType.Look, PlayerControlLockReason.Dialogue);
         Lock(PlayerControlLockType.MeleeAttack, PlayerControlLockReason.Dialogue);
         Lock(PlayerControlLockType.WeaponThrow, PlayerControlLockReason.Dialogue);
         Lock(PlayerControlLockType.Dodge, PlayerControlLockReason.Dialogue);
@@ -75,6 +79,7 @@ public class PlayerControlLock : MonoBehaviour
     private void UnlockAll(PlayerControlLockReason reason)
     {
         movementLocks.Remove(reason);
+        lookLocks.Remove(reason);
         meleeAttackLocks.Remove(reason);
         weaponThrowLocks.Remove(reason);
         dodgeLocks.Remove(reason);
@@ -85,6 +90,7 @@ public class PlayerControlLock : MonoBehaviour
         return lockType switch
         {
             PlayerControlLockType.Movement => movementLocks,
+            PlayerControlLockType.Look => lookLocks,
             PlayerControlLockType.MeleeAttack => meleeAttackLocks,
             PlayerControlLockType.WeaponThrow => weaponThrowLocks,
             PlayerControlLockType.Dodge => dodgeLocks,

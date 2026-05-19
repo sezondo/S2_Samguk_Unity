@@ -12,6 +12,24 @@ public class DialogueBubblePresenter : MonoBehaviour
     private readonly List<SpeechBubbleView> activeBubbles = new();
     private readonly Stack<SpeechBubbleView> pooledBubbles = new();
 
+    public bool AreActiveBubblesComplete
+    {
+        get
+        {
+            // 한 스텝 안에 여러 말풍선이 동시에 나올 수 있으므로 모두 출력 완료되어야 진행 가능하다.
+            for (int i = 0; i < activeBubbles.Count; i++)
+            {
+                SpeechBubbleView bubble = activeBubbles[i];
+                if (bubble != null && !bubble.IsTextFullyVisible)
+                {
+                    return false;
+                }
+            }
+
+            return true;
+        }
+    }
+
     private void Awake()
     {
         if (bubbleRoot == null)
@@ -55,11 +73,26 @@ public class DialogueBubblePresenter : MonoBehaviour
                 return false;
             }
 
-            bubble.Show(speaker.SpeechBubbleAnchor, line.text);
+            bubble.Show(speaker.SpeechBubbleAnchor, line);
             activeBubbles.Add(bubble);
         }
 
         return true;
+    }
+
+    // F 입력으로 현재 스텝을 스킵할 때 모든 활성 말풍선을 즉시 완성한다.
+    public void CompleteActiveBubbles()
+    {
+        for (int i = 0; i < activeBubbles.Count; i++)
+        {
+            SpeechBubbleView bubble = activeBubbles[i];
+            if (bubble == null)
+            {
+                continue;
+            }
+
+            bubble.CompleteText();
+        }
     }
 
     public void HideActiveBubbles()
