@@ -555,9 +555,7 @@ public class PlayerMeleeAttack : MonoBehaviour
         Vector2 normalizedDirection = attackDirection.sqrMagnitude > 0.0001f
             ? attackDirection.normalized
             : Vector2.down;
-        Vector2 perpendicular = new(-normalizedDirection.y, normalizedDirection.x);
 
-        return normalizedDirection * attackData.hitboxOffset.x
-            + perpendicular * attackData.hitboxOffset.y;
+        return MeleeHitbox.ResolveAttackOffset(attackData.hitboxOffset, normalizedDirection);
     }
 }

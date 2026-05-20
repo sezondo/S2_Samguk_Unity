@@ -15,11 +15,13 @@ public class MeleeHitbox : MonoBehaviour
 
     private Collider2D hitboxCollider;
     private Transform owner;
-    // 활성화된 공격의 데이터. 위치/크기/데미지/디버그 표시를 여기서 읽는다.
-    private PlayerMeleeAttackData attackData;
     private int damage;
+    private Vector2 hitboxOffset;
+    private Vector2 hitboxSize;
+    private bool rotateHitboxToAim;
     private bool drawDebug;
     private Color debugColor;
+    private float debugDrawDuration;
 
     private void Awake()
     {
@@ -35,12 +37,44 @@ public class MeleeHitbox : MonoBehaviour
 
     public void Activate(Transform newOwner, PlayerMeleeAttackData newAttackData, Vector2 attackDirection)
     {
+        if (newAttackData == null)
+        {
+            Deactivate();
+            return;
+        }
+
+        Activate(
+            newOwner,
+            newAttackData.damage,
+            newAttackData.hitboxOffset,
+            newAttackData.hitboxSize,
+            newAttackData.rotateHitboxToAim,
+            newAttackData.drawDebug,
+            newAttackData.debugColor,
+            newAttackData.debugDrawDuration,
+            attackDirection);
+    }
+
+    public void Activate(
+        Transform newOwner,
+        int newDamage,
+        Vector2 newHitboxOffset,
+        Vector2 newHitboxSize,
+        bool newRotateHitboxToAim,
+        bool newDrawDebug,
+        Color newDebugColor,
+        float newDebugDrawDuration,
+        Vector2 attackDirection)
+    {
         // owner는 플레이어 본인/자식 오브젝트를 때리지 않기 위해 저장한다.
         owner = newOwner;
-        attackData = newAttackData;
-        damage = attackData != null ? Mathf.Max(0, attackData.damage) : 0;
-        drawDebug = attackData != null && attackData.drawDebug;
-        debugColor = attackData != null ? attackData.debugColor : Color.red;
+        damage = Mathf.Max(0, newDamage);
+        hitboxOffset = newHitboxOffset;
+        hitboxSize = newHitboxSize;
+        rotateHitboxToAim = newRotateHitboxToAim;
+        drawDebug = newDrawDebug;
+        debugColor = newDebugColor;
+        debugDrawDuration = Mathf.Max(0f, newDebugDrawDuration);
 
         // 판정을 켜기 전에 Transform과 Collider 모양을 먼저 현재 공격 데이터에 맞춘다.
         ApplyHitboxTransform(attackDirection);
@@ -70,7 +104,7 @@ public class MeleeHitbox : MonoBehaviour
 
     private void ApplyHitboxTransform(Vector2 attackDirection) //히트박스 위치
     {
-        if (attackData == null || owner == null)
+        if (owner == null)
         {
             return;
         }
@@ -78,12 +112,12 @@ public class MeleeHitbox : MonoBehaviour
         Vector2 normalizedDirection = attackDirection.sqrMagnitude > 0.0001f
             ? attackDirection.normalized
             : Vector2.down;
-        Vector2 offset = PlayerMeleeAttack.ResolveAttackOffset(attackData, normalizedDirection);
+        Vector2 offset = ResolveAttackOffset(hitboxOffset, normalizedDirection);
 
         // Hitbox 오브젝트는 플레이어 자식이라는 전제라 localPosition을 쓴다.
         transform.localPosition = offset;
 
-        if (attackData.rotateHitboxToAim)
+        if (rotateHitboxToAim)
         {
             float angle = Mathf.Atan2(normalizedDirection.y, normalizedDirection.x) * Mathf.Rad2Deg;
             transform.localRotation = Quaternion.Euler(0f, 0f, angle);
@@ -92,7 +126,7 @@ public class MeleeHitbox : MonoBehaviour
 
     private void ApplyColliderShape() // 히트박스 크기
     {
-        if (attackData == null || hitboxCollider == null)
+        if (hitboxCollider == null)
         {
             return;
         }
@@ -100,19 +134,19 @@ public class MeleeHitbox : MonoBehaviour
         // 현재 테스트는 BoxCollider2D가 가장 적합하지만, 다른 2D 콜라이더도 기본 대응해둔다.
         if (hitboxCollider is BoxCollider2D boxCollider)
         {
-            boxCollider.size = attackData.hitboxSize;
+            boxCollider.size = hitboxSize;
             return;
         }
 
         if (hitboxCollider is CapsuleCollider2D capsuleCollider)
         {
-            capsuleCollider.size = attackData.hitboxSize;
+            capsuleCollider.size = hitboxSize;
             return;
         }
 
         if (hitboxCollider is CircleCollider2D circleCollider)
         {
-            circleCollider.radius = Mathf.Max(attackData.hitboxSize.x, attackData.hitboxSize.y) * 0.5f;
+            circleCollider.radius = Mathf.Max(hitboxSize.x, hitboxSize.y) * 0.5f;
         }
     }
 
@@ -180,7 +214,7 @@ public class MeleeHitbox : MonoBehaviour
 
     private void DrawDebugHitbox()
     {
-        if (!drawDebug || attackData == null)
+        if (!drawDebug)
         {
             return;
         }
@@ -188,7 +222,7 @@ public class MeleeHitbox : MonoBehaviour
         // 현재 Transform 회전을 반영한 사각형 외곽선을 그린다.
         // Unity Scene/Game 뷰에서 Gizmos가 켜져 있어야 확인하기 쉽다.
         Vector3 center = transform.position;
-        Vector2 size = attackData.hitboxSize;
+        Vector2 size = hitboxSize;
         Vector3 right = transform.right * (size.x * 0.5f);
         Vector3 up = transform.up * (size.y * 0.5f);
 
@@ -196,11 +230,21 @@ public class MeleeHitbox : MonoBehaviour
         Vector3 topLeft = center - right + up;
         Vector3 bottomLeft = center - right - up;
         Vector3 bottomRight = center + right - up;
-        float duration = attackData.debugDrawDuration;
+        float duration = debugDrawDuration;
 
         Debug.DrawLine(topRight, topLeft, debugColor, duration);
         Debug.DrawLine(topLeft, bottomLeft, debugColor, duration);
         Debug.DrawLine(bottomLeft, bottomRight, debugColor, duration);
         Debug.DrawLine(bottomRight, topRight, debugColor, duration);
+    }
+
+    public static Vector2 ResolveAttackOffset(Vector2 offset, Vector2 attackDirection)
+    {
+        Vector2 normalizedDirection = attackDirection.sqrMagnitude > 0.0001f
+            ? attackDirection.normalized
+            : Vector2.down;
+        Vector2 perpendicular = new(-normalizedDirection.y, normalizedDirection.x);
+
+        return normalizedDirection * offset.x + perpendicular * offset.y;
     }
 }
