@@ -91,7 +91,14 @@ public class EnemyHealth : MonoBehaviour, IDamageable
             return true;
         }
 
-        fsm.RequestState(EnemyState.Hit);
+        if (fsm.IsState(EnemyState.Hit))
+        {
+            hitTimer = Mathf.Max(0f, enemyBase.Data.hitStateDuration);
+        }
+        else
+        {
+            fsm.RequestState(EnemyState.Hit);
+        }
         return true;
     }
 
@@ -134,7 +141,7 @@ public class EnemyHealth : MonoBehaviour, IDamageable
         OnDied?.Invoke();
         Debug.Log($"{name} died.", this);
 
-        if (enemyBase.Data.destroyOnDeath)
+        if (enemyBase.Data.destroyOnDeath) // 추후에 사망 연출 필요
         {
             Destroy(gameObject);
         }

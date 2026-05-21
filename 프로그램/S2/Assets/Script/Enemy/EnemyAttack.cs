@@ -4,7 +4,7 @@ using UnityEngine;
 [RequireComponent(typeof(EnemyBase))]
 [RequireComponent(typeof(EnemyFSMManager))]
 [RequireComponent(typeof(EnemyDetector))]
-public class EnemyAttack : MonoBehaviour
+public class EnemyAttack : MonoBehaviour, IAttackInfoProvider
 {
     [Header("Hitbox")]
     [SerializeField] private MeleeHitbox meleeHitbox;
@@ -30,7 +30,6 @@ public class EnemyAttack : MonoBehaviour
         enemyBase = context.Base;
         fsm = context.Fsm;
         detector = context.Detector;
-        meleeHitbox = meleeHitbox != null ? meleeHitbox : context.MeleeHitbox;
 
         if (enemyBase == null || fsm == null || detector == null || meleeHitbox == null || !HasValidData())
         {
@@ -150,12 +149,6 @@ public class EnemyAttack : MonoBehaviour
     {
         DeactivateHitbox();
         cooldownTimer = ResolveAttackData().cooldown;
-
-        if (detector.HasTarget && !detector.IsTargetInAttackRange)
-        {
-            fsm.RequestState(EnemyState.Chase);
-            return;
-        }
 
         fsm.RequestState(detector.HasTarget ? EnemyState.Chase : EnemyState.Idle);
     }

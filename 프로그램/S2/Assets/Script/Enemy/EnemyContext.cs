@@ -13,7 +13,6 @@ public class EnemyContext : MonoBehaviour
     [SerializeField] private EnemyAttack attack;
     [SerializeField] private EnemyAnimation enemyAnimation;
     [SerializeField] private Rigidbody2D body;
-    [SerializeField] private MeleeHitbox meleeHitbox;
 
     public Transform Root => transform;
     public EnemyBase Base => enemyBase;
@@ -22,9 +21,9 @@ public class EnemyContext : MonoBehaviour
     public EnemyDetector Detector => detector;
     public EnemyMovement Movement => movement;
     public EnemyAttack Attack => attack;
+    public IAttackInfoProvider AttackInfoProvider => attack;
     public EnemyAnimation Animation => enemyAnimation;
     public Rigidbody2D Body => body;
-    public MeleeHitbox MeleeHitbox => meleeHitbox;
 
     private void Awake()
     {
@@ -73,9 +72,5 @@ public class EnemyContext : MonoBehaviour
             body = GetComponent<Rigidbody2D>();
         }
 
-        if (meleeHitbox == null)
-        {
-            meleeHitbox = GetComponentInChildren<MeleeHitbox>(true);
-        }
     }
 }

@@ -12,6 +12,7 @@ public class MeleeHitbox : MonoBehaviour
     // 한 번의 공격에서 같은 대상이 여러 콜라이더로 중복 피격되는 것을 막는다.
     // 인터페이스 자체는 HashSet 키로 쓰기 애매하므로 실제 MonoBehaviour 컴포넌트를 저장한다.
     private readonly HashSet<Component> hitTargets = new();
+    private readonly List<Collider2D> overlapResults = new();
 
     private Collider2D hitboxCollider;
     private Transform owner;
@@ -35,6 +36,7 @@ public class MeleeHitbox : MonoBehaviour
         }
     }
 
+    //플레이어 공격룡
     public void Activate(Transform newOwner, PlayerMeleeAttackData newAttackData, Vector2 attackDirection)
     {
         if (newAttackData == null)
@@ -43,6 +45,7 @@ public class MeleeHitbox : MonoBehaviour
             return;
         }
 
+        //재귀형식으로 호출
         Activate(
             newOwner,
             newAttackData.damage,
@@ -55,6 +58,7 @@ public class MeleeHitbox : MonoBehaviour
             attackDirection);
     }
 
+    
     public void Activate(
         Transform newOwner,
         int newDamage,
@@ -86,6 +90,7 @@ public class MeleeHitbox : MonoBehaviour
         if (hitboxCollider != null)
         {
             hitboxCollider.enabled = true;
+            HitCurrentOverlaps();
         }
 
         DrawDebugHitbox();
@@ -187,6 +192,24 @@ public class MeleeHitbox : MonoBehaviour
         }
 
         damageable.TakeDamage(damage);
+    }
+
+    private void HitCurrentOverlaps()
+    {
+        if (hitboxCollider == null)
+        {
+            return;
+        }
+
+        // 판정을 켠 순간 이미 겹쳐 있는 대상도 맞도록 현재 Overlap을 즉시 검사한다.
+        Physics2D.SyncTransforms();
+        overlapResults.Clear();
+        hitboxCollider.Overlap(new ContactFilter2D().NoFilter(), overlapResults);
+
+        foreach (Collider2D overlap in overlapResults)
+        {
+            TryHit(overlap.gameObject);
+        }
     }
 
     private bool CanHitTarget(GameObject target)

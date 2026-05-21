@@ -10,7 +10,7 @@ public class EnemyAnimation : MonoBehaviour
 
     private EnemyFSMManager fsm;
     private EnemyMovement movement;
-    private EnemyAttack attack;
+    private IAttackInfoProvider attackInfoProvider;
     private EnemyDirection4 lastDirection = EnemyDirection4.Down;
     private EnemyAnimState? currentAnimState;
 
@@ -26,7 +26,7 @@ public class EnemyAnimation : MonoBehaviour
 
         fsm = context.Fsm;
         movement = context.Movement;
-        attack = context.Attack;
+        attackInfoProvider = context.AttackInfoProvider;
 
         if (animator == null)
         {
@@ -55,9 +55,9 @@ public class EnemyAnimation : MonoBehaviour
     {
         Vector2 direction = Vector2.zero;
 
-        if (fsm.IsState(EnemyState.Attack) && attack != null)
+        if (fsm.IsState(EnemyState.Attack) && attackInfoProvider != null)
         {
-            direction = attack.AttackDirection;
+            direction = attackInfoProvider.AttackDirection;
         }
         else if (movement != null)
         {

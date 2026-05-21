@@ -6,7 +6,7 @@ using UnityEngine;
 [RequireComponent(typeof(PlayerAim))]
 [RequireComponent(typeof(PlayerLoadout))]
 [RequireComponent(typeof(PlayerContext))]
-public class PlayerMeleeAttack : MonoBehaviour
+public class PlayerMeleeAttack : MonoBehaviour, IAttackInfoProvider
 {
     [Header("References")]
     // 플레이어 자식 오브젝트에 붙일 실제 공격 판정 콜라이더.
@@ -72,6 +72,9 @@ public class PlayerMeleeAttack : MonoBehaviour
     // 공격 시작 순간에 고정된 마우스 기준 방향이다.
     // 공격 도중 마우스를 움직여도 실제 판정과 검 연출 방향이 함께 흔들리지 않게 한다.
     public Vector2 CurrentAttackDirection => currentAttackDirection;
+    // 추후 플레이어/적/NPC 공격 정보를 공용 시스템에서 읽을 때 사용하는 인터페이스용 값이다.
+    public Vector2 AttackDirection => currentAttackDirection;
+    public bool IsAttacking => fsm != null && fsm.IsState(PlayerState.MeleeAttack);
 
     // 현재 콤보 인덱스다. 디버그 표시나 연출 분기용으로만 읽게 둔다.
     public int CurrentComboIndex => comboIndex;

@@ -56,7 +56,7 @@ public class EnemyMovement : MonoBehaviour
 
     private void UpdateStateByDetection()
     {
-        if (fsm.IsState(EnemyState.Dead) || fsm.IsState(EnemyState.Hacked) || fsm.IsState(EnemyState.Attack) || fsm.IsState(EnemyState.Hit))
+        if (fsm.IsState(EnemyState.Dead) || fsm.IsState(EnemyState.Attack) || fsm.IsState(EnemyState.Hit))
         {
             return;
         }
