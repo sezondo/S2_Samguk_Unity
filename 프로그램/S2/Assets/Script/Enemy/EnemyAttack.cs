@@ -71,7 +71,7 @@ public class EnemyAttack : MonoBehaviour, IAttackInfoProvider
 
     private void TryEnterAttack()
     {
-        if (cooldownTimer > 0f || !fsm.CanAttack() || !detector.IsTargetInAttackRange)
+        if (cooldownTimer > 0f || !fsm.CanAttack() || !detector.IsTargetDetected || !detector.IsTargetInAttackRange)
         {
             return;
         }
@@ -150,7 +150,7 @@ public class EnemyAttack : MonoBehaviour, IAttackInfoProvider
         DeactivateHitbox();
         cooldownTimer = ResolveAttackData().cooldown;
 
-        fsm.RequestState(detector.HasTarget ? EnemyState.Chase : EnemyState.Idle);
+        fsm.RequestState(detector.IsTargetDetected ? EnemyState.Chase : EnemyState.Idle);
     }
 
     private void UpdateCooldown()

@@ -15,6 +15,12 @@ public class EnemyData : ScriptableObject
     public float attackRange = 0.8f;
     public float stopDistance = 0.6f;
 
+    [Header("Sight")]
+    public float viewAngle = 90f;
+    public LayerMask sightBlockLayers;
+    public bool drawSightDebug = true;
+    public Color sightDebugColor = Color.cyan;
+
     [Header("Attack")]
     public EnemyMeleeAttackData meleeAttack = new();
 }

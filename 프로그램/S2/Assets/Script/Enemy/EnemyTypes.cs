@@ -9,6 +9,12 @@ public enum EnemyState
     Hacked,
 }
 
+public enum EnemyDetectionState
+{
+    PlayerUndetected,
+    PlayerDetected,
+}
+
 public enum EnemyDirection4
 {
     Down,

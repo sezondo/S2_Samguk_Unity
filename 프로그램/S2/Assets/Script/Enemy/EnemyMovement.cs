@@ -43,7 +43,7 @@ public class EnemyMovement : MonoBehaviour
 
     private void FixedUpdate()
     {
-        if (!fsm.CanMove() || !detector.HasTarget || detector.DistanceToTarget <= ResolveStopDistance())
+        if (!fsm.CanMove() || !detector.IsTargetDetected || detector.DistanceToTarget <= ResolveStopDistance())
         {
             Stop();
             return;
@@ -61,13 +61,13 @@ public class EnemyMovement : MonoBehaviour
             return;
         }
 
-        if (detector.HasTarget && !detector.IsTargetInAttackRange)
+        if (detector.IsTargetDetected && !detector.IsTargetInAttackRange)
         {
             fsm.RequestState(EnemyState.Chase);
             return;
         }
 
-        if (!detector.HasTarget && fsm.IsState(EnemyState.Chase))
+        if (!detector.IsTargetDetected && fsm.IsState(EnemyState.Chase))
         {
             fsm.RequestState(EnemyState.Idle);
         }
