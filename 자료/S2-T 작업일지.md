@@ -48,6 +48,9 @@
 ## 검증
 - `dotnet build Assembly-CSharp.csproj --no-restore` 통과.
 - 경고 0개, 오류 0개.
+- 변수 주석과 규칙 문서 반영 후 `dotnet build Assembly-CSharp.csproj --no-restore` 재검증 통과.
+- 함수 주석과 규칙 문서 반영 후 `dotnet build Assembly-CSharp.csproj --no-restore` 재검증 통과.
+- 로그 한글화와 규칙 문서 반영 후 `dotnet build Assembly-CSharp.csproj --no-restore` 재검증 통과.
 
 ## 다음
 - S2-T 전용 테스트 씬을 만들지, 기존 테스트 씬을 복제해 쓸지 결정한다.
@@ -94,5 +97,46 @@
 - `dotnet build Assembly-CSharp.csproj --no-restore` 통과.
 - 경고 0개, 오류 0개.
 
+## 추가 핵심
+- `TurnManager`를 추가했다.
+- `TurnSide.Player`, `TurnSide.Enemy` 기준으로 현재 턴 주체를 관리한다.
+- `TurnStarted`, `TurnEnded` 이벤트를 열어 AP, 행동 선택, 적 행동이 턴 흐름에 붙을 수 있게 했다.
+- 정식 턴 종료 UI 전까지 스페이스바로 턴 전환 로그를 확인할 수 있게 했다.
+- `ActionPoint`를 추가했다.
+- 플레이어 턴 시작 시 AP를 보충하고, `CanSpend()`, `TrySpend()`로 행동 비용을 확인/소비하게 했다.
+- `GridPlayerDebugMover`가 플레이어 턴과 AP를 확인한 뒤 이동하게 연결했다.
+- 같은 오브젝트에 `ActionPoint`가 있으면 WASD 1칸 이동마다 AP 1을 소비한다.
+- 이 WASD 연결은 정식 조작이 아니라 턴/AP 검증용으로 둔다.
 
+## 검증
+- `dotnet build Assembly-CSharp.csproj --no-restore` 통과.
+- 경고 0개, 오류 0개.
 
+## 다음
+- 씬의 Manager에 `TurnManager`를 붙이고, 플레이어 토큰에 `ActionPoint`를 붙여 AP 로그와 이동 제한을 확인한다.
+- 이후 마우스 기반 이동 행동 선택 상태와 이동 가능 칸 표시를 구현한다.
+
+# 2026-05-30
+
+## 핵심
+- `PlayerGridMoveAction`을 추가했다.
+- UI 버튼이 붙기 전까지 `M` 키로 이동 행동 선택을 검증할 수 있게 했다.
+- 이동 행동 선택 중 좌클릭한 칸을 `GridManager.WorldToGrid()`로 변환해 목표 칸으로 사용한다.
+- 이동 가능 칸은 현재 플레이어 위치 기준 맨해튼 거리 3칸 이내로 계산한다.
+- 이동 행동 1회는 AP 1을 행동 시작 시점에 소비한다.
+- 정식 경로 탐색 전까지 X축 우선, Y축 후속의 단순 맨해튼 경로를 사용한다.
+- 이동 가능 칸 표시, 칸 진입 시야 검사, 이동 완료 후속 처리를 붙을 수 있도록 이벤트를 열어뒀다.
+- S2-T 핵심 스크립트의 멤버 변수와 주요 상태 변수에 한국어 주석을 추가했다.
+- S2-T 핵심 스크립트의 함수에 무엇을 하는 함수인지 한국어 XML 주석을 추가했다.
+- `AGENTS.md`와 구현 구조 문서에 앞으로 새 변수와 함수에는 의미 주석을 붙이는 규칙을 명시했다.
+- S2-T 스크립트의 런타임 로그 문장을 한글로 바꿨다.
+- `AGENTS.md`와 구현 구조 문서에 앞으로 런타임 로그는 기본적으로 한국어로 작성하는 규칙을 명시했다.
+
+## 검증
+- `dotnet build Assembly-CSharp.csproj --no-restore` 통과.
+- 경고 0개, 오류 0개.
+
+## 다음
+- 테스트 씬에서 플레이어 토큰에 `PlayerGridMoveAction`을 붙여 마우스 이동 흐름을 확인한다.
+- 이동 가능 칸 표시용 하이라이트 컴포넌트를 추가한다.
+- 이후 경로 계산과 `MoveStepEntered` 기반 적 시야 검사를 연결한다.

@@ -22,7 +22,7 @@ public class DialogueManager : MonoBehaviour
     {
         if (Instance != null && Instance != this)
         {
-            Debug.LogError($"{nameof(DialogueManager)} already exists. Only one dialogue manager is allowed.", this);
+            Debug.LogError($"{nameof(DialogueManager)}: 이미 인스턴스가 있습니다. 대사 매니저는 씬에 하나만 둘 수 있습니다.", this);
             enabled = false;
             return;
         }
@@ -72,7 +72,7 @@ public class DialogueManager : MonoBehaviour
     {
         if (IsPlaying)
         {
-            Debug.LogWarning($"{nameof(DialogueManager)} rejected dialogue '{GetSequenceName(sequence)}' because another dialogue is already playing.", this);
+            Debug.LogWarning($"{nameof(DialogueManager)}: 이미 다른 대사가 재생 중이라 '{GetSequenceName(sequence)}' 대사를 시작하지 못했습니다.", this);
             return false;
         }
 
@@ -117,7 +117,7 @@ public class DialogueManager : MonoBehaviour
 
         if (bubblePresenter == null)
         {
-            Debug.LogError($"{nameof(DialogueManager)} requires {nameof(DialogueBubblePresenter)} to show dialogue bubbles.", this);
+            Debug.LogError($"{nameof(DialogueManager)}: 말풍선을 표시하려면 {nameof(DialogueBubblePresenter)}가 필요합니다.", this);
             FinishActiveSequence();
             return;
         }
@@ -178,19 +178,19 @@ public class DialogueManager : MonoBehaviour
     {
         if (sequence == null)
         {
-            Debug.LogError($"{nameof(DialogueManager)} received a null dialogue sequence.", this);
+            Debug.LogError($"{nameof(DialogueManager)}: 비어 있는 대사 시퀀스를 받았습니다.", this);
             return false;
         }
 
         if (sequence.steps == null || sequence.steps.Length == 0)
         {
-            Debug.LogError($"{nameof(DialogueManager)} received empty dialogue sequence '{sequence.name}'.", this);
+            Debug.LogError($"{nameof(DialogueManager)}: '{sequence.name}' 대사 시퀀스에 스텝이 없습니다.", this);
             return false;
         }
 
         if (speakers == null || speakers.Length == 0)
         {
-            Debug.LogError($"{nameof(DialogueManager)} received dialogue '{sequence.name}' without speakers.", this);
+            Debug.LogError($"{nameof(DialogueManager)}: '{sequence.name}' 대사에 사용할 발화자 목록이 없습니다.", this);
             return false;
         }
 

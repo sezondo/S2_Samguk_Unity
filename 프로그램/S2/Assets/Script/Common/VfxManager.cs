@@ -101,7 +101,7 @@ public class VfxManager : MonoBehaviour
     {
         if (Instance != null && Instance != this)
         {
-            Debug.LogWarning($"{nameof(VfxManager)} instance already exists. Disabling duplicate on {name}.", this);
+            Debug.LogWarning($"{nameof(VfxManager)}: 이미 인스턴스가 있습니다. 중복 오브젝트 {name}의 컴포넌트를 비활성화합니다.", this);
             enabled = false;
             return;
         }

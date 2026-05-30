@@ -8,29 +8,44 @@ using UnityEngine;
 public class GridManager : MonoBehaviour
 {
     [Header("Board")]
+    // 보드의 가로 칸 수다.
     [SerializeField] private int width = 10;
+    // 보드의 세로 칸 수다.
     [SerializeField] private int height = 10;
+    // 그리드 한 칸이 Unity 월드에서 차지하는 크기다.
     [SerializeField] private float cellSize = 1f;
+    // 그리드 (0, 0) 칸의 기준 월드 위치다.
     [SerializeField] private Vector3 originWorldPosition;
 
     [Header("Gizmos")]
+    // Scene 뷰에서 보드 선과 점유 칸을 그릴지 정한다.
     [SerializeField] private bool drawGizmos = true;
+    // Scene 뷰에 표시할 보드 선 색이다.
     [SerializeField] private Color gridColor = new(0.25f, 0.75f, 1f, 0.35f);
+    // Scene 뷰에 표시할 점유 칸 색이다.
     [SerializeField] private Color occupiedColor = new(1f, 0.35f, 0.25f, 0.45f);
 
+    // 현재 어떤 칸을 어떤 GridActor가 점유 중인지 저장한다.
     private readonly Dictionary<GridPosition, GridActor> actorByPosition = new();
 
+    // 씬에서 사용하는 단일 그리드 매니저 인스턴스다.
     public static GridManager Instance { get; private set; }
 
+    // 외부에서 읽는 보드 가로 칸 수다.
     public int Width => width;
+    // 외부에서 읽는 보드 세로 칸 수다.
     public int Height => height;
+    // 외부에서 읽는 한 칸의 월드 크기다.
     public float CellSize => cellSize;
 
+    /// <summary>
+    /// 씬의 단일 GridManager 인스턴스를 등록한다.
+    /// </summary>
     private void Awake()
     {
         if (Instance != null && Instance != this)
         {
-            Debug.LogWarning($"{nameof(GridManager)} instance already exists. Disabling duplicate on {name}.", this);
+            Debug.LogWarning($"{nameof(GridManager)}: 이미 인스턴스가 있습니다. 중복 오브젝트 {name}의 컴포넌트를 비활성화합니다.", this);
             enabled = false;
             return;
         }
@@ -38,6 +53,9 @@ public class GridManager : MonoBehaviour
         Instance = this;
     }
 
+    /// <summary>
+    /// 현재 인스턴스가 제거될 때 싱글톤 참조를 정리한다.
+    /// </summary>
     private void OnDestroy()
     {
         if (Instance == this)
@@ -46,16 +64,25 @@ public class GridManager : MonoBehaviour
         }
     }
 
+    /// <summary>
+    /// 지정한 칸이 보드 범위 안에 있는지 확인한다.
+    /// </summary>
     public bool IsInside(GridPosition position)
     {
         return position.x >= 0 && position.x < width && position.y >= 0 && position.y < height;
     }
 
+    /// <summary>
+    /// 보드 칸 좌표를 Unity 월드 좌표로 변환한다.
+    /// </summary>
     public Vector3 GridToWorld(GridPosition position)
     {
         return originWorldPosition + new Vector3(position.x * cellSize, position.y * cellSize, 0f);
     }
 
+    /// <summary>
+    /// Unity 월드 좌표를 가장 가까운 보드 칸 좌표로 변환한다.
+    /// </summary>
     public GridPosition WorldToGrid(Vector3 worldPosition)
     {
         Vector3 localPosition = worldPosition - originWorldPosition;
@@ -64,21 +91,33 @@ public class GridManager : MonoBehaviour
         return new GridPosition(x, y);
     }
 
+    /// <summary>
+    /// 지정한 칸에 새 말이 들어갈 수 있는지 확인한다.
+    /// </summary>
     public bool CanEnter(GridPosition position)
     {
         return IsInside(position) && !IsOccupied(position);
     }
 
+    /// <summary>
+    /// 지정한 칸이 다른 GridActor에게 점유되어 있는지 확인한다.
+    /// </summary>
     public bool IsOccupied(GridPosition position)
     {
         return actorByPosition.TryGetValue(position, out GridActor actor) && actor != null;
     }
 
+    /// <summary>
+    /// 지정한 칸에 등록된 GridActor를 가져온다.
+    /// </summary>
     public bool TryGetActorAt(GridPosition position, out GridActor actor)
     {
         return actorByPosition.TryGetValue(position, out actor) && actor != null;
     }
 
+    /// <summary>
+    /// GridActor를 지정한 칸의 점유자로 등록한다.
+    /// </summary>
     public bool RegisterActor(GridActor actor, GridPosition position)
     {
         if (actor == null || !IsInside(position))
@@ -88,7 +127,7 @@ public class GridManager : MonoBehaviour
 
         if (TryGetActorAt(position, out GridActor existingActor) && existingActor != actor)
         {
-            Debug.LogWarning($"Grid cell {position} is already occupied by {existingActor.name}.", this);
+            Debug.LogWarning($"{nameof(GridManager)}: {position} 칸은 이미 {existingActor.name} 오브젝트가 점유하고 있습니다.", this);
             return false;
         }
 
@@ -96,6 +135,9 @@ public class GridManager : MonoBehaviour
         return true;
     }
 
+    /// <summary>
+    /// 지정한 칸에서 GridActor 점유 등록을 해제한다.
+    /// </summary>
     public void UnregisterActor(GridActor actor, GridPosition position)
     {
         if (actor == null)
@@ -109,6 +151,9 @@ public class GridManager : MonoBehaviour
         }
     }
 
+    /// <summary>
+    /// GridActor의 점유 칸을 시작 칸에서 목표 칸으로 옮긴다.
+    /// </summary>
     public bool TryMoveActor(GridActor actor, GridPosition from, GridPosition to)
     {
         if (actor == null || !CanEnter(to))
@@ -121,6 +166,9 @@ public class GridManager : MonoBehaviour
         return true;
     }
 
+    /// <summary>
+    /// Scene 뷰에서 보드 선과 점유 칸을 시각화한다.
+    /// </summary>
     private void OnDrawGizmos()
     {
         if (!drawGizmos)

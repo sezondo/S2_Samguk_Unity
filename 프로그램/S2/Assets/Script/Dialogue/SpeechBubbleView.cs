@@ -73,7 +73,7 @@ public class SpeechBubbleView : MonoBehaviour
     {
         if (line == null)
         {
-            Debug.LogError($"{nameof(SpeechBubbleView)} on {name} received a null dialogue line.", this);
+            Debug.LogError($"{nameof(SpeechBubbleView)}: {name} 오브젝트가 비어 있는 대사 줄을 받았습니다.", this);
             return;
         }
 
@@ -275,7 +275,7 @@ public class SpeechBubbleView : MonoBehaviour
             return true;
         }
 
-        Debug.LogError($"{nameof(SpeechBubbleView)} on {name} requires a parent Canvas, bubbleImage, and dialogueText references.", this);
+        Debug.LogError($"{nameof(SpeechBubbleView)}: {name} 오브젝트에는 부모 Canvas, bubbleImage, dialogueText 참조가 필요합니다.", this);
         return false;
     }
 

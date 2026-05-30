@@ -43,7 +43,7 @@ public class DialogueBubblePresenter : MonoBehaviour
 
         if (step == null || step.lines == null || step.lines.Length == 0)
         {
-            Debug.LogError($"{nameof(DialogueBubblePresenter)} received an empty dialogue step in '{sequenceName}'.", this);
+            Debug.LogError($"{nameof(DialogueBubblePresenter)}: '{sequenceName}' 대사에서 비어 있는 스텝을 받았습니다.", this);
             return false;
         }
 
@@ -52,7 +52,7 @@ public class DialogueBubblePresenter : MonoBehaviour
             DialogueLineData line = step.lines[i];
             if (line == null)
             {
-                Debug.LogError($"{nameof(DialogueBubblePresenter)} received a null line in '{sequenceName}'.", this);
+                Debug.LogError($"{nameof(DialogueBubblePresenter)}: '{sequenceName}' 대사에 비어 있는 대사 줄이 있습니다.", this);
                 HideActiveBubbles();
                 return false;
             }
@@ -60,7 +60,7 @@ public class DialogueBubblePresenter : MonoBehaviour
             DialogueSpeaker speaker = ResolveSpeaker(line.speakerTag, speakers);
             if (speaker == null)
             {
-                Debug.LogError($"{nameof(DialogueBubblePresenter)} could not find speakerTag '{line.speakerTag}' in dialogue '{sequenceName}'.", this);
+                Debug.LogError($"{nameof(DialogueBubblePresenter)}: '{sequenceName}' 대사에서 speakerTag '{line.speakerTag}'에 해당하는 발화자를 찾지 못했습니다.", this);
                 HideActiveBubbles();
                 return false;
             }
@@ -117,7 +117,7 @@ public class DialogueBubblePresenter : MonoBehaviour
 
         if (speechBubblePrefab == null)
         {
-            Debug.LogError($"{nameof(DialogueBubblePresenter)} on {name} requires a speech bubble prefab.", this);
+            Debug.LogError($"{nameof(DialogueBubblePresenter)}: {name} 오브젝트에 말풍선 프리팹이 필요합니다.", this);
             return null;
         }
 
