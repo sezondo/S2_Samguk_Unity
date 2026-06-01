@@ -16,11 +16,14 @@ public class GridMoveRangeHighlighter : MonoBehaviour
     [SerializeField] private GridCellHighlighter cellHighlighter;
 
     /// <summary>
-    /// 같은 오브젝트의 이동 행동과 하이라이트 표시기 참조를 준비한다.
+    /// 이동 범위 하이라이트 연결에 필요한 필수 참조를 확인한다.
     /// </summary>
     private void Awake()
     {
-        ResolveReferences();
+        if (!HasValidReference())
+        {
+            enabled = false;
+        }
     }
 
     /// <summary>
@@ -28,10 +31,9 @@ public class GridMoveRangeHighlighter : MonoBehaviour
     /// </summary>
     private void OnEnable()
     {
-        ResolveReferences();
-
-        if (moveAction == null)
+        if (!HasValidReference())
         {
+            enabled = false;
             return;
         }
 
@@ -58,7 +60,7 @@ public class GridMoveRangeHighlighter : MonoBehaviour
     /// </summary>
     private void ShowMoveRange(IReadOnlyList<GridPosition> positions)
     {
-        cellHighlighter?.Show(positions);
+        cellHighlighter.Show(positions);
     }
 
     /// <summary>
@@ -66,22 +68,29 @@ public class GridMoveRangeHighlighter : MonoBehaviour
     /// </summary>
     private void HideMoveRange()
     {
-        cellHighlighter?.Hide();
+        if (cellHighlighter != null)
+        {
+            cellHighlighter.Hide();
+        }
     }
 
     /// <summary>
-    /// 필요한 같은 오브젝트 컴포넌트 참조를 확보한다.
+    /// 이동 범위 하이라이트 연결에 필요한 필수 참조가 연결되어 있는지 확인한다.
     /// </summary>
-    private void ResolveReferences()
+    private bool HasValidReference()
     {
         if (moveAction == null)
         {
-            moveAction = GetComponent<PlayerGridMoveAction>();
+            Debug.LogError($"{nameof(GridMoveRangeHighlighter)} on {name}에는 {nameof(PlayerGridMoveAction)} 참조가 필요합니다.", this);
+            return false;
         }
 
         if (cellHighlighter == null)
         {
-            cellHighlighter = GetComponent<GridCellHighlighter>();
+            Debug.LogError($"{nameof(GridMoveRangeHighlighter)} on {name}에는 {nameof(GridCellHighlighter)} 참조가 필요합니다.", this);
+            return false;
         }
+
+        return true;
     }
 }

@@ -1,0 +1,57 @@
+using UnityEngine;
+
+/// <summary>
+/// 플레이어 루트에 붙은 핵심 컴포넌트와 데이터를 모아 제공하는 참조 주머니다.
+/// 정책 계산이나 상태 변경은 하지 않고, 다른 플레이어 컴포넌트가 필요한 참조를 꺼내 쓰게 한다.
+/// </summary>
+public class PlayerContext : MonoBehaviour
+{
+    [Header("Data")]
+    // 플레이어 턴 행동에 사용하는 AP, 이동 같은 튜닝 데이터다.
+    [SerializeField] private PlayerTurnData turnData;
+
+    [Header("Core Components")]
+    // 플레이어가 보드에서 차지하는 칸과 실제 격자 이동을 관리하는 공용 말 컴포넌트다.
+    [SerializeField] private GridActor gridActor;
+    // 플레이어 턴 행동에서 소비하는 AP 컴포넌트다.
+    [SerializeField] private ActionPoint actionPoint;
+    // 플레이어의 마우스 기반 그리드 이동 행동 컴포넌트다.
+    [SerializeField] private PlayerGridMoveAction gridMoveAction;
+
+    public PlayerTurnData TurnData => turnData;
+    public GridActor GridActor => gridActor;
+    public ActionPoint ActionPoint => actionPoint;
+    public PlayerGridMoveAction GridMoveAction => gridMoveAction;
+
+    /// <summary>
+    /// 플레이어 Context에 필수 참조가 모두 연결되어 있는지 확인한다.
+    /// </summary>
+    public bool HasValidReference()
+    {
+        if (turnData == null)
+        {
+            Debug.LogError($"{nameof(PlayerContext)} on {name}에는 {nameof(PlayerTurnData)} 참조가 필요합니다.", this);
+            return false;
+        }
+
+        if (gridActor == null)
+        {
+            Debug.LogError($"{nameof(PlayerContext)} on {name}에는 {nameof(GridActor)} 참조가 필요합니다.", this);
+            return false;
+        }
+
+        if (actionPoint == null)
+        {
+            Debug.LogError($"{nameof(PlayerContext)} on {name}에는 {nameof(ActionPoint)} 참조가 필요합니다.", this);
+            return false;
+        }
+
+        if (gridMoveAction == null)
+        {
+            Debug.LogError($"{nameof(PlayerContext)} on {name}에는 {nameof(PlayerGridMoveAction)} 참조가 필요합니다.", this);
+            return false;
+        }
+
+        return true;
+    }
+}

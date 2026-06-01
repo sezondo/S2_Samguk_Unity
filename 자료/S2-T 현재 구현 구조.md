@@ -335,6 +335,8 @@ Notion에는 목표, 방향, 남은 작업만 짧게 두고, 상세 구현 구�
 - 플레이어 턴이 시작되면 설정된 AP를 보충한다.
 - `CanSpend()`와 `TrySpend()`로 행동 비용 확인과 소비를 처리한다.
 - AP 정책만 담당하고, 어떤 행동이 AP를 쓰는지는 호출자가 결정한다.
+- 최대 AP와 턴 시작 AP는 `PlayerContext.TurnData` 값을 사용한다.
+- `PlayerContext` 또는 `PlayerTurnData`가 없거나 AP 데이터가 유효하지 않으면 `ActionPoint.HasValidData()`에서 오류 로그를 남기고 컴포넌트를 비활성화한다.
 
 ### 디버그 이동 연결
 
@@ -342,6 +344,37 @@ Notion에는 목표, 방향, 남은 작업만 짧게 두고, 상세 구현 구�
 - `ActionPoint`가 같은 오브젝트에 있으면 WASD 1칸 이동마다 AP 1을 소비한다.
 - 이 연결은 정식 조작이 아니라 턴/AP 구조 검증용이다.
 - 다음 단계에서는 WASD 확장이 아니라 마우스 기반 이동 행동 선택 상태로 옮겨간다.
+- 디버그 이동 AP 비용도 `PlayerContext.TurnData.MoveActionPointCost`를 사용한다.
+
+## 플레이어 Context와 턴 데이터
+
+2026-06-01 기준 플레이어 수치와 핵심 참조를 정리하기 위해 `PlayerContext`와 `PlayerTurnData`를 추가했다.
+
+### PlayerTurnData
+
+- `PlayerTurnData`는 S2-T 플레이어의 턴 기반 행동 수치를 보관하는 `ScriptableObject`다.
+- 현재 포함 값은 최대 AP, 턴 시작 AP, 이동 범위, 이동 AP 비용이다.
+- `ActionPoint`, `PlayerGridMoveAction`, `GridPlayerDebugMover`는 `PlayerContext.TurnData`를 기준으로 수치를 읽는다.
+- `PlayerTurnData` 자체는 값 보관만 담당하고, 데이터 유효성 검사는 데이터를 사용하는 스크립트의 `HasValidData()`가 직접 수행한다.
+- 데이터가 비어 있거나 유효하지 않으면 해당 데이터를 사용하는 스크립트가 임의 fallback 없이 오류 로그를 남기고 해당 흐름을 중단한다.
+- 검 투척 거리/비용, 해킹 비용, 회수 비용 같은 값은 실제 기능을 구현할 때 추가한다.
+
+### PlayerContext
+
+- `PlayerContext`는 플레이어 루트의 참조 주머니 역할만 한다.
+- 현재 참조는 `PlayerTurnData`, `GridActor`, `ActionPoint`, `PlayerGridMoveAction`이다.
+- `PlayerContext`는 튜닝 수치 계산, 이동 정책, AP 소비 정책을 직접 처리하지 않는다.
+- `PlayerContext.HasValidReference()`는 필수 참조 누락 여부를 검사한다.
+- `PlayerContext`는 데이터 값의 유효성을 검사하지 않는다. 실제 데이터 값 검사는 `ActionPoint`, `PlayerGridMoveAction`, `GridPlayerDebugMover`처럼 데이터를 사용하는 스크립트가 맡는다.
+- `GridActor`는 여전히 공용 컴포넌트이며, `PlayerContext`를 알지 않는다.
+- 플레이어 전용 컴포넌트가 `PlayerContext`에서 공용 컴포넌트 참조를 꺼내 쓰는 방향으로 둔다.
+- 적/NPC도 추후 `EnemyContext`, `NPCContext`에서 같은 `GridActor` 같은 공용 컴포넌트를 참조할 수 있다.
+
+### 현재 씬 연결
+
+- `Tset` 씬의 플레이어 토큰에는 `PlayerContext`가 연결되어 있다.
+- `PlayerContext.TurnData`에는 `Assets/Data/Player/PlayerTurnData.asset`이 연결되어 있다.
+- `PlayerContext.GridActor`, `ActionPoint`, `GridMoveAction`은 같은 플레이어 토큰의 컴포넌트를 참조한다.
 
 ## 마우스 기반 이동 행동 최소 구조
 
@@ -360,6 +393,8 @@ Notion에는 목표, 방향, 남은 작업만 짧게 두고, 상세 구현 구�
 - 현재 플레이어 칸에서 맨해튼 거리 기준 `moveRange` 이내의 칸을 이동 후보로 계산한다.
 - 기본 이동 거리는 3칸이다.
 - 이동 행동 1회는 `actionPointCost`만큼 AP를 소비하며, 기본 비용은 AP 1이다.
+- 이동 거리와 이동 AP 비용은 `PlayerContext.TurnData` 기준으로 읽는다.
+- `PlayerContext` 또는 `PlayerTurnData`가 없거나 이동 데이터가 유효하지 않으면 `PlayerGridMoveAction.HasValidData()`에서 오류 로그를 남기고 컴포넌트를 비활성화한다.
 - AP는 이동 시작 시점에 소비한다.
 - 목표 칸은 보드 안에 있고 점유되지 않은 칸이어야 한다.
 - 정식 경로 탐색 전까지는 X축 우선, Y축 후속의 단순 맨해튼 경로를 사용한다.

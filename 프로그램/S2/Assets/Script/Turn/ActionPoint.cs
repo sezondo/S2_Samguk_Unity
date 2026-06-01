@@ -8,10 +8,8 @@ using UnityEngine;
 public class ActionPoint : MonoBehaviour
 {
     [Header("AP")]
-    // 이 오브젝트가 가질 수 있는 최대 AP다.
-    [SerializeField] private int maxActionPoint = 3;
-    // 턴 시작 시 보충할 AP 양이다. 최대 AP를 넘으면 최대 AP로 제한된다.
-    [SerializeField] private int startTurnActionPoint = 3;
+    // 플레이어 공통 참조와 턴 데이터를 제공하는 필수 Context다.
+    [SerializeField] private PlayerContext playerContext;
     // true면 플레이어 턴이 시작될 때 AP를 자동 보충한다.
     [SerializeField] private bool refillOnPlayerTurnStart = true;
     // AP가 바뀔 때 Unity 콘솔에 로그를 남길지 정한다.
@@ -20,13 +18,24 @@ public class ActionPoint : MonoBehaviour
     // 현재 남아 있는 AP다.
     public int Current { get; private set; }
     // 음수 설정을 막은 실제 최대 AP 값이다.
-    public int Max => Mathf.Max(0, maxActionPoint);
+    public int Max => playerContext.TurnData.MaxActionPoint;
 
     // AP가 바뀔 때 현재 AP와 최대 AP를 알려준다.
     public event Action<int, int> ActionPointChanged;
 
     // 이벤트 중복 구독을 막기 위해 현재 구독 중인 턴 매니저를 보관한다.
     private TurnManager subscribedTurnManager;
+
+    /// <summary>
+    /// 같은 오브젝트의 PlayerContext 참조를 준비한다.
+    /// </summary>
+    private void Awake()
+    {
+        if (!HasValidReference() || !HasValidData())
+        {
+            enabled = false;
+        }
+    }
 
     /// <summary>
     /// 오브젝트가 활성화될 때 턴 시작 이벤트 구독을 시도한다.
@@ -88,9 +97,7 @@ public class ActionPoint : MonoBehaviour
     /// </summary>
     public void RefillForTurn()
     {
-        int clampedMax = Mathf.Max(0, maxActionPoint);
-        int refillAmount = Mathf.Clamp(startTurnActionPoint, 0, clampedMax);
-        SetCurrent(refillAmount);
+        SetCurrent(playerContext.TurnData.StartTurnActionPoint);
     }
 
     /// <summary>
@@ -129,7 +136,7 @@ public class ActionPoint : MonoBehaviour
     /// </summary>
     private void SetCurrent(int value)
     {
-        int clampedMax = Mathf.Max(0, maxActionPoint);
+        int clampedMax = playerContext.TurnData.MaxActionPoint;
         int nextValue = Mathf.Clamp(value, 0, clampedMax);
         if (Current == nextValue)
         {
@@ -143,5 +150,56 @@ public class ActionPoint : MonoBehaviour
         }
 
         ActionPointChanged?.Invoke(Current, Max);
+    }
+    /// <summary>
+    /// AP 관리에 필요한 필수 참조가 연결되어 있는지 확인한다.
+    /// </summary>
+    private bool HasValidReference()
+    {
+        if (playerContext == null)
+        {
+            Debug.LogError($"{nameof(ActionPoint)} on {name}에는 {nameof(PlayerContext)} 참조가 필요합니다.", this);
+            return false;
+        }
+
+        if (!playerContext.HasValidReference())
+        {
+            return false;
+        }
+
+        return true;
+    }
+
+    /// <summary>
+    /// AP 관리에 필요한 데이터가 유효한지 확인한다.
+    /// </summary>
+    private bool HasValidData()
+    {
+        PlayerTurnData turnData = playerContext.TurnData;
+        if (turnData == null)
+        {
+            Debug.LogError($"{nameof(ActionPoint)} on {name}에는 {nameof(PlayerTurnData)} 참조가 필요합니다.", this);
+            return false;
+        }
+
+        if (turnData.MaxActionPoint <= 0)
+        {
+            Debug.LogError($"{nameof(ActionPoint)} on {name}의 {nameof(PlayerTurnData)} 최대 AP는 0보다 커야 합니다.", this);
+            return false;
+        }
+
+        if (turnData.StartTurnActionPoint < 0)
+        {
+            Debug.LogError($"{nameof(ActionPoint)} on {name}의 {nameof(PlayerTurnData)} 턴 시작 AP는 0 이상이어야 합니다.", this);
+            return false;
+        }
+
+        if (turnData.StartTurnActionPoint > turnData.MaxActionPoint)
+        {
+            Debug.LogError($"{nameof(ActionPoint)} on {name}의 {nameof(PlayerTurnData)} 턴 시작 AP는 최대 AP보다 클 수 없습니다.", this);
+            return false;
+        }
+
+        return true;
     }
 }

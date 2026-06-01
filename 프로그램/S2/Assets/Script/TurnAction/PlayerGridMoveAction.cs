@@ -11,12 +11,8 @@ using UnityEngine.InputSystem;
 public class PlayerGridMoveAction : MonoBehaviour
 {
     [Header("Move Action")]
-    // 이동 행동 1회로 도달할 수 있는 최대 맨해튼 거리다.
-    [SerializeField] private int moveRange = 3;
-    // 이동 행동을 시작할 때 소비하는 AP 비용이다.
-    [SerializeField] private int actionPointCost = 1;
-    // 플레이어가 보유한 AP 컴포넌트다. 비어 있으면 같은 오브젝트에서 자동으로 찾는다.
-    [SerializeField] private ActionPoint actionPoint;
+    // 플레이어 공통 참조와 턴 데이터를 제공하는 필수 Context다.
+    [SerializeField] private PlayerContext playerContext;
     // true면 플레이어 턴일 때만 이동 행동을 선택하고 실행할 수 있다.
     [SerializeField] private bool requirePlayerTurn = true;
 
@@ -51,7 +47,7 @@ public class PlayerGridMoveAction : MonoBehaviour
     // 외부 UI나 표시 컴포넌트가 이동 선택 상태를 읽을 때 사용한다.
     public bool IsMoveSelected => isMoveSelected;
     // 음수 입력을 막은 실제 이동 거리 값이다.
-    public int MoveRange => Mathf.Max(0, moveRange);
+    public int MoveRange => playerContext.TurnData.MoveRange;
 
     // 이동 가능 칸 목록을 화면에 표시해야 할 때 발생한다.
     public event Action<IReadOnlyList<GridPosition>> MoveRangeShown;
@@ -67,11 +63,13 @@ public class PlayerGridMoveAction : MonoBehaviour
     /// </summary>
     private void Awake()
     {
-        actor = GetComponent<GridActor>();
-        if (actionPoint == null)
+        if (!HasValidReference() || !HasValidData())
         {
-            actionPoint = GetComponent<ActionPoint>();
+            enabled = false;
+            return;
         }
+
+        actor = playerContext.GridActor;
     }
 
     /// <summary>
@@ -154,7 +152,9 @@ public class PlayerGridMoveAction : MonoBehaviour
         }
 
         // 이동 행동은 시작 시점에 AP를 소비한다.
-        if (actionPoint != null && actionPointCost > 0 && !actionPoint.TrySpend(actionPointCost))
+        int cost = playerContext.TurnData.MoveActionPointCost;
+        ActionPoint actionPoint = playerContext.ActionPoint;
+        if (cost > 0 && !actionPoint.TrySpend(cost))
         {
             LogBlockedTarget(targetPosition, "AP가 부족합니다");
             return false;
@@ -257,11 +257,13 @@ public class PlayerGridMoveAction : MonoBehaviour
             return false;
         }
 
-        if (actionPoint != null && actionPointCost > 0 && !actionPoint.CanSpend(actionPointCost))
+        int cost = playerContext.TurnData.MoveActionPointCost;
+        ActionPoint actionPoint = playerContext.ActionPoint;
+        if (cost > 0 && !actionPoint.CanSpend(cost))
         {
             if (logBlockedTarget)
             {
-                Debug.Log($"{nameof(PlayerGridMoveAction)}: AP가 부족해서 이동 행동을 선택할 수 없습니다. 필요 AP: {actionPointCost}, 현재 AP: {actionPoint.Current}", this);
+                Debug.Log($"{nameof(PlayerGridMoveAction)}: AP가 부족해서 이동 행동을 선택할 수 없습니다. 필요 AP: {cost}, 현재 AP: {actionPoint.Current}", this);
             }
 
             return false;
@@ -407,5 +409,51 @@ public class PlayerGridMoveAction : MonoBehaviour
         {
             Debug.Log($"{nameof(PlayerGridMoveAction)}: {targetPosition} 칸으로 이동할 수 없습니다. 사유: {reason}", this);
         }
+    }
+
+    /// <summary>
+    /// 이동 행동에 필요한 필수 참조가 연결되어 있는지 확인한다.
+    /// </summary>
+    private bool HasValidReference()
+    {
+        if (playerContext == null)
+        {
+            Debug.LogError($"{nameof(PlayerGridMoveAction)} on {name}에는 {nameof(PlayerContext)} 참조가 필요합니다.", this);
+            return false;
+        }
+
+        if (!playerContext.HasValidReference())
+        {
+            return false;
+        }
+
+        return true;
+    }
+
+    /// <summary>
+    /// 이동 행동에 필요한 데이터가 유효한지 확인한다.
+    /// </summary>
+    private bool HasValidData()
+    {
+        PlayerTurnData turnData = playerContext.TurnData;
+        if (turnData == null)
+        {
+            Debug.LogError($"{nameof(PlayerGridMoveAction)} on {name}에는 {nameof(PlayerTurnData)} 참조가 필요합니다.", this);
+            return false;
+        }
+
+        if (turnData.MoveRange <= 0)
+        {
+            Debug.LogError($"{nameof(PlayerGridMoveAction)} on {name}의 {nameof(PlayerTurnData)} 이동 범위는 0보다 커야 합니다.", this);
+            return false;
+        }
+
+        if (turnData.MoveActionPointCost <= 0)
+        {
+            Debug.LogError($"{nameof(PlayerGridMoveAction)} on {name}의 {nameof(PlayerTurnData)} 이동 AP 비용은 0보다 커야 합니다.", this);
+            return false;
+        }
+
+        return true;
     }
 }

@@ -163,3 +163,25 @@
 - `GridHighlightPurpose`, `IGridHighlightTarget`, 대상 투명도/점멸 표현, 검 투척/해킹 범위 하이라이트는 실제 사용처가 생길 때 추가한다.
 - 다음 구현 후보는 단순 X축 우선 경로를 대체할 경로 계산 구조 정리다.
 - 이후 `MoveStepEntered` 기반 적 시야 검사 연결을 준비한다.
+
+## 추가 핵심
+- 플레이어 턴 수치가 `ActionPoint`, `PlayerGridMoveAction`, `GridPlayerDebugMover`에 흩어져 있던 상태를 정리하기 시작했다.
+- `PlayerTurnData`를 추가해 최대 AP, 턴 시작 AP, 이동 범위, 이동 AP 비용을 데이터 에셋으로 관리하게 했다.
+- `PlayerContext`를 추가해 플레이어의 `PlayerTurnData`, `GridActor`, `ActionPoint`, `PlayerGridMoveAction` 참조를 모았다.
+- `ActionPoint`는 AP 수치를 `PlayerContext.TurnData` 기준으로만 사용한다.
+- `PlayerGridMoveAction`은 이동 범위와 이동 AP 비용을 `PlayerContext.TurnData` 기준으로만 사용한다.
+- `GridPlayerDebugMover`는 디버그 이동 AP 비용을 `PlayerContext.TurnData` 기준으로만 사용한다.
+- 필수 데이터나 참조가 비어 있으면 fallback 없이 `HasValidReference()`, `HasValidData()`에서 오류 로그를 남기고 컴포넌트를 비활성화하게 했다.
+- `PlayerTurnData` 자체가 유효성 검사를 들고 있지 않고, 데이터를 사용하는 `ActionPoint`, `PlayerGridMoveAction`, `GridPlayerDebugMover`가 각자 필요한 필드를 `HasValidData()`에서 직접 검사하고 로그를 남기게 했다.
+- `PlayerGridMoveAction`, `ActionPoint`, `GridPlayerDebugMover`에서 핵심 컴포넌트를 직접 `GetComponent<T>()`로 보정하던 흐름을 제거했다.
+- `GridMoveRangeHighlighter`도 필수 표시 컴포넌트 참조가 비어 있으면 `HasValidReference()`에서 오류를 남기고 비활성화하게 했다.
+- `Tset` 씬의 플레이어 토큰에 `PlayerContext`를 붙이고 `PlayerTurnData` 에셋을 연결했다.
+
+## 추가 검증
+- `dotnet build Assembly-CSharp.csproj --no-restore` 통과.
+- 경고 0개, 오류 0개.
+
+## 작업 규칙 정리
+- 실제 작업 시작 지시 전에는 코드를 수정하지 않고 먼저 작업 방향을 토론하는 기준을 `AGENTS.md`에 명시했다.
+- 인스펙터 세팅은 사용자가 직접 갈아 끼우는 것을 기본으로 두고, AI는 문제 확인을 위해 조회할 수 있지만 임의 수정은 사용자 지시가 있을 때만 진행하는 기준으로 정리했다.
+- 필수 데이터/참조 누락 시 fallback 없이 `HasValidData()`, `HasValidReference()`에서 오류 로그를 남기고 흐름을 중단하는 기준을 명시했다.

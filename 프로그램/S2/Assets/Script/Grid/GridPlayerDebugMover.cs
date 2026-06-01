@@ -9,10 +9,8 @@ using UnityEngine.InputSystem;
 public class GridPlayerDebugMover : MonoBehaviour
 {
     [Header("Debug")]
-    // WASD 디버그 이동 1칸마다 소비할 AP 비용이다.
-    [SerializeField] private int moveActionPointCost = 1;
-    // 디버그 이동 비용을 소비할 AP 컴포넌트다. 비어 있으면 같은 오브젝트에서 찾는다.
-    [SerializeField] private ActionPoint actionPoint;
+    // 플레이어 공통 참조와 턴 데이터를 제공하는 필수 Context다.
+    [SerializeField] private PlayerContext playerContext;
     // true면 플레이어 턴일 때만 WASD 디버그 이동을 허용한다.
     [SerializeField] private bool requirePlayerTurn = true;
     // 목표 칸이 막혔을 때 로그를 출력할지 정한다.
@@ -30,11 +28,13 @@ public class GridPlayerDebugMover : MonoBehaviour
     /// </summary>
     private void Awake()
     {
-        actor = GetComponent<GridActor>();
-        if (actionPoint == null)
+        if (!HasValidReference() || !HasValidData())
         {
-            actionPoint = GetComponent<ActionPoint>();
+            enabled = false;
+            return;
         }
+
+        actor = playerContext.GridActor;
     }
 
     /// <summary>
@@ -87,7 +87,8 @@ public class GridPlayerDebugMover : MonoBehaviour
             return;
         }
 
-        if (actionPoint != null && moveActionPointCost > 0 && !actionPoint.TrySpend(moveActionPointCost))
+        int cost = playerContext.TurnData.MoveActionPointCost;
+        if (cost > 0 && !playerContext.ActionPoint.TrySpend(cost))
         {
             Debug.LogWarning($"{nameof(GridPlayerDebugMover)}: 이동은 되었지만 AP 소비에 실패했습니다. AP 흐름을 확인해야 합니다.", this);
         }
@@ -109,11 +110,12 @@ public class GridPlayerDebugMover : MonoBehaviour
             return false;
         }
 
-        if (actionPoint != null && moveActionPointCost > 0 && !actionPoint.CanSpend(moveActionPointCost))
+        int cost = playerContext.TurnData.MoveActionPointCost;
+        if (cost > 0 && !playerContext.ActionPoint.CanSpend(cost))
         {
             if (logTurnOrApBlockedMove)
             {
-                Debug.Log($"{nameof(GridPlayerDebugMover)}: AP가 부족해서 이동할 수 없습니다. 필요 AP: {moveActionPointCost}, 현재 AP: {actionPoint.Current}", this);
+                Debug.Log($"{nameof(GridPlayerDebugMover)}: AP가 부족해서 이동할 수 없습니다. 필요 AP: {cost}, 현재 AP: {playerContext.ActionPoint.Current}", this);
             }
 
             return false;
@@ -160,5 +162,45 @@ public class GridPlayerDebugMover : MonoBehaviour
 
         direction = GridPosition.Zero;
         return false;
+    }
+
+    /// <summary>
+    /// 디버그 이동에 필요한 필수 참조가 연결되어 있는지 확인한다.
+    /// </summary>
+    private bool HasValidReference()
+    {
+        if (playerContext == null)
+        {
+            Debug.LogError($"{nameof(GridPlayerDebugMover)} on {name}에는 {nameof(PlayerContext)} 참조가 필요합니다.", this);
+            return false;
+        }
+
+        if (!playerContext.HasValidReference())
+        {
+            return false;
+        }
+
+        return true;
+    }
+
+    /// <summary>
+    /// 디버그 이동에 필요한 데이터가 유효한지 확인한다.
+    /// </summary>
+    private bool HasValidData()
+    {
+        PlayerTurnData turnData = playerContext.TurnData;
+        if (turnData == null)
+        {
+            Debug.LogError($"{nameof(GridPlayerDebugMover)} on {name}에는 {nameof(PlayerTurnData)} 참조가 필요합니다.", this);
+            return false;
+        }
+
+        if (turnData.MoveActionPointCost <= 0)
+        {
+            Debug.LogError($"{nameof(GridPlayerDebugMover)} on {name}의 {nameof(PlayerTurnData)} 이동 AP 비용은 0보다 커야 합니다.", this);
+            return false;
+        }
+
+        return true;
     }
 }
