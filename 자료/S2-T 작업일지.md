@@ -140,3 +140,26 @@
 - 테스트 씬에서 플레이어 토큰에 `PlayerGridMoveAction`을 붙여 마우스 이동 흐름을 확인한다.
 - 이동 가능 칸 표시용 하이라이트 컴포넌트를 추가한다.
 - 이후 경로 계산과 `MoveStepEntered` 기반 적 시야 검사를 연결한다.
+
+# 2026-06-01
+
+## 핵심
+- 전체 화면 Game 뷰에서 `PlayerGridMoveAction`의 `M` 키 이동 행동 선택과 마우스 클릭 이동 흐름을 확인했다.
+- `GridMoveRangeHighlighter`를 추가했다.
+- `PlayerGridMoveAction.MoveRangeShown`, `MoveRangeHidden` 이벤트를 구독해 이동 가능 칸 하이라이트를 표시하고 숨기게 했다.
+- 하이라이트 프리팹이 없어도 런타임에 임시 반투명 사각형 스프라이트를 생성해 테스트할 수 있게 했다.
+- `Tset` 씬의 플레이어 토큰에 `GridMoveRangeHighlighter`를 연결했다.
+- 하이라이트 표시 책임을 공용 `GridCellHighlighter`와 이동 행동 연결용 `GridMoveRangeHighlighter`로 분리했다.
+- `GridCellHighlighter`는 이동뿐 아니라 검 투척 범위, 해킹 예상 범위 같은 다른 칸 표시에도 재사용할 수 있는 표시 전용 컴포넌트로 둔다.
+
+## 검증
+- `dotnet build Assembly-CSharp.csproj --no-restore` 통과.
+- 경고 0개, 오류 0개.
+- Unity 플레이 모드에서 `M` 입력 시 이동 가능 칸 하이라이트가 표시되는 것을 확인했다.
+- 이동 완료 후 하이라이트가 사라지는 것을 확인했다.
+
+## 다음
+- 하이라이트는 현재 이동 가능 칸 표시까지만 유지한다.
+- `GridHighlightPurpose`, `IGridHighlightTarget`, 대상 투명도/점멸 표현, 검 투척/해킹 범위 하이라이트는 실제 사용처가 생길 때 추가한다.
+- 다음 구현 후보는 단순 X축 우선 경로를 대체할 경로 계산 구조 정리다.
+- 이후 `MoveStepEntered` 기반 적 시야 검사 연결을 준비한다.
