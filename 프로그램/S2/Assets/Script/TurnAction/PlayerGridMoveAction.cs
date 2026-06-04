@@ -145,9 +145,9 @@ public class PlayerGridMoveAction : MonoBehaviour
             return false;
         }
 
-        if (!TryBuildSimplePath(actor.GridPosition, targetPosition, movePathBuffer))
+        if (!GridPathfinder.TryFindPath(GridManager.Instance, actor.GridPosition, targetPosition, MoveRange, movePathBuffer))
         {
-            LogBlockedTarget(targetPosition, "단순 이동 경로가 막혀 있습니다");
+            LogBlockedTarget(targetPosition, "이동 가능한 경로를 찾지 못했습니다");
             return false;
         }
 
@@ -285,25 +285,7 @@ public class PlayerGridMoveAction : MonoBehaviour
             return;
         }
 
-        GridPosition origin = actor.GridPosition;
-        int range = MoveRange;
-
-        for (int x = origin.x - range; x <= origin.x + range; x++)
-        {
-            for (int y = origin.y - range; y <= origin.y + range; y++)
-            {
-                GridPosition candidate = new(x, y);
-                if (candidate == origin || origin.ManhattanDistanceTo(candidate) > range)
-                {
-                    continue;
-                }
-
-                if (gridManager.CanEnter(candidate))
-                {
-                    movablePositions.Add(candidate);
-                }
-            }
-        }
+        GridPathfinder.FindReachablePositions(gridManager, actor.GridPosition, MoveRange, movablePositions);
     }
 
     /// <summary>
@@ -325,61 +307,6 @@ public class PlayerGridMoveAction : MonoBehaviour
         }
 
         return false;
-    }
-
-    /// <summary>
-    /// 시작 칸에서 목표 칸까지 X축 우선 단순 맨해튼 경로를 만든다.
-    /// </summary>
-    private bool TryBuildSimplePath(GridPosition from, GridPosition to, List<GridPosition> path)
-    {
-        path.Clear();
-
-        GridManager gridManager = GridManager.Instance;
-        if (gridManager == null)
-        {
-            return false;
-        }
-
-        GridPosition current = from;
-        while (current.x != to.x)
-        {
-            int nextX = current.x + Math.Sign(to.x - current.x);
-            current = new GridPosition(nextX, current.y);
-            if (!CanStepThrough(gridManager, current, to))
-            {
-                return false;
-            }
-
-            path.Add(current);
-        }
-
-        while (current.y != to.y)
-        {
-            int nextY = current.y + Math.Sign(to.y - current.y);
-            current = new GridPosition(current.x, nextY);
-            if (!CanStepThrough(gridManager, current, to))
-            {
-                return false;
-            }
-
-            path.Add(current);
-        }
-
-        return path.Count > 0;
-    }
-
-    /// <summary>
-    /// 단순 경로의 한 칸을 지나가거나 도착할 수 있는지 확인한다.
-    /// </summary>
-    private bool CanStepThrough(GridManager gridManager, GridPosition position, GridPosition targetPosition)
-    {
-        if (position == targetPosition)
-        {
-            return gridManager.CanEnter(position);
-        }
-
-        // 정식 경로 탐색 전까지는 X축 우선 맨해튼 경로의 중간 칸도 비어 있어야 한다.
-        return gridManager.CanEnter(position);
     }
 
     /// <summary>

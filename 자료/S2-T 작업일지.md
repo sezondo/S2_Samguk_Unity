@@ -185,3 +185,18 @@
 - 실제 작업 시작 지시 전에는 코드를 수정하지 않고 먼저 작업 방향을 토론하는 기준을 `AGENTS.md`에 명시했다.
 - 인스펙터 세팅은 사용자가 직접 갈아 끼우는 것을 기본으로 두고, AI는 문제 확인을 위해 조회할 수 있지만 임의 수정은 사용자 지시가 있을 때만 진행하는 기준으로 정리했다.
 - 필수 데이터/참조 누락 시 fallback 없이 `HasValidData()`, `HasValidReference()`에서 오류 로그를 남기고 흐름을 중단하는 기준을 명시했다.
+
+# 2026-06-03
+
+## 핵심
+- `GridPathfinder`를 추가해 격자 이동 가능 칸과 목표 칸까지의 경로 계산을 공용 도구로 분리했다.
+- `PlayerGridMoveAction`의 X축 우선 단순 경로 계산을 제거하고 `GridPathfinder` 기반 BFS 경로 계산을 사용하게 했다.
+- 이동 가능 칸 하이라이트도 실제 도달 가능한 칸만 표시하도록 `GridPathfinder.FindReachablePositions()`를 사용하게 했다.
+
+## 검증
+- `dotnet build Assembly-CSharp.csproj --no-restore` 통과.
+- 경고 0개, 오류 0개.
+
+## 다음
+- Unity 플레이 모드에서 장애물/점유 칸 우회 이동과 하이라이트 표시를 확인한다.
+- 이후 `MoveStepEntered` 기반 적 시야 검사 연결을 준비한다.
