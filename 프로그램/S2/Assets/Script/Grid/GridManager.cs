@@ -17,16 +17,22 @@ public class GridManager : MonoBehaviour
     // 그리드 (0, 0) 칸의 기준 월드 위치다.
     [SerializeField] private Vector3 originWorldPosition;
 
+    [Header("Blocked Cells")]
+    // 벽, 장애물, 낭떠러지처럼 어떤 말도 들어갈 수 없는 고정 이동불가 칸 목록이다.
+    [SerializeField] private List<GridPosition> blockedPositions = new();
+
     [Header("Gizmos")]
     // Scene 뷰에서 보드 선과 점유 칸을 그릴지 정한다.
     [SerializeField] private bool drawGizmos = true;
     // Scene 뷰에 표시할 보드 선 색이다.
     [SerializeField] private Color gridColor = new(0.25f, 0.75f, 1f, 0.35f);
+    // Scene 뷰에 표시할 고정 이동불가 칸 색이다.
+    [SerializeField] private Color blockedColor = new(0.25f, 0.25f, 0.25f, 0.6f);
     // Scene 뷰에 표시할 점유 칸 색이다.
     [SerializeField] private Color occupiedColor = new(1f, 0.35f, 0.25f, 0.45f);
 
-    // 현재 어떤 칸을 어떤 GridActor가 점유 중인지 저장한다.
-    private readonly Dictionary<GridPosition, GridActor> actorByPosition = new();
+    // 보드 좌표별 칸 상태를 저장하는 런타임 상태 DB다.
+    private readonly Dictionary<GridPosition, GridCellState> cellByPosition = new();
 
     // 씬에서 사용하는 단일 그리드 매니저 인스턴스다.
     public static GridManager Instance { get; private set; }
@@ -51,6 +57,15 @@ public class GridManager : MonoBehaviour
         }
 
         Instance = this;
+        RebuildCellStates();
+    }
+
+    /// <summary>
+    /// 인스펙터에서 보드 크기나 이동불가 칸 목록이 바뀌면 런타임 칸 상태를 갱신한다.
+    /// </summary>
+    private void OnValidate()
+    {
+        RebuildCellStates();
     }
 
     /// <summary>
@@ -96,7 +111,50 @@ public class GridManager : MonoBehaviour
     /// </summary>
     public bool CanEnter(GridPosition position)
     {
-        return IsInside(position) && !IsOccupied(position);
+        return TryGetCellState(position, out GridCellState cellState) && cellState.CanEnter;
+    }
+
+    /// <summary>
+    /// 지정한 칸이 고정 이동불가 칸인지 확인한다.
+    /// </summary>
+    public bool IsBlocked(GridPosition position)
+    {
+        return TryGetCellState(position, out GridCellState cellState) && cellState.IsBlocked;
+    }
+
+    /// <summary>
+    /// 지정한 칸을 런타임에 이동불가 칸으로 설정하거나 해제한다.
+    /// </summary>
+    public void SetBlocked(GridPosition position, bool blocked)
+    {
+        if (!IsInside(position))
+        {
+            Debug.LogWarning($"{nameof(GridManager)}: {position} 칸은 보드 범위 밖이라 이동불가 설정을 바꿀 수 없습니다.", this);
+            return;
+        }
+
+        if (!TryGetCellState(position, out GridCellState cellState))
+        {
+            Debug.LogWarning($"{nameof(GridManager)}: {position} 칸 상태를 찾지 못해 이동불가 설정을 바꿀 수 없습니다.", this);
+            return;
+        }
+
+        if (blocked)
+        {
+            if (!cellState.IsBlocked)
+            {
+                cellState.SetBlocked(true);
+                blockedPositions.Add(position);
+            }
+
+            return;
+        }
+
+        if (cellState.IsBlocked)
+        {
+            cellState.SetBlocked(false);
+            blockedPositions.RemoveAll(blockedPosition => blockedPosition == position);
+        }
     }
 
     /// <summary>
@@ -104,7 +162,7 @@ public class GridManager : MonoBehaviour
     /// </summary>
     public bool IsOccupied(GridPosition position)
     {
-        return actorByPosition.TryGetValue(position, out GridActor actor) && actor != null;
+        return TryGetCellState(position, out GridCellState cellState) && cellState.IsOccupied;
     }
 
     /// <summary>
@@ -112,7 +170,22 @@ public class GridManager : MonoBehaviour
     /// </summary>
     public bool TryGetActorAt(GridPosition position, out GridActor actor)
     {
-        return actorByPosition.TryGetValue(position, out actor) && actor != null;
+        if (TryGetCellState(position, out GridCellState cellState) && cellState.OccupiedActor != null)
+        {
+            actor = cellState.OccupiedActor;
+            return true;
+        }
+
+        actor = null;
+        return false;
+    }
+
+    /// <summary>
+    /// 지정한 칸의 상태를 가져온다.
+    /// </summary>
+    public bool TryGetCellState(GridPosition position, out GridCellState cellState)
+    {
+        return cellByPosition.TryGetValue(position, out cellState);
     }
 
     /// <summary>
@@ -120,8 +193,20 @@ public class GridManager : MonoBehaviour
     /// </summary>
     public bool RegisterActor(GridActor actor, GridPosition position)
     {
-        if (actor == null || !IsInside(position))
+        if (actor == null)
         {
+            return false;
+        }
+
+        if (!IsInside(position))
+        {
+            Debug.LogWarning($"{nameof(GridManager)}: {actor.name} 오브젝트의 시작 칸 {position}은 보드 범위 밖입니다.", this);
+            return false;
+        }
+
+        if (IsBlocked(position))
+        {
+            Debug.LogWarning($"{nameof(GridManager)}: {actor.name} 오브젝트의 시작 칸 {position}은 이동불가 칸입니다.", this);
             return false;
         }
 
@@ -131,7 +216,13 @@ public class GridManager : MonoBehaviour
             return false;
         }
 
-        actorByPosition[position] = actor;
+        if (!TryGetCellState(position, out GridCellState cellState))
+        {
+            Debug.LogWarning($"{nameof(GridManager)}: {position} 칸 상태를 찾지 못해 {actor.name} 오브젝트를 등록할 수 없습니다.", this);
+            return false;
+        }
+
+        cellState.SetOccupiedActor(actor);
         return true;
     }
 
@@ -145,9 +236,9 @@ public class GridManager : MonoBehaviour
             return;
         }
 
-        if (TryGetActorAt(position, out GridActor registeredActor) && registeredActor == actor)
+        if (TryGetCellState(position, out GridCellState cellState))
         {
-            actorByPosition.Remove(position);
+            cellState.TryClearOccupiedActor(actor);
         }
     }
 
@@ -156,13 +247,18 @@ public class GridManager : MonoBehaviour
     /// </summary>
     public bool TryMoveActor(GridActor actor, GridPosition from, GridPosition to)
     {
-        if (actor == null || !CanEnter(to))
+        if (actor == null || !TryGetCellState(from, out GridCellState fromCell) || !TryGetCellState(to, out GridCellState toCell))
         {
             return false;
         }
 
-        UnregisterActor(actor, from);
-        actorByPosition[to] = actor;
+        if (fromCell.OccupiedActor != actor || !toCell.CanEnter)
+        {
+            return false;
+        }
+
+        fromCell.TryClearOccupiedActor(actor);
+        toCell.SetOccupiedActor(actor);
         return true;
     }
 
@@ -175,6 +271,7 @@ public class GridManager : MonoBehaviour
         {
             return;
         }
+        RebuildCellStates();
 
         float safeCellSize = Mathf.Max(0.01f, cellSize);
         Gizmos.color = gridColor;
@@ -193,10 +290,66 @@ public class GridManager : MonoBehaviour
             Gizmos.DrawLine(start, end);
         }
 
-        Gizmos.color = occupiedColor;
-        foreach (GridPosition position in actorByPosition.Keys)
+        Gizmos.color = blockedColor;
+        foreach (GridCellState cellState in cellByPosition.Values)
         {
-            Gizmos.DrawCube(GridToWorld(position), Vector3.one * safeCellSize * 0.75f);
+            if (cellState.IsBlocked)
+            {
+                Gizmos.DrawCube(GridToWorld(cellState.Position), Vector3.one * safeCellSize * 0.85f);
+            }
+        }
+
+        Gizmos.color = occupiedColor;
+        foreach (GridCellState cellState in cellByPosition.Values)
+        {
+            if (cellState.IsOccupied)
+            {
+                Gizmos.DrawCube(GridToWorld(cellState.Position), Vector3.one * safeCellSize * 0.75f);
+            }
+        }
+    }
+
+    /// <summary>
+    /// 보드 범위 안의 모든 칸 상태를 다시 만들고 인스펙터 이동불가 칸 목록을 반영한다.
+    /// </summary>
+    private void RebuildCellStates()
+    {
+        Dictionary<GridPosition, GridActor> previousActorByPosition = new();
+        foreach (GridCellState cellState in cellByPosition.Values)
+        {
+            if (cellState.OccupiedActor != null)
+            {
+                previousActorByPosition[cellState.Position] = cellState.OccupiedActor;
+            }
+        }
+
+        cellByPosition.Clear();
+
+        int safeWidth = Mathf.Max(0, width);
+        int safeHeight = Mathf.Max(0, height);
+
+        for (int x = 0; x < safeWidth; x++)
+        {
+            for (int y = 0; y < safeHeight; y++)
+            {
+                GridPosition position = new(x, y);
+                GridCellState cellState = new(position);
+
+                if (previousActorByPosition.TryGetValue(position, out GridActor actor) && actor != null)
+                {
+                    cellState.SetOccupiedActor(actor);
+                }
+
+                cellByPosition[position] = cellState;
+            }
+        }
+
+        for (int i = 0; i < blockedPositions.Count; i++)
+        {
+            if (cellByPosition.TryGetValue(blockedPositions[i], out GridCellState cellState))
+            {
+                cellState.SetBlocked(true);
+            }
         }
     }
 }

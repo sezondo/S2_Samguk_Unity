@@ -200,3 +200,33 @@
 ## 다음
 - Unity 플레이 모드에서 장애물/점유 칸 우회 이동과 하이라이트 표시를 확인한다.
 - 이후 `MoveStepEntered` 기반 적 시야 검사 연결을 준비한다.
+
+## 2026-06-04
+
+## 핵심
+- `GridManager`에 인스펙터 설정용 `blockedPositions`를 추가했다.
+- 이동불가 칸은 런타임에 `HashSet<GridPosition>`으로 변환해 `IsBlocked()`와 `CanEnter()`에서 사용한다.
+- `CanEnter()`가 보드 범위, 이동불가 칸, 점유 칸을 함께 검사하게 바꿨다.
+- Scene 뷰 Gizmo에서 이동불가 칸을 별도 색상으로 표시하게 했다.
+
+## 검증
+- `dotnet build Assembly-CSharp.csproj --no-restore` 통과.
+- 경고 0개, 오류 0개.
+
+## 다음
+- Unity 플레이 모드에서 `blockedPositions`를 설정한 뒤 하이라이트와 경로 우회가 정상인지 확인한다.
+
+## 추가 핵심
+- `GridCellState`를 추가해 칸의 현재 상태를 보관하는 데이터 주머니를 만들었다.
+- `GridManager`의 내부 저장 구조를 `Dictionary<GridPosition, GridCellState>` 중심으로 변경했다.
+- 기존 `CanEnter()`, `IsBlocked()`, `IsOccupied()`, `TryGetActorAt()`, `RegisterActor()`, `UnregisterActor()`, `TryMoveActor()` 외부 API는 유지했다.
+- 점유 액터와 이동불가 상태는 이제 각 `GridCellState`에 기록된다.
+- `GridManager`는 칸 상태 변경의 승인자 역할을 유지하고, 외부 시스템이 `GridCellState`를 직접 수정하지 않는 방향으로 잡았다.
+
+## 추가 검증
+- `dotnet build Assembly-CSharp.csproj --no-restore` 통과.
+- 경고 0개, 오류 0개.
+
+## 다음
+- Unity 플레이 모드에서 기존 이동, 점유, 이동불가 칸 우회가 동일하게 동작하는지 확인한다.
+- 이후 특수 오브젝트/칸 효과/엄폐 슬롯은 실제 기능이 필요해질 때 `GridCellState`에 단계적으로 추가한다.

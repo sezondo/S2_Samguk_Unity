@@ -439,3 +439,44 @@ Notion에는 목표, 방향, 남은 작업만 짧게 두고, 상세 구현 구�
 - 주석은 값의 역할과 사용 기준을 설명하고, 코드 이름을 그대로 풀어쓰는 수준의 중복 설명은 피한다.
 - `Debug.Log`, `Debug.LogWarning`, `Debug.LogError`로 출력하는 런타임 로그 문장은 기본적으로 한국어로 작성한다.
 - 클래스명, 컴포넌트명, 변수명은 로그 추적을 위해 그대로 남겨도 되지만, 원인과 조치 설명은 한국어로 적는다.
+
+## 이동불가 칸 구조
+
+2026-06-04 기준 `GridManager`에 고정 이동불가 칸 구조를 추가했다.
+
+- `blockedPositions`는 인스펙터에서 설정하는 이동불가 칸 좌표 목록이다.
+- 런타임에서는 `HashSet<GridPosition>` 기반 `blockedPositionSet`으로 변환해 빠르게 조회한다.
+- `IsBlocked()`는 지정한 칸이 고정 이동불가 칸인지 확인한다.
+- `SetBlocked()`는 런타임에서 특정 칸의 이동불가 상태를 바꿀 때 사용한다.
+- `CanEnter()`는 이제 보드 범위, 이동불가 칸, 점유 칸을 함께 검사한다.
+- `GridPathfinder`는 `GridManager.CanEnter()`를 사용하므로 별도 수정 없이 이동불가 칸을 피해 도달 가능 칸과 경로를 계산한다.
+- Scene 뷰에서는 이동불가 칸을 `blockedColor`로 표시한다.
+
+### 현재 사용 기준
+
+- 1차 테스트에서는 `GridManager.blockedPositions`에 좌표를 직접 입력해 장애물 배치를 검증한다.
+- 타일맵이나 `GridObstacle` 컴포넌트 기반 자동 등록은 스테이지 제작 방식이 정해진 뒤 검토한다.
+
+## GridCellState 1차 구조
+
+2026-06-04 기준 `GridCellState`를 추가해 칸 상태 저장 책임을 `GridManager` 내부 딕셔너리에서 분리했다.
+
+### 역할
+
+- `GridCellState`는 한 칸의 현재 상태를 보관하는 데이터 주머니다.
+- 현재 포함 상태는 `Position`, `IsBlocked`, `OccupiedActor`, `IsOccupied`, `CanEnter`다.
+- `GridCellState`는 게임 규칙을 판단하지 않고, `GridManager`가 승인한 상태만 기록한다.
+- 외부 시스템은 `GridCellState`를 직접 수정하지 않고 `GridManager`에 상태 변경을 요청한다.
+
+### GridManager 기준
+
+- `GridManager`는 `Dictionary<GridPosition, GridCellState>`로 보드 칸 상태를 소유한다.
+- 기존 외부 API인 `CanEnter()`, `IsBlocked()`, `IsOccupied()`, `TryGetActorAt()`, `RegisterActor()`, `UnregisterActor()`, `TryMoveActor()`는 유지한다.
+- 내부 구현만 `GridCellState` 조회/수정 기준으로 변경했다.
+- `GridManager`는 좌표 유효성, 점유 슬롯 충돌, 이동불가 칸 여부 같은 기본 무결성을 검사한다.
+- 화염, 독, 엄폐, 특수 오브젝트 같은 세부 규칙은 추후 전용 시스템이 판단하고, `GridManager`는 상태 기록 관문 역할을 맡는다.
+
+### 확장 보류
+
+- 칸 효과 목록, 엄폐 정보, 특수 오브젝트 슬롯은 아직 추가하지 않는다.
+- 실제 기능 요구가 생길 때 `GridCellState`에 슬롯을 단계적으로 추가한다.
