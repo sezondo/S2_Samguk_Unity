@@ -73,6 +73,17 @@ public class GridCellHighlighter : MonoBehaviour
     }
 
     /// <summary>
+    /// 런타임에서 임시 하이라이트의 색상과 표시 크기 기준을 설정한다.
+    /// </summary>
+    public void ConfigureFallbackStyle(Color color, float scaleRatio, int rendererSortingOrder, float worldZOffset)
+    {
+        fallbackColor = color;
+        cellScaleRatio = scaleRatio;
+        sortingOrder = rendererSortingOrder;
+        zOffset = worldZOffset;
+    }
+
+    /// <summary>
     /// 현재 표시 중인 하이라이트를 숨기고 풀로 돌려보낸다.
     /// </summary>
     public void Hide()

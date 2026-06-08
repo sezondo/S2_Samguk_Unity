@@ -230,3 +230,52 @@
 ## 다음
 - Unity 플레이 모드에서 기존 이동, 점유, 이동불가 칸 우회가 동일하게 동작하는지 확인한다.
 - 이후 특수 오브젝트/칸 효과/엄폐 슬롯은 실제 기능이 필요해질 때 `GridCellState`에 단계적으로 추가한다.
+
+# 2026-06-07
+
+## 핵심
+- `PlayerGridMoveAction`에 이동 경로 미리보기 1차 구조를 추가했다.
+- 이동 행동 선택 중 마우스가 가리키는 이동 가능 칸까지 `GridPathfinder.TryFindPath()`로 경로를 계산한다.
+- 현재 미리보기 표시는 별도 UI 없이 Scene 뷰 `Gizmos`로 처리한다.
+- 이동 선택 취소 또는 이동 완료 시 경로 미리보기 버퍼를 정리한다.
+
+## 검증
+- `dotnet build Assembly-CSharp.csproj --no-restore` 통과.
+- 경고 0개, 오류 0개.
+
+## 다음
+- Unity 플레이 모드에서 이동 선택 중 마우스 오버 경로 Gizmo가 의도대로 보이는지 확인한다.
+- 이후 경로 미리보기를 런타임 표시 컴포넌트로 분리할지 검토한다.
+
+## 추가 핵심
+- 경로 미리보기를 Scene 뷰 `Gizmos` 방식에서 런타임 하이라이트 오브젝트 방식으로 바꿨다.
+- `PlayerGridMoveAction`이 경로 미리보기 전용 `GridCellHighlighter`를 런타임에 생성한다.
+- 마우스가 가리키는 이동 가능 칸까지의 경로가 바뀌면 경로 칸 오브젝트를 표시하고, 취소/이동 완료/무효 칸에서는 숨긴다.
+- `GridCellHighlighter`에 런타임 스타일 설정용 `ConfigureFallbackStyle()`을 추가했다.
+
+## 추가 검증
+- `dotnet build Assembly-CSharp.csproj --no-restore` 통과.
+- 경고 0개, 오류 0개.
+
+## 다음
+- Unity 플레이 모드 Game 뷰에서 이동 경로 프리뷰 오브젝트가 정상 표시되는지 확인한다.
+
+# 2026-06-08
+
+## 핵심
+- 적 시야 계산 1차 구조를 추가했다.
+- `EnemyData`를 추가해 정면 시야 거리, 근접 감지 사용 여부, 근접 감지 반경을 데이터 에셋으로 관리하게 했다.
+- `EnemyContext`를 추가해 `EnemyData`, `GridActor`, `EnemyGridSight` 참조를 모았다.
+- `GridDirection`을 추가해 적이 바라보는 방향을 상하좌우 4방향으로 제한했다.
+- `EnemyGridSight`를 추가해 정면 부채꼴 시야와 주변 8칸 근접 감지를 계산하게 했다.
+- 정면 시야는 거리 1부터 5까지 전방 거리에 따라 좌우 폭이 넓어지는 구조로 계산한다.
+- 장애물 칸은 정면 시야에 포함하지 않고, 같은 레인에서 장애물 뒤 칸을 차단한다.
+- 근접 감지는 바라보는 방향과 장애물 영향 없이 주변 8칸을 감지한다.
+
+## 검증
+- `dotnet build Assembly-CSharp.csproj --no-restore` 통과.
+- 경고 0개, 오류 0개.
+
+## 다음
+- 테스트 씬에 임시 적 오브젝트, `EnemyData`, `EnemyContext`, `EnemyGridSight`를 연결해 감지 칸 계산을 확인한다.
+- 이후 `GridCellHighlighter`로 적 시야 칸 표시를 연결한다.

@@ -28,6 +28,18 @@ public class PlayerGridMoveAction : MonoBehaviour
     // true면 Escape 키로 현재 이동 행동 선택을 취소한다.
     [SerializeField] private bool cancelByEscape = true;
 
+    [Header("Path Preview")]
+    // 이동 행동 선택 중 마우스를 올린 목표 칸까지의 경로를 런타임 하이라이트로 표시할지 정한다.
+    [SerializeField] private bool showPathPreview = true;
+    // 이동 경로 미리보기 하이라이트 색이다.
+    [SerializeField] private Color pathPreviewColor = new(0.2f, 1f, 0.45f, 0.75f);
+    // 이동 경로 미리보기 하이라이트가 그리드 한 칸에서 차지할 비율이다.
+    [SerializeField] private float pathPreviewCellScale = 0.55f;
+    // 이동 범위 하이라이트보다 위에 보이도록 사용할 렌더러 정렬 순서다.
+    [SerializeField] private int pathPreviewSortingOrder = 30;
+    // 이동 경로 미리보기 하이라이트를 월드 좌표에서 살짝 앞뒤로 보낼 때 쓰는 Z 오프셋이다.
+    [SerializeField] private float pathPreviewZOffset = -0.08f;
+
     [Header("Log")]
     // 이동 행동 선택, 취소, 완료 같은 상태 로그를 출력할지 정한다.
     [SerializeField] private bool logActionState = true;
@@ -38,11 +50,19 @@ public class PlayerGridMoveAction : MonoBehaviour
     private readonly List<GridPosition> movablePositions = new();
     // 목표 칸까지 한 칸씩 이동할 경로를 임시로 담는 재사용 버퍼다.
     private readonly List<GridPosition> movePathBuffer = new();
+    // 이동 행동 선택 중 마우스가 가리키는 칸까지의 경로 미리보기다.
+    private readonly List<GridPosition> pathPreviewPositions = new();
 
     // 같은 오브젝트의 그리드 말 컴포넌트다.
     private GridActor actor;
+    // 이동 경로 미리보기 오브젝트 표시를 담당하는 런타임 하이라이터다.
+    private GridCellHighlighter pathPreviewHighlighter;
     // 플레이어가 현재 이동 행동을 선택한 상태인지 나타낸다.
     private bool isMoveSelected;
+    // 마지막으로 경로 미리보기를 계산한 마우스 칸이다.
+    private GridPosition lastPreviewTargetPosition;
+    // 현재 경로 미리보기 대상 칸이 유효한지 나타낸다.
+    private bool hasPreviewTargetPosition;
 
     // 외부 UI나 표시 컴포넌트가 이동 선택 상태를 읽을 때 사용한다.
     public bool IsMoveSelected => isMoveSelected;
@@ -70,6 +90,27 @@ public class PlayerGridMoveAction : MonoBehaviour
         }
 
         actor = playerContext.GridActor;
+        pathPreviewHighlighter = CreatePathPreviewHighlighter();
+    }
+
+    /// <summary>
+    /// 컴포넌트가 비활성화될 때 이동 경로 미리보기를 정리한다.
+    /// </summary>
+    private void OnDisable()
+    {
+        ClearPathPreview();
+    }
+
+    /// <summary>
+    /// 컴포넌트가 제거될 때 런타임 미리보기 오브젝트를 정리한다.
+    /// </summary>
+    private void OnDestroy()
+    {
+        if (pathPreviewHighlighter != null)
+        {
+            Destroy(pathPreviewHighlighter.gameObject);
+            pathPreviewHighlighter = null;
+        }
     }
 
     /// <summary>
@@ -85,6 +126,12 @@ public class PlayerGridMoveAction : MonoBehaviour
         }
 
         HandleCancelInput();
+        if (!isMoveSelected)
+        {
+            return;
+        }
+
+        UpdatePathPreview();
         HandleTargetClickInput();
     }
 
@@ -121,6 +168,7 @@ public class PlayerGridMoveAction : MonoBehaviour
 
         isMoveSelected = false;
         movablePositions.Clear();
+        ClearPathPreview();
         MoveRangeHidden?.Invoke();
 
         if (logActionState)
@@ -139,9 +187,9 @@ public class PlayerGridMoveAction : MonoBehaviour
             return false;
         }
 
-        if (!IsValidMoveTarget(targetPosition))
+        // 턴, AP 같은 행동 가능 상태와 실제 경로 유효성은 서로 다른 책임으로 분리한다.
+        if (!CanSelectMoveAction())
         {
-            LogBlockedTarget(targetPosition, "목표 칸이 현재 이동 범위 밖이거나 진입할 수 없는 칸입니다");
             return false;
         }
 
@@ -174,6 +222,7 @@ public class PlayerGridMoveAction : MonoBehaviour
 
         isMoveSelected = false;
         movablePositions.Clear();
+        ClearPathPreview();
         MoveRangeHidden?.Invoke();
         MoveCompleted?.Invoke(actor.GridPosition);
 
@@ -289,24 +338,59 @@ public class PlayerGridMoveAction : MonoBehaviour
     }
 
     /// <summary>
-    /// 목표 칸이 현재 이동 행동에서 선택 가능한 칸인지 확인한다.
+    /// 이동 선택 상태에서 현재 마우스 칸까지의 경로 미리보기를 갱신한다.
     /// </summary>
-    private bool IsValidMoveTarget(GridPosition targetPosition)
+    private void UpdatePathPreview()
     {
-        if (!CanSelectMoveAction())
+        if (!TryGetMouseGridPosition(out GridPosition targetPosition))
         {
-            return false;
+            ClearPathPreview();
+            return;
         }
 
-        for (int i = 0; i < movablePositions.Count; i++)
+        if (hasPreviewTargetPosition && lastPreviewTargetPosition == targetPosition)
         {
-            if (movablePositions[i] == targetPosition)
-            {
-                return true;
-            }
+            return;
         }
 
-        return false;
+        hasPreviewTargetPosition = true;
+        lastPreviewTargetPosition = targetPosition;
+        pathPreviewPositions.Clear();
+
+        if (GridPathfinder.TryFindPath(GridManager.Instance, actor.GridPosition, targetPosition, MoveRange, pathPreviewPositions))
+        {
+            ShowPathPreview();
+            return;
+        }
+
+        ClearPathPreview();
+    }
+
+    /// <summary>
+    /// 현재 이동 경로 미리보기 정보를 비운다.
+    /// </summary>
+    private void ClearPathPreview()
+    {
+        hasPreviewTargetPosition = false;
+        pathPreviewPositions.Clear();
+
+        if (pathPreviewHighlighter != null)
+        {
+            pathPreviewHighlighter.Hide();
+        }
+    }
+
+    /// <summary>
+    /// 현재 계산된 이동 경로 미리보기를 런타임 하이라이트 오브젝트로 표시한다.
+    /// </summary>
+    private void ShowPathPreview()
+    {
+        if (!showPathPreview || pathPreviewHighlighter == null)
+        {
+            return;
+        }
+
+        pathPreviewHighlighter.Show(pathPreviewPositions);
     }
 
     /// <summary>
@@ -314,6 +398,12 @@ public class PlayerGridMoveAction : MonoBehaviour
     /// </summary>
     private bool TryGetMouseGridPosition(out GridPosition gridPosition)
     {
+        if (Mouse.current == null)
+        {
+            gridPosition = GridPosition.Zero;
+            return false;
+        }
+
         Camera cameraToUse = worldCamera != null ? worldCamera : Camera.main;
         if (cameraToUse == null)
         {
@@ -336,6 +426,17 @@ public class PlayerGridMoveAction : MonoBehaviour
         {
             Debug.Log($"{nameof(PlayerGridMoveAction)}: {targetPosition} 칸으로 이동할 수 없습니다. 사유: {reason}", this);
         }
+    }
+
+    /// <summary>
+    /// 이동 경로 미리보기 전용 런타임 하이라이터를 만든다.
+    /// </summary>
+    private GridCellHighlighter CreatePathPreviewHighlighter()
+    {
+        GameObject highlighterObject = new($"{nameof(PlayerGridMoveAction)}_PathPreviewHighlighter");
+        GridCellHighlighter highlighter = highlighterObject.AddComponent<GridCellHighlighter>();
+        highlighter.ConfigureFallbackStyle(pathPreviewColor, pathPreviewCellScale, pathPreviewSortingOrder, pathPreviewZOffset);
+        return highlighter;
     }
 
     /// <summary>

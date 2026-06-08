@@ -480,3 +480,63 @@ Notion에는 목표, 방향, 남은 작업만 짧게 두고, 상세 구현 구�
 
 - 칸 효과 목록, 엄폐 정보, 특수 오브젝트 슬롯은 아직 추가하지 않는다.
 - 실제 기능 요구가 생길 때 `GridCellState`에 슬롯을 단계적으로 추가한다.
+
+## 이동 경로 미리보기 1차 구조
+
+2026-06-07 기준 `PlayerGridMoveAction`에 Scene 뷰 Gizmo 기반 이동 경로 미리보기를 추가했다.
+
+- 이동 행동 선택 중 현재 마우스 칸이 바뀌면 경로 미리보기를 갱신한다.
+- 목표 칸이 현재 이동 가능한 칸이면 `GridPathfinder.TryFindPath()`로 실제 이동 경로를 계산한다.
+- 계산한 경로는 `pathPreviewPositions`에 보관한다.
+- `OnDrawGizmos()`에서 `pathPreviewPositions`의 각 칸을 `pathPreviewColor`와 `pathPreviewCellScale` 기준으로 표시한다.
+- 이동 선택 취소나 이동 완료 시 `ClearPathPreview()`로 미리보기 상태를 비운다.
+- 현재 단계에서는 런타임 UI/프리팹 표시가 아니라 Scene 뷰 검증용 Gizmo 표시만 제공한다.
+
+### 이동 경로 미리보기 표시 방식 변경
+
+2026-06-07 추가 기준으로 경로 미리보기는 `Gizmos`가 아니라 런타임 하이라이트 오브젝트로 표시한다.
+
+- `PlayerGridMoveAction`은 이동 경로 미리보기 전용 `GridCellHighlighter`를 런타임에 생성한다.
+- 경로 미리보기 색상, 칸 크기 비율, 정렬 순서, Z 오프셋은 `PlayerGridMoveAction`의 Path Preview 설정값을 사용한다.
+- `GridCellHighlighter.ConfigureFallbackStyle()`로 런타임 생성 하이라이터의 임시 스프라이트 표시 스타일을 설정한다.
+- 이 방식은 Game 뷰에서도 표시되며, Play Maximized가 아니어도 마우스 조작 중 경로를 확인할 수 있게 하기 위한 것이다.
+
+
+## 적 시야 계산 1차 구조
+
+2026-06-08 기준 적의 기본 감지 칸 계산 구조를 추가했다.
+
+### 방향 기준
+
+- `GridDirection`은 적이 바라보는 방향을 상하좌우 4방향으로 제한한다.
+- 대각선 방향을 바라보는 상태는 만들지 않는다.
+- `GridDirectionUtility`는 방향을 전방 오프셋과 오른쪽 오프셋으로 변환한다.
+
+### EnemyData
+
+- `EnemyData`는 적 시야 계산에 필요한 튜닝 데이터를 보관하는 `ScriptableObject`다.
+- 현재 포함 값은 정면 시야 거리, 근접 감지 사용 여부, 근접 감지 반경이다.
+- 기본 정면 시야 거리는 5칸이다.
+- 기본 근접 감지 반경은 1칸이며, 적 주변 8칸을 감지한다.
+- `EnemyData` 자체는 값 보관만 담당하고, 실제 데이터 유효성 검사는 데이터를 사용하는 스크립트가 수행한다.
+
+### EnemyContext
+
+- `EnemyContext`는 적 루트의 참조 주머니 역할만 한다.
+- 현재 참조는 `EnemyData`, `GridActor`, `EnemyGridSight`다.
+- 적 전용 컴포넌트는 같은 루트의 핵심 컴포넌트를 직접 찾지 않고 `EnemyContext`에서 꺼내 쓰는 방향으로 둔다.
+
+### EnemyGridSight
+
+- `EnemyGridSight`는 적의 정면 부채꼴 시야와 근접 감지 칸을 계산한다.
+- 정면 시야는 바라보는 방향 기준으로 거리 1에서 1칸, 거리 2에서 3칸, 거리 3에서 5칸처럼 전방 거리에 따라 좌우 폭이 넓어진다.
+- 장애물 칸은 정면 시야에 포함하지 않는다.
+- 장애물을 만나면 같은 레인의 그 뒤 칸은 보이지 않는 것으로 처리한다.
+- 근접 감지는 바라보는 방향과 장애물 영향 없이 주변 8칸을 감지한다.
+- 계산 결과는 `DetectedPositions`로 읽을 수 있고, `SightRefreshed` 이벤트로 표시 컴포넌트가 연결될 수 있다.
+
+### 다음 연결 대상
+
+- 테스트 씬에 임시 적 오브젝트를 배치하고 `EnemyData`, `EnemyContext`, `EnemyGridSight` 참조를 연결한다.
+- `GridCellHighlighter`를 재사용해 적 시야 칸 표시를 붙인다.
+- 이후 플레이어 이동 중 `MoveStepEntered`에서 적 시야 포함 여부를 검사해 발각 판정을 연결한다.
