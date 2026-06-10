@@ -14,13 +14,16 @@ public class PlayerTurnData : ScriptableObject
     [SerializeField] private int startTurnActionPoint = 3;
 
     [Header("Move")]
-    // 이동 행동 1회로 도달할 수 있는 최대 맨해튼 거리다.
+    // AP 1을 이동에 썼을 때 갈 수 있는 최대 칸 수다.
+    [SerializeField] private int moveDistancePerActionPoint = 3;
+    // 기존 이동 범위 값이다. 새 이동 구조에서는 호환용으로만 남기고 직접 사용하지 않는다.
     [SerializeField] private int moveRange = 3;
-    // 이동 행동 1회가 시작될 때 소비하는 AP 비용이다.
+    // 이동 거리 구간 1개가 소비하는 AP 비용이다. 기본값 1이면 1~3칸은 AP 1, 4~6칸은 AP 2를 쓴다.
     [SerializeField] private int moveActionPointCost = 1;
 
     public int MaxActionPoint => maxActionPoint;
     public int StartTurnActionPoint => startTurnActionPoint;
+    public int MoveDistancePerActionPoint => moveDistancePerActionPoint;
     public int MoveRange => moveRange;
     public int MoveActionPointCost => moveActionPointCost;
 }

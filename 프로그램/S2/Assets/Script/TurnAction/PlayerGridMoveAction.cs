@@ -48,6 +48,14 @@ public class PlayerGridMoveAction : MonoBehaviour
 
     // 현재 이동 행동 선택 상태에서 실제로 이동 가능한 칸 목록이다.
     private readonly List<GridPosition> movablePositions = new();
+    // AP 1개 구간으로 이동 가능한 칸 목록이다.
+    private readonly List<GridPosition> blueMovePositions = new();
+    // AP 2개 구간으로 이동 가능한 칸 목록이다.
+    private readonly List<GridPosition> yellowMovePositions = new();
+    // AP 3개 이상 구간으로 이동 가능한 칸 목록이다.
+    private readonly List<GridPosition> redMovePositions = new();
+    // 이동 가능 칸까지의 실제 최단 거리 정보를 임시로 보관한다.
+    private readonly Dictionary<GridPosition, int> distanceByMovablePosition = new();
     // 목표 칸까지 한 칸씩 이동할 경로를 임시로 담는 재사용 버퍼다.
     private readonly List<GridPosition> movePathBuffer = new();
     // 이동 행동 선택 중 마우스가 가리키는 칸까지의 경로 미리보기다.
@@ -66,13 +74,21 @@ public class PlayerGridMoveAction : MonoBehaviour
 
     // 외부 UI나 표시 컴포넌트가 이동 선택 상태를 읽을 때 사용한다.
     public bool IsMoveSelected => isMoveSelected;
-    // 음수 입력을 막은 실제 이동 거리 값이다.
-    public int MoveRange => playerContext.TurnData.MoveRange;
+    // 현재 AP로 한 번에 이동할 수 있는 최대 칸 수다.
+    public int MoveRange => CalculateAffordableMoveSegmentCount() * MoveDistancePerActionPoint;
+    // AP 1개 구간당 이동 가능한 칸 수다.
+    public int MoveDistancePerActionPoint => playerContext.TurnData.MoveDistancePerActionPoint;
 
     // 이동 가능 칸 목록을 화면에 표시해야 할 때 발생한다.
     public event Action<IReadOnlyList<GridPosition>> MoveRangeShown;
+    // AP 소비 구간별 이동 가능 칸 목록을 화면에 표시해야 할 때 발생한다.
+    public event Action<IReadOnlyList<GridPosition>, IReadOnlyList<GridPosition>, IReadOnlyList<GridPosition>> MoveRangeSegmentsShown;
     // 이동 가능 칸 표시를 지워야 할 때 발생한다.
     public event Action MoveRangeHidden;
+    // 이동 경로 미리보기가 갱신될 때 현재 경로 칸 목록을 전달한다.
+    public event Action<IReadOnlyList<GridPosition>> MovePathPreviewShown;
+    // 이동 경로 미리보기를 지워야 할 때 발생한다.
+    public event Action MovePathPreviewHidden;
     // 플레이어가 경로상의 한 칸에 진입할 때마다 발생한다. 적 시야 검사 연결 지점이다.
     public event Action<GridPosition> MoveStepEntered;
     // 이동 행동이 최종 도착 칸까지 끝났을 때 발생한다.
@@ -168,6 +184,7 @@ public class PlayerGridMoveAction : MonoBehaviour
 
         isMoveSelected = false;
         movablePositions.Clear();
+        ClearMoveRangeSegments();
         ClearPathPreview();
         MoveRangeHidden?.Invoke();
 
@@ -200,7 +217,7 @@ public class PlayerGridMoveAction : MonoBehaviour
         }
 
         // 이동 행동은 시작 시점에 AP를 소비한다.
-        int cost = playerContext.TurnData.MoveActionPointCost;
+        int cost = CalculateMoveActionPointCost(movePathBuffer.Count);
         ActionPoint actionPoint = playerContext.ActionPoint;
         if (cost > 0 && !actionPoint.TrySpend(cost))
         {
@@ -222,6 +239,7 @@ public class PlayerGridMoveAction : MonoBehaviour
 
         isMoveSelected = false;
         movablePositions.Clear();
+        ClearMoveRangeSegments();
         ClearPathPreview();
         MoveRangeHidden?.Invoke();
         MoveCompleted?.Invoke(actor.GridPosition);
@@ -327,6 +345,8 @@ public class PlayerGridMoveAction : MonoBehaviour
     private void RefreshMovablePositions()
     {
         movablePositions.Clear();
+        ClearMoveRangeSegments();
+        distanceByMovablePosition.Clear();
 
         GridManager gridManager = GridManager.Instance;
         if (gridManager == null || actor == null)
@@ -334,7 +354,16 @@ public class PlayerGridMoveAction : MonoBehaviour
             return;
         }
 
-        GridPathfinder.FindReachablePositions(gridManager, actor.GridPosition, MoveRange, movablePositions);
+        GridPathfinder.FindReachablePositionDistances(gridManager, actor.GridPosition, MoveRange, distanceByMovablePosition);
+        foreach (KeyValuePair<GridPosition, int> pair in distanceByMovablePosition)
+        {
+            GridPosition position = pair.Key;
+            int distance = pair.Value;
+            movablePositions.Add(position);
+            AddMovePositionToSegment(position, distance);
+        }
+
+        MoveRangeSegmentsShown?.Invoke(blueMovePositions, yellowMovePositions, redMovePositions);
     }
 
     /// <summary>
@@ -359,6 +388,7 @@ public class PlayerGridMoveAction : MonoBehaviour
 
         if (GridPathfinder.TryFindPath(GridManager.Instance, actor.GridPosition, targetPosition, MoveRange, pathPreviewPositions))
         {
+            MovePathPreviewShown?.Invoke(pathPreviewPositions);
             ShowPathPreview();
             return;
         }
@@ -378,6 +408,8 @@ public class PlayerGridMoveAction : MonoBehaviour
         {
             pathPreviewHighlighter.Hide();
         }
+
+        MovePathPreviewHidden?.Invoke();
     }
 
     /// <summary>
@@ -429,6 +461,65 @@ public class PlayerGridMoveAction : MonoBehaviour
     }
 
     /// <summary>
+    /// 이동 경로 길이 기준으로 실제 소비할 AP를 계산한다.
+    /// </summary>
+    private int CalculateMoveActionPointCost(int pathLength)
+    {
+        if (pathLength <= 0)
+        {
+            return 0;
+        }
+
+        int segmentCount = Mathf.CeilToInt(pathLength / (float)MoveDistancePerActionPoint);
+        return segmentCount * playerContext.TurnData.MoveActionPointCost;
+    }
+
+    /// <summary>
+    /// 현재 AP로 감당할 수 있는 이동 거리 구간 수를 계산한다.
+    /// </summary>
+    private int CalculateAffordableMoveSegmentCount()
+    {
+        int segmentCost = playerContext.TurnData.MoveActionPointCost;
+        if (segmentCost <= 0)
+        {
+            return 0;
+        }
+
+        return Mathf.Max(0, playerContext.ActionPoint.Current / segmentCost);
+    }
+
+    /// <summary>
+    /// 이동 가능 칸을 실제 거리 기준 AP 소비 구간 목록에 추가한다.
+    /// </summary>
+    private void AddMovePositionToSegment(GridPosition position, int distance)
+    {
+        int segmentIndex = Mathf.CeilToInt(distance / (float)MoveDistancePerActionPoint);
+        if (segmentIndex <= 1)
+        {
+            blueMovePositions.Add(position);
+            return;
+        }
+
+        if (segmentIndex == 2)
+        {
+            yellowMovePositions.Add(position);
+            return;
+        }
+
+        redMovePositions.Add(position);
+    }
+
+    /// <summary>
+    /// 이동 가능 칸의 AP 소비 구간 캐시를 비운다.
+    /// </summary>
+    private void ClearMoveRangeSegments()
+    {
+        blueMovePositions.Clear();
+        yellowMovePositions.Clear();
+        redMovePositions.Clear();
+    }
+
+    /// <summary>
     /// 이동 경로 미리보기 전용 런타임 하이라이터를 만든다.
     /// </summary>
     private GridCellHighlighter CreatePathPreviewHighlighter()
@@ -470,9 +561,9 @@ public class PlayerGridMoveAction : MonoBehaviour
             return false;
         }
 
-        if (turnData.MoveRange <= 0)
+        if (turnData.MoveDistancePerActionPoint <= 0)
         {
-            Debug.LogError($"{nameof(PlayerGridMoveAction)} on {name}의 {nameof(PlayerTurnData)} 이동 범위는 0보다 커야 합니다.", this);
+            Debug.LogError($"{nameof(PlayerGridMoveAction)} on {name}의 {nameof(PlayerTurnData)} AP당 이동 거리는 0보다 커야 합니다.", this);
             return false;
         }
 

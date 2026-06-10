@@ -64,6 +64,7 @@ public class GridCellHighlighter : MonoBehaviour
             Vector3 worldPosition = gridManager.GridToWorld(positions[i]);
             worldPosition.z += zOffset;
 
+            ApplyHighlightStyle(highlight);
             highlight.transform.SetPositionAndRotation(worldPosition, Quaternion.identity);
             float cellScale = Mathf.Max(0.01f, gridManager.CellSize * cellScaleRatio);
             highlight.transform.localScale = new Vector3(cellScale, cellScale, 1f);
@@ -119,6 +120,24 @@ public class GridCellHighlighter : MonoBehaviour
 
         Transform parent = ResolveHighlightRoot();
         return highlightPrefab != null ? Instantiate(highlightPrefab, parent) : CreateFallbackHighlight(parent);
+    }
+
+    /// <summary>
+    /// 하이라이트 프리팹이나 임시 스프라이트에 현재 표시 스타일을 적용한다.
+    /// </summary>
+    private void ApplyHighlightStyle(GameObject highlight)
+    {
+        if (highlight == null)
+        {
+            return;
+        }
+
+        SpriteRenderer[] spriteRenderers = highlight.GetComponentsInChildren<SpriteRenderer>(true);
+        for (int i = 0; i < spriteRenderers.Length; i++)
+        {
+            spriteRenderers[i].color = fallbackColor;
+            spriteRenderers[i].sortingOrder = sortingOrder;
+        }
     }
 
     /// <summary>

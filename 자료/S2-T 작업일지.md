@@ -279,3 +279,103 @@
 ## 다음
 - 테스트 씬에 임시 적 오브젝트, `EnemyData`, `EnemyContext`, `EnemyGridSight`를 연결해 감지 칸 계산을 확인한다.
 - 이후 `GridCellHighlighter`로 적 시야 칸 표시를 연결한다.
+
+
+## 추가 핵심
+- `PlayerGridMoveAction`에서 `IsValidMoveTarget()`을 제거했다.
+- 이동 실행과 경로 프리뷰의 실제 도달 가능 판정은 `GridPathfinder.TryFindPath()`를 단일 기준으로 사용하게 정리했다.
+- `movablePositions`는 이동 가능 범위 하이라이트 표시용 캐시로만 남겼다.
+- `GridDirection`, `EnemyData`, `EnemyContext`, `EnemyGridSight`를 추가해 적 시야 계산 1차 구조를 만들었다.
+- 적 정면 시야는 상하좌우 4방향 기준 부채꼴이며, 기본 거리는 5칸이다.
+- 장애물 칸은 정면 시야에 포함하지 않고, 같은 레인에서 장애물 뒤 칸을 차단한다.
+- 근접 감지는 방향과 장애물 영향 없이 주변 8칸을 감지한다.
+- 기존 `EnemyDataTest.asset` 연결을 유지하기 위해 새 `EnemyData.cs.meta`에 기존 EnemyData GUID를 사용했다.
+
+## 추가 검증
+- `dotnet build Assembly-CSharp.csproj --no-restore` 통과.
+- 경고 0개, 오류 0개.
+
+## 다음
+- 테스트 씬에 임시 적 오브젝트를 만들고 `EnemyData`, `EnemyContext`, `EnemyGridSight` 참조를 연결한다.
+- `GridCellHighlighter`를 재사용해 적 시야 칸 표시를 확인한다.
+- 이후 플레이어 이동 경로의 각 칸이 적 시야에 포함되는지 검사해 발각 판정을 연결한다.
+
+# 2026-06-10
+
+## 핵심
+- S2-T의 장기 전투/잠입 방향성을 2D XCOM식 턴제 잠입 전술로 정리했다.
+- 플레이어 이동은 목표 칸 선택 후 경로를 따라 슬라이드하듯 이동하는 방식으로 잡았다.
+- AP가 3이고 AP 1당 이동량이 3칸이면 최대 9칸까지 이동할 수 있는 식으로, AP와 이동 가능 거리를 연결하는 방향을 잡았다.
+- 이동 가능 범위는 AP 소비 구간별로 1~3칸 파랑, 4~6칸 노랑, 7~9칸 빨강처럼 색을 나누어 표시하는 기준을 남겼다.
+- 적 시야 범위 자체는 항상 표시하지 않고, 이동 중 어느 지점에서 애드가 발생하는지 플레이어가 알 수 있는 범위 안에서 경고 표시를 제공하는 방향으로 정했다.
+- 플레이어 시야 밖의 적은 사전 경고 없이 실제 이동 중 애드 이벤트를 발생시킨다.
+- 이동 중 적 시야에 들어오면 해당 지점에서 일시 정지하고, 카메라 줌/연출/적 AI 반응 후 남은 이동을 마저 진행하는 큰 흐름을 정했다.
+- 직접 공격은 즉시 애드로 보고, 해킹이나 교란은 플레이어 위치를 바로 들키는 것이 아니라 적을 경계 태세로 전환시키는 방향으로 잡았다.
+
+## 다음
+- 현재 즉시 이동 구조를 나중에 경로 순차 처리와 중간 애드 이벤트를 끼울 수 있는 액션 시퀀스 구조로 확장한다.
+- 이동 경로 평가, 애드 판정, 경고 표시를 서로 다른 책임으로 분리하는 설계를 유지한다.
+
+## 추가 핵심
+- AP 기반 다구간 이동 범위 1차 구조를 구현했다.
+- `PlayerTurnData`에 `moveDistancePerActionPoint`를 추가했다.
+- 현재 AP와 AP당 이동량을 기준으로 플레이어가 한 번에 이동 가능한 최대 거리를 계산하게 했다.
+- 이동 경로 길이에 따라 AP 비용을 계산하게 했다.
+- 기본값 기준 1~3칸은 AP 1, 4~6칸은 AP 2, 7~9칸은 AP 3을 소비한다.
+- 이동 가능 칸을 AP 소비 구간별로 파랑, 노랑, 빨강 하이라이트로 나누어 표시하게 했다.
+- `GridPathfinder.FindReachablePositionDistances()`를 추가해 각 이동 가능 칸까지의 실제 최단 거리를 얻을 수 있게 했다.
+- 기존 이동 범위 하이라이트 참조가 끊기지 않도록 `GridMoveRangeHighlighter`의 기존 `cellHighlighter` 필드를 `FormerlySerializedAs`로 보존했다.
+
+## 추가 검증
+- `dotnet build Assembly-CSharp.csproj --no-restore` 통과.
+- 경고 0개, 오류 0개.
+
+## 다음
+- Unity 플레이 모드에서 AP 3 기준 9칸 표시와 파랑/노랑/빨강 구간 표시를 확인한다.
+- 4~6칸 이동 시 AP 2, 7~9칸 이동 시 AP 3이 소비되는지 확인한다.
+- 이후 이동 경로의 애드 위험 지점 경고 표시를 붙인다.
+
+## 추가 핵심
+- 이동 경로 위험 평가 1차 구조를 구현했다.
+- `PlayerGridMoveAction`에 `MovePathPreviewShown`, `MovePathPreviewHidden` 이벤트를 추가했다.
+- `GridMoveRiskEvaluator`를 추가해 경로 미리보기 중 처음 적 시야에 들어가는 칸을 찾고 경고 하이라이트로 표시하게 했다.
+- 실제 이동 중 적 시야 칸에 진입하면 1차 애드 로그를 출력하게 했다.
+- 적 시야 목록은 임의 검색하지 않고 인스펙터에서 명시 연결하는 기준으로 잡았다.
+- 이번 단계에서는 이동 중단, 카메라 줌, 적 AI 반응은 구현하지 않고 후속 연결 지점만 만들었다.
+
+## 추가 검증
+- `dotnet build Assembly-CSharp.csproj --no-restore` 통과.
+- 경고 0개, 오류 0개.
+
+## 다음
+- Unity 플레이 모드에서 `GridMoveRiskEvaluator.enemySights`에 테스트 적 시야를 연결하고 이동 경로 위험 칸 표시를 확인한다.
+- 위험 칸 진입 시 애드 로그가 1회 출력되는지 확인한다.
+- 이후 경고 표시를 XCOM식 아이콘 UI로 교체하고, 실제 이동 일시 정지/카메라 연출/적 AI 반응으로 확장한다.
+
+## 추가 핵심
+- `GridMoveRiskEvaluator`를 `PlayerContext` 핵심 컴포넌트 참조에 추가했다.
+- `PlayerContext.GridMoveRiskEvaluator` 프로퍼티를 추가했다.
+- `PlayerContext.HasValidReference()`에서 `GridMoveRiskEvaluator` 누락을 검사하게 했다.
+
+## 추가 검증
+- `dotnet build Assembly-CSharp.csproj --no-restore` 통과.
+- 경고 0개, 오류 0개.
+
+## 추가 핵심
+- `GridMoveRiskEvaluator`가 `PlayerGridMoveAction`을 직접 인스펙터 참조로 들지 않게 변경했다.
+- `GridMoveRiskEvaluator`는 `PlayerContext`를 참조하고, `PlayerContext.GridMoveAction`에서 이동 행동 컴포넌트를 꺼내 이벤트를 구독한다.
+- 플레이어 계열 컴포넌트의 핵심 참조는 `PlayerContext`를 통해 접근한다는 규칙에 맞췄다.
+
+## 추가 검증
+- `dotnet build Assembly-CSharp.csproj --no-restore` 통과.
+- 경고 0개, 오류 0개.
+
+## 추가 핵심
+- 애드는 최초 감지 적 1명만 반응하는 사건이 아니라 주변 적 집단으로 전파되는 사건으로 정리했다.
+- 플레이어를 실제로 본 적이 최초 감지자가 되고, 해당 적 주변 일정 범위 안의 적들도 함께 애드된다.
+- 애드 전파 범위는 별도 값으로 관리한다.
+- `GridMoveRiskEvaluator`는 최초 감지 칸과 감지 적을 찾는 역할까지만 맡기고, 실제 전파는 후속 Alert 전담 시스템으로 분리하는 방향을 잡았다.
+- 전파 전담 시스템 후보 이름은 `EnemyAlertCoordinator`, `EnemyAlertManager`, `GridAlertPropagator`다.
+
+## 다음
+- 실제 애드 구현 시 최초 감지 적과 전파 대상 적 목록을 함께 다룰 수 있는 이벤트 구조를 설계한다.

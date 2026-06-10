@@ -26,6 +26,25 @@ public static class GridPathfinder
     {
         results.Clear();
 
+        Dictionary<GridPosition, int> distanceByPosition = new();
+        FindReachablePositionDistances(gridManager, startPosition, maxDistance, distanceByPosition);
+        foreach (GridPosition position in distanceByPosition.Keys)
+        {
+            results.Add(position);
+        }
+    }
+
+    /// <summary>
+    /// 시작 칸에서 지정한 최대 이동 거리 안에 도달 가능한 칸과 실제 최단 거리를 계산한다.
+    /// </summary>
+    public static void FindReachablePositionDistances(
+        GridManager gridManager,
+        GridPosition startPosition,
+        int maxDistance,
+        Dictionary<GridPosition, int> results)
+    {
+        results.Clear();
+
         if (gridManager == null || maxDistance <= 0 || !gridManager.IsInside(startPosition))
         {
             return;
@@ -58,7 +77,7 @@ public static class GridPathfinder
                 int nextDistance = currentDistance + 1;
                 distanceByPosition[next] = nextDistance;
                 frontier.Enqueue(next);
-                results.Add(next);
+                results.Add(next, nextDistance);
             }
         }
     }

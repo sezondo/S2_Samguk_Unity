@@ -17,11 +17,14 @@ public class PlayerContext : MonoBehaviour
     [SerializeField] private ActionPoint actionPoint;
     // 플레이어의 마우스 기반 그리드 이동 행동 컴포넌트다.
     [SerializeField] private PlayerGridMoveAction gridMoveAction;
+    // 플레이어 이동 경로의 적 시야 위험을 평가하고 경고 표시를 담당하는 컴포넌트다.
+    [SerializeField] private GridMoveRiskEvaluator gridMoveRiskEvaluator;
 
     public PlayerTurnData TurnData => turnData;
     public GridActor GridActor => gridActor;
     public ActionPoint ActionPoint => actionPoint;
     public PlayerGridMoveAction GridMoveAction => gridMoveAction;
+    public GridMoveRiskEvaluator GridMoveRiskEvaluator => gridMoveRiskEvaluator;
 
     /// <summary>
     /// 플레이어 Context에 필수 참조가 모두 연결되어 있는지 확인한다.
@@ -49,6 +52,12 @@ public class PlayerContext : MonoBehaviour
         if (gridMoveAction == null)
         {
             Debug.LogError($"{nameof(PlayerContext)} on {name}에는 {nameof(PlayerGridMoveAction)} 참조가 필요합니다.", this);
+            return false;
+        }
+
+        if (gridMoveRiskEvaluator == null)
+        {
+            Debug.LogError($"{nameof(PlayerContext)} on {name}에는 {nameof(GridMoveRiskEvaluator)} 참조가 필요합니다.", this);
             return false;
         }
 
