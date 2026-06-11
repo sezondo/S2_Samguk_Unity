@@ -1,21 +1,16 @@
 using System.Collections.Generic;
 using UnityEngine;
-using UnityEngine.Serialization;
 
 /// <summary>
 /// PlayerGridMoveAction의 이동 가능 칸 이벤트를 공용 그리드 하이라이트 표시기에 연결한다.
 /// 이동 규칙은 처리하지 않고, 이동 행동의 표시 요청만 중계한다.
 /// </summary>
 [RequireComponent(typeof(PlayerGridMoveAction))]
-[RequireComponent(typeof(GridCellHighlighter))]
 public class GridMoveRangeHighlighter : MonoBehaviour
 {
     [Header("Source")]
     // 이동 가능 칸 이벤트를 발생시키는 플레이어 이동 행동 컴포넌트다.
     [SerializeField] private PlayerGridMoveAction moveAction;
-    // AP 1개 구간 칸 표시와 풀링을 담당하는 공용 하이라이트 컴포넌트다.
-    [FormerlySerializedAs("cellHighlighter")]
-    [SerializeField] private GridCellHighlighter blueRangeHighlighter;
 
     [Header("Segment Style")]
     // AP 1개 구간 이동 가능 칸에 적용할 색이다.
@@ -31,6 +26,8 @@ public class GridMoveRangeHighlighter : MonoBehaviour
     // 이동 가능 칸 하이라이트를 월드 좌표에서 살짝 앞뒤로 보낼 때 쓰는 Z 오프셋이다.
     [SerializeField] private float zOffset = -0.05f;
 
+    // AP 1개 구간 표시를 담당하는 런타임 하이라이터다.
+    private GridCellHighlighter blueRangeHighlighter;
     // AP 2개 구간 표시를 담당하는 런타임 하이라이터다.
     private GridCellHighlighter yellowRangeHighlighter;
     // AP 3개 이상 구간 표시를 담당하는 런타임 하이라이터다.
@@ -85,6 +82,12 @@ public class GridMoveRangeHighlighter : MonoBehaviour
     /// </summary>
     private void OnDestroy()
     {
+        if (blueRangeHighlighter != null)
+        {
+            Destroy(blueRangeHighlighter.gameObject);
+            blueRangeHighlighter = null;
+        }
+
         if (yellowRangeHighlighter != null)
         {
             Destroy(yellowRangeHighlighter.gameObject);
@@ -137,11 +140,7 @@ public class GridMoveRangeHighlighter : MonoBehaviour
     /// </summary>
     private void ConfigureHighlighters()
     {
-        if (blueRangeHighlighter != null)
-        {
-            blueRangeHighlighter.ConfigureFallbackStyle(blueRangeColor, cellScaleRatio, sortingOrder, zOffset);
-        }
-
+        blueRangeHighlighter = EnsureRuntimeHighlighter(blueRangeHighlighter, "Blue", blueRangeColor, zOffset);
         yellowRangeHighlighter = EnsureRuntimeHighlighter(yellowRangeHighlighter, "Yellow", yellowRangeColor, zOffset - 0.01f);
         redRangeHighlighter = EnsureRuntimeHighlighter(redRangeHighlighter, "Red", redRangeColor, zOffset - 0.02f);
     }
@@ -169,12 +168,6 @@ public class GridMoveRangeHighlighter : MonoBehaviour
         if (moveAction == null)
         {
             Debug.LogError($"{nameof(GridMoveRangeHighlighter)} on {name}에는 {nameof(PlayerGridMoveAction)} 참조가 필요합니다.", this);
-            return false;
-        }
-
-        if (blueRangeHighlighter == null)
-        {
-            Debug.LogError($"{nameof(GridMoveRangeHighlighter)} on {name}에는 AP 1개 구간을 표시할 {nameof(GridCellHighlighter)} 참조가 필요합니다.", this);
             return false;
         }
 

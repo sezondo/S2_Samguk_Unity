@@ -379,3 +379,56 @@
 
 ## 다음
 - 실제 애드 구현 시 최초 감지 적과 전파 대상 적 목록을 함께 다룰 수 있는 이벤트 구조를 설계한다.
+
+## 추가 핵심
+- `GridMoveRangeHighlighter`의 이동 범위 하이라이터 소유 방식을 통일했다.
+- 기존에는 파랑 구간만 인스펙터 `GridCellHighlighter` 참조를 쓰고 노랑/빨강은 런타임 생성했지만, 이제 파랑/노랑/빨강 모두 런타임 생성으로 맞췄다.
+- `GridMoveRangeHighlighter`에서 `GridCellHighlighter` 필수 컴포넌트 요구와 인스펙터 참조 검사를 제거했다.
+- 이동 범위 표시용 `GridCellHighlighter`는 이제 플레이어 오브젝트에 별도로 붙이지 않아도 된다.
+
+## 추가 검증
+- `dotnet build Assembly-CSharp.csproj --no-restore` 통과.
+- 경고 0개, 오류 0개.
+
+## 추가 핵심
+- `GridMoveRangeHighlighter`를 `PlayerContext` 핵심 컴포넌트 참조에 추가했다.
+- `PlayerContext.GridMoveRangeHighlighter` 프로퍼티를 추가했다.
+- `PlayerContext.HasValidReference()`에서 `GridMoveRangeHighlighter` 누락을 검사하게 했다.
+
+## 추가 검증
+- `dotnet build Assembly-CSharp.csproj --no-restore` 통과.
+- 경고 0개, 오류 0개.
+
+## 추가 핵심
+- `EnemyGridSight`에 `Start()` 시점 `RefreshSight()` 재계산을 추가했다.
+- `GridManager` 또는 `GridActor` 초기화 순서 때문에 `Awake()` 시점 시야 계산이 비는 상황을 보정하기 위한 처리다.
+
+## 추가 검증
+- `dotnet build Assembly-CSharp.csproj --no-restore` 통과.
+- 경고 0개, 오류 0개.
+
+## 마무리 확인
+- Unity 플레이 모드에서 AP 기반 이동 범위 표시를 확인했다.
+- 이동 경로 중 애드 위험 칸 경고 표시를 확인했다.
+- 실제 이동 중 위험 칸 진입 시 애드 로그가 출력되는 것을 확인했다.
+- 오늘 작업은 여기서 마무리하고, 다음 작업은 `EnemyRegistry` 추가로 정했다.
+
+## 다음
+- `EnemyRegistry`를 추가해 `GridMoveRiskEvaluator.enemySights` 수동 연결을 제거한다.
+- 적 시야 컴포넌트가 등록/해제되고, 위험 평가가 레지스트리의 적 시야 목록을 사용하도록 바꾼다.
+- 이후 `AddTriggered` 이벤트와 애드 전파 시스템을 설계한다.
+
+## 추가 핵심
+- `EnemyRegistry`를 추가해 현재 씬의 활성 적 시야 목록을 등록/해제 기반으로 관리하게 했다.
+- `EnemyGridSight`가 활성화 시 `EnemyRegistry`에 등록하고 비활성화 시 해제되게 연결했다.
+- 씬 초기화 순서 때문에 등록소가 아직 준비되지 않은 경우를 고려해 `Start()`에서 한 번 더 등록을 시도한다.
+- `GridMoveRiskEvaluator.enemySights` 수동 배열을 제거하고 `EnemyRegistry.Instance.GridSights` 기준으로 이동 경로 위험을 평가하게 했다.
+- `GridMoveRiskEvaluator`의 초기화 순서를 정리해 `PlayerContext` 누락 시 NullReference보다 명확한 오류 로그가 먼저 나오도록 했다.
+
+## 추가 검증
+- `dotnet build Assembly-CSharp.csproj --no-restore` 통과.
+- 경고 0개, 오류 0개.
+
+## 다음
+- 테스트 씬에 `EnemyRegistry` 오브젝트를 추가하고 플레이 모드에서 적 시야 자동 등록, 이동 경로 위험 표시, 위험 칸 진입 애드 로그를 확인한다.
+- 이후 `AddTriggered` 이벤트와 애드 전파 전담 시스템을 설계한다.

@@ -12,8 +12,6 @@ public class GridMoveRiskEvaluator : MonoBehaviour
     [Header("Source")]
     // 플레이어 공통 참조와 이동 행동 컴포넌트를 제공하는 필수 Context다.
     [SerializeField] private PlayerContext playerContext;
-    // 이동 경로 위험 판정에 사용할 적 시야 컴포넌트 목록이다.
-    [SerializeField] private EnemyGridSight[] enemySights;
 
     [Header("Warning Highlight")]
     // true면 경로 미리보기 중 첫 애드 위험 칸을 하이라이트로 표시한다.
@@ -42,21 +40,21 @@ public class GridMoveRiskEvaluator : MonoBehaviour
     private GridPosition previewRiskPosition;
     // 현재 이동 실행 중 애드 로그를 이미 남겼는지 나타낸다.
     private bool didLogAddInCurrentMove;
+    // 이동 행동 이벤트를 현재 구독 중인지 나타낸다.
+    private bool subscribedMoveAction;
 
     /// <summary>
     /// 이동 위험 평가에 필요한 참조를 확인하고 경고 하이라이터를 준비한다.
     /// </summary>
     private void Awake()
     {
-        moveAction = playerContext.GridMoveAction;
-
         if (!HasValidReference())
         {
             enabled = false;
             return;
         }
 
-        
+        moveAction = playerContext.GridMoveAction;
         warningHighlighter = CreateWarningHighlighter();
     }
 
@@ -65,7 +63,26 @@ public class GridMoveRiskEvaluator : MonoBehaviour
     /// </summary>
     private void OnEnable()
     {
-        moveAction = playerContext.GridMoveAction;
+        TrySubscribeMoveAction(false);
+    }
+
+    /// <summary>
+    /// 씬 초기화 순서 때문에 OnEnable에서 놓친 이동 행동 이벤트 구독을 시작 시점에 한 번 더 시도한다.
+    /// </summary>
+    private void Start()
+    {
+        TrySubscribeMoveAction(true);
+    }
+
+    /// <summary>
+    /// 이동 행동 이벤트 구독을 시도한다.
+    /// </summary>
+    private void TrySubscribeMoveAction(bool logMissingRegistry)
+    {
+        if (subscribedMoveAction)
+        {
+            return;
+        }
 
         if (!HasValidReference())
         {
@@ -73,12 +90,24 @@ public class GridMoveRiskEvaluator : MonoBehaviour
             return;
         }
 
-        
+        if (EnemyRegistry.Instance == null)
+        {
+            if (logMissingRegistry)
+            {
+                Debug.LogError($"{nameof(GridMoveRiskEvaluator)} on {name}에는 이동 위험 평가에 사용할 씬의 {nameof(EnemyRegistry)}가 필요합니다.", this);
+                enabled = false;
+            }
+
+            return;
+        }
+
+        moveAction = playerContext.GridMoveAction;
         moveAction.MovePathPreviewShown += HandleMovePathPreviewShown;
         moveAction.MovePathPreviewHidden += HidePreviewRisk;
         moveAction.MoveStepEntered += HandleMoveStepEntered;
         moveAction.MoveCompleted += HandleMoveCompleted;
         moveAction.MoveRangeHidden += HidePreviewRisk;
+        subscribedMoveAction = true;
     }
 
     /// <summary>
@@ -95,6 +124,7 @@ public class GridMoveRiskEvaluator : MonoBehaviour
             moveAction.MoveRangeHidden -= HidePreviewRisk;
         }
 
+        subscribedMoveAction = false;
         HidePreviewRisk();
     }
 
@@ -179,7 +209,14 @@ public class GridMoveRiskEvaluator : MonoBehaviour
     /// </summary>
     private bool TryFindDetectingEnemy(GridPosition position, out EnemyGridSight detectingEnemy)
     {
-        for (int i = 0; i < enemySights.Length; i++)
+        if (EnemyRegistry.Instance == null)
+        {
+            detectingEnemy = null;
+            return false;
+        }
+
+        IReadOnlyList<EnemyGridSight> enemySights = EnemyRegistry.Instance.GridSights;
+        for (int i = 0; i < enemySights.Count; i++)
         {
             EnemyGridSight enemySight = enemySights[i];
             if (enemySight != null && enemySight.enabled && enemySight.CanDetect(position))
@@ -254,21 +291,6 @@ public class GridMoveRiskEvaluator : MonoBehaviour
         {
             Debug.LogError($"{nameof(GridMoveRiskEvaluator)} on {name}에는 {nameof(PlayerContext)}에 연결된 {nameof(PlayerGridMoveAction)} 참조가 필요합니다.", this);
             return false;
-        }
-
-        if (enemySights == null || enemySights.Length == 0)
-        {
-            Debug.LogError($"{nameof(GridMoveRiskEvaluator)} on {name}에는 위험 평가에 사용할 {nameof(EnemyGridSight)} 목록이 필요합니다.", this);
-            return false;
-        }
-
-        for (int i = 0; i < enemySights.Length; i++)
-        {
-            if (enemySights[i] == null)
-            {
-                Debug.LogError($"{nameof(GridMoveRiskEvaluator)} on {name}의 적 시야 목록 {i}번 항목이 비어 있습니다.", this);
-                return false;
-            }
         }
 
         return true;

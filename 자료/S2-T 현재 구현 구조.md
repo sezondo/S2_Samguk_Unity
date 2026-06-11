@@ -716,3 +716,48 @@ Notion에는 목표, 방향, 남은 작업만 짧게 두고, 상세 구현 구�
 - 애드 전파 시스템은 최초 감지 적을 기준으로 주변 적을 검색하고, 범위 안 적들에게 Alert 전환을 요청한다.
 - 카메라 연출, UI 경고, 적 AI 반응은 최초 감지 적과 전파 대상 목록을 함께 받을 수 있어야 한다.
 - 해킹/교란으로 발생하는 경계 태세 전파는 즉시 애드 전파와 다른 규칙으로 분리할 수 있다.
+
+### GridMoveRangeHighlighter 하이라이터 소유 기준 정리
+
+- `GridMoveRangeHighlighter`는 이동 범위 표시 전용 프레젠터로 보고, AP 구간별 `GridCellHighlighter`를 내부 런타임 인스턴스로 소유한다.
+- 파랑, 노랑, 빨강 이동 범위 표시가 모두 같은 방식으로 생성되고 관리된다.
+- 따라서 플레이어 오브젝트에 이동 범위 표시용 `GridCellHighlighter`를 별도로 붙이는 것은 필수가 아니다.
+- `GridCellHighlighter`는 실제 칸 표시를 수행하는 저수준 표시기이고, `GridMoveRangeHighlighter`는 이동 범위 데이터를 받아 AP 구간별 표시기에 전달하는 역할이다.
+- 나중에 전용 하이라이트 프리팹이 필요해지면 `GridMoveRangeHighlighter`에 프리팹 설정을 추가하고, 내부에서 생성하는 `GridCellHighlighter`에 전달하는 방식으로 확장한다.
+
+### PlayerContext 이동 범위 표시 참조 추가
+
+- `PlayerContext`에 `GridMoveRangeHighlighter` 참조를 추가했다.
+- 이동 가능 범위 표시 컴포넌트도 플레이어 루트의 핵심 표시 컴포넌트로 보고 `PlayerContext.GridMoveRangeHighlighter`에서 꺼내 쓸 수 있게 한다.
+- `PlayerContext.HasValidReference()`는 `GridMoveRangeHighlighter` 누락도 필수 참조 오류로 보고한다.
+
+### EnemyGridSight 시작 시점 재계산
+
+- `EnemyGridSight`는 `Awake()`에서 1차 시야를 계산하지만, 다른 오브젝트의 실행 순서 때문에 `GridManager` 또는 `GridActor` 등록이 아직 준비되지 않았을 수 있다.
+- 이 경우 감지 칸 목록이 비어 있을 수 있으므로 `Start()`에서 `RefreshSight()`를 한 번 더 호출한다.
+- 이는 인스펙터 참조를 보정하는 fallback이 아니라, 씬 초기화 순서로 인한 시야 계산 타이밍을 보정하기 위한 재계산이다.
+
+## 2026-06-10 테스트 확인 및 다음 작업 기준
+
+- AP 기반 다구간 이동 범위 표시를 플레이 모드에서 확인했다.
+- 이동 경로 중 적 시야에 들어가는 위험 칸 경고 표시를 확인했다.
+- 실제 이동 중 위험 칸에 들어갔을 때 애드 로그가 출력되는 것을 확인했다.
+- 현재 `GridMoveRiskEvaluator.enemySights`는 인스펙터 수동 배열 연결 방식이다.
+- 다음 작업은 `EnemyRegistry`를 추가해 적 시야 목록을 수동 배열이 아니라 등록/해제 기반으로 관리하는 것이다.
+- `EnemyRegistry` 이후에는 `GridMoveRiskEvaluator`가 레지스트리의 현재 적 시야 목록을 기준으로 위험 평가를 수행하게 한다.
+- 그 다음 단계에서 `AddTriggered` 이벤트와 애드 전파 전담 시스템을 붙인다.
+
+## 추가 핵심
+- `EnemyRegistry`를 추가해 현재 씬의 활성 적 시야 목록을 등록/해제 기반으로 관리하게 했다.
+- `EnemyGridSight`가 활성화 시 `EnemyRegistry`에 등록하고 비활성화 시 해제되게 연결했다.
+- 씬 초기화 순서 때문에 등록소가 아직 준비되지 않은 경우를 고려해 `Start()`에서 한 번 더 등록을 시도한다.
+- `GridMoveRiskEvaluator.enemySights` 수동 배열을 제거하고 `EnemyRegistry.Instance.GridSights` 기준으로 이동 경로 위험을 평가하게 했다.
+- `GridMoveRiskEvaluator`의 초기화 순서를 정리해 `PlayerContext` 누락 시 NullReference보다 명확한 오류 로그가 먼저 나오도록 했다.
+
+## 추가 검증
+- `dotnet build Assembly-CSharp.csproj --no-restore` 통과.
+- 경고 0개, 오류 0개.
+
+## 다음
+- 테스트 씬에 `EnemyRegistry` 오브젝트를 추가하고 플레이 모드에서 적 시야 자동 등록, 이동 경로 위험 표시, 위험 칸 진입 애드 로그를 확인한다.
+- 이후 `AddTriggered` 이벤트와 애드 전파 전담 시스템을 설계한다.

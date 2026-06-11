@@ -19,12 +19,15 @@ public class PlayerContext : MonoBehaviour
     [SerializeField] private PlayerGridMoveAction gridMoveAction;
     // 플레이어 이동 경로의 적 시야 위험을 평가하고 경고 표시를 담당하는 컴포넌트다.
     [SerializeField] private GridMoveRiskEvaluator gridMoveRiskEvaluator;
+    // 플레이어 이동 가능 범위의 AP 구간별 표시를 담당하는 컴포넌트다.
+    [SerializeField] private GridMoveRangeHighlighter gridMoveRangeHighlighter;
 
     public PlayerTurnData TurnData => turnData;
     public GridActor GridActor => gridActor;
     public ActionPoint ActionPoint => actionPoint;
     public PlayerGridMoveAction GridMoveAction => gridMoveAction;
     public GridMoveRiskEvaluator GridMoveRiskEvaluator => gridMoveRiskEvaluator;
+    public GridMoveRangeHighlighter GridMoveRangeHighlighter => gridMoveRangeHighlighter;
 
     /// <summary>
     /// 플레이어 Context에 필수 참조가 모두 연결되어 있는지 확인한다.
@@ -58,6 +61,12 @@ public class PlayerContext : MonoBehaviour
         if (gridMoveRiskEvaluator == null)
         {
             Debug.LogError($"{nameof(PlayerContext)} on {name}에는 {nameof(GridMoveRiskEvaluator)} 참조가 필요합니다.", this);
+            return false;
+        }
+
+        if (gridMoveRangeHighlighter == null)
+        {
+            Debug.LogError($"{nameof(PlayerContext)} on {name}에는 {nameof(GridMoveRangeHighlighter)} 참조가 필요합니다.", this);
             return false;
         }
 
