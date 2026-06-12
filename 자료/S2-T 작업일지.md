@@ -484,3 +484,35 @@
 ## 다음
 - Unity 씬에 `EnemyAlertCoordinator`를 배치하고 `PlayerContext`를 연결해 전파 로그를 확인한다.
 - 이후 `EnemyAlertState`를 추가해 로그 대신 실제 적 상태 전환 요청을 연결한다.
+
+## 추가 테스트 확인
+- Unity 플레이 모드에서 `EnemyRegistry`, `EnemyContext` 등록 흐름을 확인했다.
+- `GridMoveRiskEvaluator.AlertTriggered` 발행 이후 `EnemyAlertCoordinator`가 전파 대상 로그를 출력하는 흐름을 확인했다.
+- `EnemyData.AlertSpreadRange` 기준으로 최초 감지 적 주변에 애드가 전파되는 1차 구조를 확인했다.
+- 현재는 실제 적 상태 전환 없이 로그 출력 단계로 유지한다.
+- 연쇄 전파 구조는 맵 크기와 적 배치 밀도 기준이 잡힌 뒤 BFS/큐 기반으로 확장하기로 했다.
+
+## 다음
+- `EnemyAlertState`를 추가해 적의 평상/발각 상태를 저장한다.
+- `EnemyAlertCoordinator`가 전파 대상 로그 대신 적 상태 전환 요청을 보내게 한다.
+
+## 추가 핵심
+- `EnemyAlertLevel` enum을 추가해 적 상태를 `Normal`, `Alerted`로 구분했다.
+- `EnemyAlertState`를 추가해 적 하나의 현재 발각 상태를 보관하고 `RequestAlert()` 요청으로 상태를 바꾸게 했다.
+- `EnemyAlertState`는 상태 변경 시 `AlertLevelChanged` 이벤트를 발행하고 로그를 출력한다.
+- `EnemyContext`에 `EnemyAlertState` 참조를 추가하고 필수 참조 검사에 포함했다.
+- `EnemyAlertCoordinator`는 전파 대상 로그만 찍는 대신 `enemy.AlertState.RequestAlert()`를 호출하게 변경했다.
+
+## 추가 검증
+- `dotnet build Assembly-CSharp.csproj --no-restore` 통과.
+- 경고 0개, 오류 0개.
+
+## 다음
+- Unity 씬의 각 적 오브젝트에 `EnemyAlertState`를 추가하고 `EnemyContext.AlertState`에 연결한다.
+- 플레이 모드에서 발각 시 적 상태가 `Normal`에서 `Alerted`로 바뀌는지 확인한다.
+
+## 문서 정리
+- `S2-T 현재 구현 구조.md`를 최신 구현 기준 문서로 전체 재정리했다.
+- 과거 작업 흐름, 완료된 다음 작업, 현재 코드와 충돌하는 예전 기준은 제거했다.
+- 문서 구조를 Grid, Turn/AP, Player 이동, Enemy 구조, Enemy Alert, Data, Dialogue/VFX, 현재 한계, 다음 작업 중심으로 재구성했다.
+- 상세 작업 이력은 `S2-T 작업일지.md`에 남기고, 현재 구현 구조 문서는 현재 상태와 앞으로 할 일만 담는 기준으로 정리했다.

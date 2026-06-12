@@ -1,883 +1,466 @@
 ﻿# S2-T 현재 구현 구조
 
-이 문서는 S2의 보드게임식 턴제 잠입 스테이지 분기인 S2-T의 설계 방향과 프로그래밍 구현 구조를 보관한다.
-Notion에는 목표, 방향, 남은 작업만 짧게 두고, 상세 구현 구조는 이 문서에서 관리한다.
-
-최신 기준: 2026-05-27
+최신 기준: 2026-06-12
 브랜치: `turn-based-stealth`
 프로젝트 명칭: `S2-T`
 
-## 분기 목적
+이 문서는 S2의 보드게임식 턴제 잠입 스테이지 분기인 S2-T의 현재 구현 구조를 빠르게 파악하기 위한 문서다.
+작업 순서, 과거 실험 기록, 변경 이력은 `S2-T 작업일지.md`에서 관리한다.
 
-- 기존 S2 실시간 액션 방향은 방향별 이동, 공격, 회피, 맵 제작 등 아트 리소스 부담이 크다고 판단했다.
-- 기존 게임을 폐기하는 것이 아니라, 별도 브랜치에서 보드게임식 턴제 잠입 스테이지 프로토타입으로 가능성을 검증한다.
-- 기존 세계관, 주인공, 금두꺼비, 도깨비 환도, 해킹/잠입 콘셉트는 유지한다.
-- 실시간 조작 숙련보다 턴 단위 의사결정, 위치 선정, 시야 회피, 해킹 선택지를 핵심 재미로 둔다.
-- 기존 S2 본류와 섞이지 않도록 문서와 작업일지를 S2-T 전용으로 분리한다.
+## 최신 기준 요약
 
-## 한 줄 설명
+- S2-T는 사이버 조선 세계관을 유지한 보드게임식 턴제 잠입 스테이지 실험 분기다.
+- 플레이어는 한 명이며, AP를 사용해 격자 보드에서 이동한다.
+- 이동은 목표 칸을 선택하면 BFS 경로를 따라 한 칸씩 처리하는 구조다.
+- 이동 가능 범위는 현재 AP와 AP당 이동 거리 기준으로 계산한다.
+- 적 시야는 `EnemyGridSight`가 그리드 칸 단위로 계산한다.
+- 플레이어 이동 경로가 적 시야에 들어가면 `GridMoveRiskEvaluator.AlertTriggered` 이벤트가 발생한다.
+- 애드 전파는 `EnemyAlertCoordinator`가 담당한다.
+- 적의 현재 발각 상태는 `EnemyAlertState`가 보관한다.
+- 현재 애드 구조는 단일 단계 전파 기준이며, 연쇄 전파는 맵 크기와 적 밀도 기준이 잡힌 뒤 확장한다.
 
-사이버 조선 뒷골목에서 전자식 환도를 투척해 주변 장치를 해킹하며 목표 지점까지 침투하는 보드게임식 턴제 잠입 스테이지 게임.
+## 현재 목표
 
-## 장르 구성
+S2-T의 현재 구현 목표는 `이동 -> 위험 경고 -> 발각 이벤트 -> 애드 전파 -> 적 상태 전환`까지의 최소 루프를 만드는 것이다.
+현재 실제 피해, 적 AI 반응, 카메라 연출, UI 경고, 이동 일시 정지는 아직 구현하지 않는다.
 
-- 장르: 보드게임식 턴제 잠입 스테이지 / 소규모 전술 잠입
-- 전투 참고: XCOM식 격자 전술과 보드게임식 스테이지 클리어 구조
-- 스토리 참고: Library of Ruina식 비주얼노벨 진행
-- 전체 구성: 메뉴 화면, 스토리 진행 화면, 실제 게임 플레이 화면
+## 씬 구성 기준
 
-## 화면 구조
+현재 테스트 기준 씬은 `Assets/Scenes/Tset.unity`다.
 
-### 1. 메뉴 화면
+씬에는 다음 계열 오브젝트가 필요하다.
 
-- 게임 시작 시 처음 보이는 화면이다.
-- 모바일 게임처럼 스테이지를 선택하고 클리어하는 구조를 후보로 둔다.
-- 스테이지별 목표, 보상, 클리어 여부를 보여줄 수 있다.
+- `GridManager`: 보드 크기, 좌표 변환, 칸 상태, 점유 상태를 관리한다.
+- `TurnManager`: 플레이어/적 턴 전환 이벤트를 관리한다.
+- 플레이어 토큰: `PlayerContext`, `GridActor`, `ActionPoint`, `PlayerGridMoveAction`, `GridMoveRiskEvaluator`, `GridMoveRangeHighlighter`를 가진다.
+- 적 토큰: `EnemyContext`, `GridActor`, `EnemyGridSight`, `EnemyAlertState`를 가진다.
+- `EnemyRegistry`: 현재 씬의 활성 `EnemyContext` 목록을 관리한다.
+- `EnemyAlertCoordinator`: 플레이어 발각 이벤트를 구독하고 애드 전파를 처리한다.
+- Dialogue/VFX 관련 오브젝트는 필요한 테스트에서만 배치한다.
 
-### 2. 스토리 진행 화면
+## 코드 폴더 구조
 
-- 비주얼노벨 스타일 화면이다.
-- 배경 이미지, 캐릭터 스탠딩, 대사 중심으로 진행한다.
-- Library of Ruina처럼 전투 전후 이야기와 인물 대화를 처리한다.
-- 기존 말풍선 대사 시스템을 그대로 쓰기보다, S2-T 전용 스토리 화면 UI로 분리할 가능성이 있다.
+현재 주요 스크립트 폴더 역할은 다음과 같다.
 
-### 3. 실제 게임 플레이 화면
+- `Assets/Script/Grid`: 격자 좌표, 보드 상태, 점유, 경로 탐색.
+- `Assets/Script/Turn`: 턴 진행과 AP 관리.
+- `Assets/Script/TurnAction`: 플레이어 이동 행동, 이동 범위 표시, 이동 경로 위험 평가.
+- `Assets/Script/Player`: 플레이어 핵심 참조를 모으는 `PlayerContext`.
+- `Assets/Script/Enemy`: 적 핵심 참조, 시야, 등록소, 애드 전파, 발각 상태.
+- `Assets/Script/DataScript/Data`: 플레이어/적/대사/해킹 데이터 에셋.
+- `Assets/Script/Dialogue`: 말풍선 대사 시스템.
+- `Assets/Script/Common`: 공용 VFX 풀.
+- `Assets/Script/Combat`: 공용 전투/해킹 인터페이스.
 
-- XCOM을 참고하되, 전체 감각은 보드게임식 소규모 잠입 스테이지 화면이다.
-- 주인공 한 명이 적 시야를 피해 침투한다.
-- 검 투척, 근접 제압, 해킹으로 길을 열고 목표를 달성한다.
-- 적 시야는 해당 칸이 발각 지역인지 아닌지 보이도록 연출한다.
+## Grid 시스템
 
-## 핵심 디자인 원칙
+### GridPosition
 
-### 침투가 핵심이다
+`GridPosition`은 S2-T의 보드 칸 좌표 값 타입이다.
+Unity 월드 좌표와 분리해서 턴제 규칙은 `GridPosition` 기준으로 계산한다.
 
-- 전투보다 침투가 핵심이다.
-- 적 전멸이 기본 목표가 되어서는 안 된다.
-- 스테이지 목표는 목표 장치 해킹, 정보 탈취, 특정 지점 도달, 탈출 같은 방식으로 둔다.
-- 공격은 가능하지만 잠입과 해킹을 보조하는 수단이어야 한다.
-- 정면에서 적을 무조건 베고 지나가는 방식이 가장 효율적인 구조가 되면 안 된다.
+주요 기능:
 
-### 플레이어는 한 명이다
+- `x`, `y` 칸 좌표 보관.
+- `Up`, `Down`, `Left`, `Right`, `Zero` 기본 방향 값 제공.
+- `ManhattanDistanceTo()`로 맨해튼 거리 계산.
+- `+`, `-`, `==`, `!=` 연산 지원.
 
-- XCOM처럼 여러 아군을 조작하지 않는다.
-- 주인공 한 명과 검, 해킹 가능한 환경 오브젝트로 선택지를 만든다.
-- 아군 파티 전술보다 단독 침투 퍼즐에 가깝게 설계한다.
+### GridCellState
 
-### 검 투척과 해킹이 핵심 시스템이다
+`GridCellState`는 한 칸의 현재 상태를 보관한다.
+게임 규칙 판단은 하지 않고, `GridManager`가 승인한 상태만 기록한다.
 
-- 검은 단순 공격 무기가 아니라 해킹 매개체다.
-- 검을 장치나 적에게 꽂아 주변 환경을 바꾸는 것이 핵심 선택지다.
-- 검은 동시에 하나의 대상에만 박을 수 있다.
-- 검이 장치에 박혀 있는 동안에는 다른 대상 해킹이 불가능하다.
-- 검을 박아둔 상태에서는 근접 제압 능력이 제한될 수 있다.
-- 따라서 지금 조명을 끌지, 문을 열지, 적을 무력화할지 선택이 생겨야 한다.
+현재 보관 값:
 
-## 검/해킹 예시
+- `Position`: 이 칸의 좌표.
+- `IsBlocked`: 고정 이동불가 칸 여부.
+- `OccupiedActor`: 현재 점유 중인 `GridActor`.
+- `IsOccupied`: 점유 여부.
+- `CanEnter`: 기본 이동 규칙 기준 진입 가능 여부.
 
-- 가로등 또는 배전함에 검을 꽂아 주변을 암전시킨다.
-- CCTV에 검을 꽂아 감시 범위를 제거한다.
-- 셔터나 문에 검을 꽂아 경로를 개방하거나 차단한다.
-- 경비 로봇에 검을 꽂아 일시 정지 또는 오작동시킨다.
-- 검 회수 전까지 다른 해킹 대상을 선택할 수 없게 한다.
+### GridManager
 
-## 행동 포인트 기준
+`GridManager`는 격자 보드의 단일 관리자다.
 
-- 초기 프로토타입은 AP 기반으로 시작한다.
-- 플레이어는 매 턴 AP를 가지고 행동한다.
-- 정확한 AP 수치와 행동 비용은 프로토타입을 하면서 조정한다.
+책임:
 
-### 플레이어 행동 후보
+- 보드 크기와 칸 크기 관리.
+- `GridToWorld()`, `WorldToGrid()` 좌표 변환.
+- `blockedPositions` 기준 이동불가 칸 반영.
+- `Dictionary<GridPosition, GridCellState>`로 칸 상태 관리.
+- `RegisterActor()`, `UnregisterActor()`, `TryMoveActor()`로 점유 상태 변경.
+- Scene 뷰 Gizmo로 보드, 이동불가 칸, 점유 칸 표시.
 
-- 1칸 이동
-- 검 투척
-- 해킹
-- 검 회수
-- 뒤에서 적 제압
-- 턴 종료
+주의:
 
-## 잠입 판정 기준
+- `GridManager`는 플레이어/적/장치 구분을 알지 않는다.
+- 적 검색, 애드 전파, AI 판단은 `GridManager` 책임이 아니다.
 
-- 턴 종료 시점에만 감지 판정을 하면 적 시야 앞을 지나가도 들키지 않는 문제가 생긴다.
-- 초기 기준은 플레이어가 행동 하나를 완료할 때마다 감지 판정을 수행하는 것이다.
-- 이동 1칸 완료 후 감지 판정을 수행한다.
-- 검 투척, 해킹, 제압 후에도 필요하면 감지 판정을 수행한다.
-- 적은 플레이어 턴 종료 후 자신의 순찰 행동을 수행한다.
+### GridActor
 
-## 그리드 턴제 기준
+`GridActor`는 보드 위에 올라가는 말의 최소 단위다.
+플레이어, 적, 장치처럼 칸 좌표를 가지는 대상이 사용한다.
 
-- S2-T의 실제 플레이 화면은 보드게임식 격자 잠입 스테이지를 기준으로 한다.
-- 플레이어 이동은 격자 이동으로 구현한다.
-- AP를 소비해 이동, 근접 공격, 검 투척, 해킹, 회수 같은 행동을 수행한다.
-- 적 시야는 격자 칸 단위로 발각 지역을 표시한다.
-- 승리 조건은 스테이지마다 다르게 둔다.
+책임:
 
-## 적 행동 기준
-
-- 적은 고정 순찰 경로를 가진다.
-- 적은 현재 시야 범위를 표시한다.
-- 적은 플레이어를 감지할 수 있다.
-- 적은 플레이어를 공격할 수 있다.
-- 1차 구현에서는 단순 순찰, 감지, 공격만 만든다.
-- 경계, 수색, 경보 단계는 후속 확장으로 둔다.
-
-## 승리 조건
-
-- 승리 조건은 각 스테이지별로 다르게 둔다.
-- 예시는 목표 지점 도달, 특정 장치 해킹, 정보 탈취, 탈출이다.
-- 적 전멸은 기본 승리 조건으로 두지 않는다.
-
-## 아트 제작량 제한 원칙
-
-이번 장르 전환의 가장 큰 이유는 아트 부담을 줄이기 위함이다.
-전술 맵 위 캐릭터는 실시간 액션 캐릭터가 아니라 전술 보드 위의 말판/토큰처럼 표현한다.
-
-- 8방향 애니메이션을 만들지 않는다.
-- 가능하면 오른쪽을 보는 측면 이미지 1장을 기준으로 사용한다.
-- 왼쪽은 좌우 플립으로 처리한다.
-- 위/아래 이동도 별도 방향 애니메이션 없이 같은 토큰 표현을 사용할 수 있다.
-- 일반 공격, 해킹, 검 투척은 캐릭터 방향별 다프레임 애니메이션으로 표현하지 않는다.
-- 공격은 참격 VFX, 효과음, 타겟 강조, 피격 흔들림으로 표현한다.
-- 검 투척은 검 오브젝트 하나를 목표 칸까지 이동/회전시켜 표현한다.
-- 해킹은 대상 오브젝트의 노이즈, 전류, 색 변화 VFX로 표현한다.
-- 중요한 제압이나 보스 연출만 추후 고정 구도의 컷인 1장 정도를 고려한다.
-
-## 기존 S2에서 가져올 후보
-
-- `PlayerContext`, `EnemyContext` 같은 Context 참조 주머니 규칙
-- `IDamageable`, `IHackable`, `IAttackInfoProvider` 같은 공용 인터페이스
-- `EnemyDetector`의 시야각/Linecast 감지 구조
-- `VfxManager`의 공용 VFX 풀 구조
-- 도깨비 환도 투척/회수 개념
-- 해킹 가능한 대상 인터페이스 개념
-- 대사 시스템의 데이터 분리 경험
-
-## 새로 설계할 후보
-
-- `TurnManager`: 턴 진행과 현재 행동 주체 관리
-- `TurnActor`: 턴에 참여하는 유닛 공통 컴포넌트 또는 인터페이스
-- `ActionPoint`: 턴별 AP 보유와 소비 관리
-- `GridManager`: 격자 좌표, 점유, 이동 가능 칸 관리
-- `GridMover`: 격자 이동 처리
-- `SightGrid`: 적 시야 칸 계산과 표시
-- `TurnAction`: 이동, 공격, 투척, 해킹, 회수, 턴 종료 같은 행동 단위
-- `StageObjective`: 스테이지별 승리 조건 관리
-- `HackableGridObject`: 해킹 가능한 전장 오브젝트
-
-## 초기 구현 순서 후보
-
-1. S2-T 전용 테스트 씬 또는 기존 테스트 씬 분리
-2. `TurnManager` 최소 구조 작성
-3. 플레이어 턴/적 턴 전환 로그 검증
-4. `GridManager`와 격자 좌표 기준 정리
-5. 플레이어 1칸 이동과 AP 소비 구현
-6. 행동 완료 후 감지 판정 호출 구조 작성
-7. 적 시야 칸 표시 구현
-8. 고정 순찰 경로 적 구현
-9. 플레이어 발견과 공격 구현
-10. 검 투척/회수 구현
-11. 해킹 가능한 오브젝트 1종 구현
-12. 목표 지점 도달 또는 장치 해킹 승리 조건 구현
-
-## 현재 결정된 방향
-
-- S2-T는 보드게임식 턴제 잠입 스테이지로 간다.
-- 플레이어는 한 명이다.
-- AP 기반으로 시작한다.
-- 침투와 해킹이 전투보다 중요하다.
-- 적 전멸을 기본 목표로 두지 않는다.
-- 아트는 토큰 중심으로 강하게 제한한다.
-
-## 남은 결정 사항
-
-- 1턴 기본 AP 수치
-- 이동 1칸 비용
-- 검 투척 거리와 비용
-- 검 회수 비용
-- 해킹 비용과 지속 방식
-- 제압 가능 조건
-- 적 시야 표시 방식
-- 발각 후 즉시 실패, 경고, 전투 전환 중 어떤 방식으로 갈지
-- 스테이지 선택 메뉴의 최소 구현 범위
-- 스토리 진행 화면을 기존 Dialogue 시스템으로 확장할지, 별도 UI로 만들지
-
-
-## 현재 코드 정리 상태
-
-2026-05-27 기준 S2-T 브랜치에서는 기존 실시간 액션 Player/Enemy/Legacy 코드를 삭제했다.
-남겨둔 코드는 S2-T 초기 구조를 만들 때 혼란을 줄이기 위한 최소 공통 코드다.
-
-### 유지한 코드
-
-- `IDamageable`: 피해 대상 공통 규약
-- `IHackable`: 해킹 대상 공통 규약
-- `HackableData`: 해킹 대상 데이터의 초기 형태
-- `DialogueSequenceData`, `DialogueStepData`, `DialogueLineData`: 스토리/대사 데이터 후보
-- `VfxManager`: 공용 VFX 풀 관리
-
-### 삭제한 코드 범위
-
-- 기존 실시간 Player 계열 전체
-- 기존 실시간 Enemy 계열 전체
-- 활/화살 Legacy 계열 전체
-- 실시간 근접 판정용 `MeleeHitbox`
-- 기존 런타임 Dialogue 표시/트리거 계열
-- 기존 카메라 추적 컴포넌트
-- 실시간 액션용 Player/Enemy 데이터 에셋 스크립트
-
-### 다음 코드 작성 기준
-
-- 기존 액션 컴포넌트를 살리는 방식이 아니라 S2-T 전용 구조를 새로 만든다.
-- 첫 축은 `TurnManager`, `GridManager`, AP, 플레이어 1칸 이동이다.
-- 해킹과 검은 기존 개념만 가져오고, 구현은 격자/턴제 기준으로 새로 작성한다.
-
-## 말풍선 시스템 유지 기준
-
-- S2-T에서도 말풍선 시스템은 유지한다.
-- 보드게임식 인게임 화면에서 토큰, 적, 장치 위에 짧은 대사나 반응을 표시할 수 있어야 한다.
-- 기존 실시간 입력 의존성은 제거하고, 외부 시스템이 `DialogueManager.TryPlay()`와 `DialogueManager.Advance()`를 호출하는 방식으로 둔다.
-- `DialogueSpeaker`는 말풍선 기준 Anchor와 `speakerTag`만 제공한다.
-- `DialogueBubblePresenter`는 한 스텝의 여러 말풍선을 동시에 표시하고 풀링한다.
-- `SpeechBubbleView`는 발화자 Anchor를 따라가며, 한글 폰트와 타자기식 출력을 처리한다.
-- 스토리 진행 화면은 추후 별도 UI로 만들 수 있지만, 인게임 짧은 대사와 반응은 이 말풍선 시스템을 기준으로 한다.
-
-## 그리드 기초 구조
-
-2026-05-28 기준 S2-T의 첫 그리드 틀을 추가했다.
-
-### 좌표 기준
-
-- `GridPosition`은 보드 칸 좌표를 표현하는 값 타입이다.
-- 턴제 규칙은 Unity `Transform.position`이 아니라 `GridPosition`을 기준으로 계산한다.
-- `GridPosition`은 상하좌우 방향, 맨해튼 거리, 덧셈/뺄셈을 제공한다.
-
-### 보드 관리자
-
-- `GridManager`는 보드 크기, 칸 크기, 원점 월드 위치를 가진다.
-- `GridToWorld()`와 `WorldToGrid()`로 격자 좌표와 Unity 월드 좌표를 변환한다.
-- `IsInside()`, `CanEnter()`, `IsOccupied()`로 칸 진입 가능 여부를 판단한다.
-- `RegisterActor()`, `UnregisterActor()`, `TryMoveActor()`로 칸 점유 상태를 관리한다.
-- Scene 뷰에서 보드와 점유 칸을 확인할 수 있도록 Gizmo를 그린다.
-
-### 보드 위 말
-
-- `GridActor`는 플레이어, 적, 장치처럼 보드 칸 위에 올라가는 대상의 최소 단위다.
-- `GridPosition`을 가지고, 활성화 시 `GridManager`에 등록된다.
-- `TryMoveTo()`와 `TryMoveBy()`로 칸 이동을 요청한다.
-- 현재 단계에서는 이동 입력, AP 소비, 애니메이션은 넣지 않고 좌표와 점유 개념만 만든다.
-
-### 다음 연결 대상
-
-- `TurnManager`가 현재 턴 주체를 관리한다.
-- `ActionPoint` 또는 AP 컴포넌트가 행동 비용을 처리한다.
-- 플레이어 입력은 `GridActor.TryMoveBy()`를 호출하되, 나중에는 AP와 턴 상태 검사를 거친다.
-- 적 시야와 목표 판정도 `GridPosition` 기준으로 계산한다.
-
-## 정식 조작과 AP 이동 기준
-
-2026-05-29 기준 S2-T의 정식 조작 방향은 마우스 기반으로 정한다.
-`GridPlayerDebugMover`의 WASD 이동은 그리드 동작 확인용 임시 디버그 기능이며, 본게임 조작 기준으로 보지 않는다.
-
-### 조작 방식
-
-- 1차 알파 버전은 A안으로 간다.
-- A안은 UI에서 이동, 공격, 해킹, 검 투척 같은 행동을 먼저 선택한 뒤 화면의 그리드 칸이나 오브젝트를 클릭해 실행하는 방식이다.
-- 소녀전선2, XCOM 계열의 전술 게임 조작 흐름을 참고한다.
-- 빈 칸 또는 오브젝트 우클릭 후 가능한 행동 메뉴를 띄우는 B안은 알파 버전 이후 확장 단계에서 검토한다.
-- 최종 목표는 UI 행동 선택을 기본 조작으로 두고, 우클릭 컨텍스트 메뉴를 보조 조작으로 붙일 수 있는 구조다.
-
-### 이동/AP 기준
-
-- 이동은 AP 1당 1칸이 아니라, 이동 행동 1회가 AP 1을 소비하고 최대 3칸까지 이동하는 방식이다.
-- 이동 가능 범위는 맨해튼 거리 기준으로 계산한다.
-- 장애물, 점유 칸, 이동 불가 칸은 추후 경로 계산 단계에서 제외한다.
-- AP는 행동 시작 시점에 소비한다.
-- 이동 중 발각되더라도 해당 이동 행동은 이미 수행한 것으로 본다.
-
-### 시야 검사 기준
-
-- 적 시야 검사는 최종 도착 칸만 보지 않는다.
-- 플레이어가 이동 경로를 따라 한 칸씩 지나갈 때마다 감지 판정을 수행한다.
-- 이 기준은 적 시야를 통과해 안전한 도착 칸에만 들어가는 문제를 막기 위한 것이다.
-
-### 알파 버전 입력 흐름
-
-1. 플레이어 턴 시작 시 AP를 지급한다.
-2. 플레이어가 UI에서 `이동` 행동을 선택한다.
-3. AP가 충분하면 맨해튼 거리 3칸 이내 이동 가능 칸을 표시한다.
-4. 플레이어가 목표 칸을 클릭한다.
-5. 경로가 유효하면 AP 1을 행동 시작 시 소비한다.
-6. 플레이어가 경로를 따라 한 칸씩 이동한다.
-7. 각 칸 진입마다 적 시야 검사를 수행한다.
-8. 이동이 끝나면 다음 행동 선택 상태로 돌아간다.
-
-### 다음 구현 기준
-
-- 다음 코드 작업은 WASD 이동 확장이 아니라 마우스 기반 행동 선택 구조를 염두에 둔다.
-- 먼저 `TurnManager`, AP 보유/소비 구조, 이동 행동 선택 상태를 만든다.
-- 경로 계산과 시야 검사는 `GridPosition`과 맨해튼 거리 기준으로 연결한다.
-
-## 턴/AP 최소 구조
-
-2026-05-29 기준 S2-T의 첫 턴/AP 코드를 추가했다.
-
-### 턴 관리자
-
-- `TurnManager`는 현재 턴 주체를 `TurnSide.Player`, `TurnSide.Enemy`로 관리한다.
-- `TurnStarted`, `TurnEnded` 이벤트를 제공한다.
-- 현재 단계에서는 턴 규칙과 행동 처리를 넣지 않고, 턴 시작/종료 흐름만 알린다.
-- 정식 턴 종료 UI를 붙이기 전까지 스페이스바로 턴 종료를 확인하는 디버그 옵션을 가진다.
-- 씬에는 하나만 두는 싱글톤 기준으로 사용한다.
-
-### 행동 포인트
-
-- `ActionPoint`는 턴마다 지급되는 AP를 관리한다.
-- 플레이어 턴이 시작되면 설정된 AP를 보충한다.
-- `CanSpend()`와 `TrySpend()`로 행동 비용 확인과 소비를 처리한다.
-- AP 정책만 담당하고, 어떤 행동이 AP를 쓰는지는 호출자가 결정한다.
-- 최대 AP와 턴 시작 AP는 `PlayerContext.TurnData` 값을 사용한다.
-- `PlayerContext` 또는 `PlayerTurnData`가 없거나 AP 데이터가 유효하지 않으면 `ActionPoint.HasValidData()`에서 오류 로그를 남기고 컴포넌트를 비활성화한다.
-
-### 디버그 이동 연결
-
-- `GridPlayerDebugMover`는 이제 플레이어 턴과 AP를 확인한 뒤 이동한다.
-- `ActionPoint`가 같은 오브젝트에 있으면 WASD 1칸 이동마다 AP 1을 소비한다.
-- 이 연결은 정식 조작이 아니라 턴/AP 구조 검증용이다.
-- 다음 단계에서는 WASD 확장이 아니라 마우스 기반 이동 행동 선택 상태로 옮겨간다.
-- 디버그 이동 AP 비용도 `PlayerContext.TurnData.MoveActionPointCost`를 사용한다.
-
-## 플레이어 Context와 턴 데이터
-
-2026-06-01 기준 플레이어 수치와 핵심 참조를 정리하기 위해 `PlayerContext`와 `PlayerTurnData`를 추가했다.
-
-### PlayerTurnData
-
-- `PlayerTurnData`는 S2-T 플레이어의 턴 기반 행동 수치를 보관하는 `ScriptableObject`다.
-- 현재 포함 값은 최대 AP, 턴 시작 AP, 이동 범위, 이동 AP 비용이다.
-- `ActionPoint`, `PlayerGridMoveAction`, `GridPlayerDebugMover`는 `PlayerContext.TurnData`를 기준으로 수치를 읽는다.
-- `PlayerTurnData` 자체는 값 보관만 담당하고, 데이터 유효성 검사는 데이터를 사용하는 스크립트의 `HasValidData()`가 직접 수행한다.
-- 데이터가 비어 있거나 유효하지 않으면 해당 데이터를 사용하는 스크립트가 임의 fallback 없이 오류 로그를 남기고 해당 흐름을 중단한다.
-- 검 투척 거리/비용, 해킹 비용, 회수 비용 같은 값은 실제 기능을 구현할 때 추가한다.
-
-### PlayerContext
-
-- `PlayerContext`는 플레이어 루트의 참조 주머니 역할만 한다.
-- 현재 참조는 `PlayerTurnData`, `GridActor`, `ActionPoint`, `PlayerGridMoveAction`이다.
-- `PlayerContext`는 튜닝 수치 계산, 이동 정책, AP 소비 정책을 직접 처리하지 않는다.
-- `PlayerContext.HasValidReference()`는 필수 참조 누락 여부를 검사한다.
-- `PlayerContext`는 데이터 값의 유효성을 검사하지 않는다. 실제 데이터 값 검사는 `ActionPoint`, `PlayerGridMoveAction`, `GridPlayerDebugMover`처럼 데이터를 사용하는 스크립트가 맡는다.
-- `GridActor`는 여전히 공용 컴포넌트이며, `PlayerContext`를 알지 않는다.
-- 플레이어 전용 컴포넌트가 `PlayerContext`에서 공용 컴포넌트 참조를 꺼내 쓰는 방향으로 둔다.
-- 적/NPC도 추후 `EnemyContext`, `NPCContext`에서 같은 `GridActor` 같은 공용 컴포넌트를 참조할 수 있다.
-
-### 현재 씬 연결
-
-- `Tset` 씬의 플레이어 토큰에는 `PlayerContext`가 연결되어 있다.
-- `PlayerContext.TurnData`에는 `Assets/Data/Player/PlayerTurnData.asset`이 연결되어 있다.
-- `PlayerContext.GridActor`, `ActionPoint`, `GridMoveAction`은 같은 플레이어 토큰의 컴포넌트를 참조한다.
-
-## 마우스 기반 이동 행동 최소 구조
-
-2026-05-30 기준 S2-T의 정식 조작 흐름으로 넘어가기 위한 첫 이동 행동 컴포넌트를 추가했다.
-
-### 플레이어 이동 행동
-
-- `PlayerGridMoveAction`은 플레이어의 정식 그리드 이동 행동을 담당한다.
-- UI 버튼이 붙으면 `SelectMoveAction()`을 호출해 이동 행동 선택 상태로 들어간다.
-- UI가 아직 없으므로 현재는 디버그 옵션으로 `M` 키를 눌러 이동 행동을 선택할 수 있다.
-- 이동 행동 선택 중 좌클릭한 월드 좌표를 `GridManager.WorldToGrid()`로 변환해 목표 칸을 얻는다.
-- 우클릭 또는 `Escape`로 이동 행동 선택을 취소할 수 있다.
-
-### 이동 판정
-
-- 현재 플레이어 칸에서 맨해튼 거리 기준 `moveRange` 이내의 칸을 이동 후보로 계산한다.
-- 기본 이동 거리는 3칸이다.
-- 이동 행동 1회는 `actionPointCost`만큼 AP를 소비하며, 기본 비용은 AP 1이다.
-- 이동 거리와 이동 AP 비용은 `PlayerContext.TurnData` 기준으로 읽는다.
-- `PlayerContext` 또는 `PlayerTurnData`가 없거나 이동 데이터가 유효하지 않으면 `PlayerGridMoveAction.HasValidData()`에서 오류 로그를 남기고 컴포넌트를 비활성화한다.
-- AP는 이동 시작 시점에 소비한다.
-- 목표 칸은 보드 안에 있고 점유되지 않은 칸이어야 한다.
-- 정식 경로 탐색 전까지는 X축 우선, Y축 후속의 단순 맨해튼 경로를 사용한다.
-- 단순 경로의 중간 칸이 막혀 있으면 이동하지 않는다.
-
-### 후속 연결 지점
-
-- `MoveRangeShown`과 `MoveRangeHidden` 이벤트는 이동 가능 칸 표시 UI/VFX 연결 지점이다.
-- `MoveStepEntered` 이벤트는 경로 중 각 칸 진입마다 적 시야 검사를 붙일 지점이다.
-- `MoveCompleted` 이벤트는 이동 종료 후 다음 행동 선택 상태로 돌아가거나 후속 판정을 붙일 지점이다.
-- 현재 이동은 즉시 칸 이동이며, 보간 애니메이션은 이후 별도 컴포넌트나 액션 처리 단계에서 붙인다.
-
-### 이동 가능 칸 하이라이트
-
-- 하이라이트는 전역 매니저가 아니라 필요한 오브젝트에 붙는 표시 컴포넌트 기준으로 둔다.
-- `GridCellHighlighter`는 `GridPosition` 목록을 받아 보드 위에 하이라이트를 표시하는 공용 표시 전용 컴포넌트다.
-- `GridCellHighlighter.Show()`는 전달받은 칸 목록을 `GridManager.GridToWorld()`로 변환해 칸마다 하이라이트를 배치한다.
-- `GridCellHighlighter.Hide()`는 현재 표시 중인 하이라이트를 숨기고 풀로 돌려 재사용한다.
-- 하이라이트 프리팹을 인스펙터에 연결할 수 있다.
-- 프리팹이 비어 있으면 런타임에 1픽셀 사각형 스프라이트를 만들어 임시 반투명 하이라이트로 사용한다.
-- `GridMoveRangeHighlighter`는 `PlayerGridMoveAction.MoveRangeShown`, `MoveRangeHidden` 이벤트를 `GridCellHighlighter`에 연결하는 이동 행동 전용 어댑터다.
-- `Tset` 씬에서는 플레이어 토큰에 `GridMoveRangeHighlighter`와 `GridCellHighlighter`를 붙여 `M` 키 이동 선택 시 이동 가능 칸을 바로 확인할 수 있게 했다.
-- Unity 플레이 모드에서 이동 가능 칸 표시와 이동 완료 후 숨김까지 확인했다.
-
-### 하이라이트 확장 보류 기준
-
-- 현재는 이동 가능 칸 하이라이트만 실제 코드로 유지한다.
-- 검 투척 범위, 해킹 예상 범위, 적 시야, 공격 대상 강조 같은 추가 하이라이트는 실제 사용처가 생길 때 구현한다.
-- `GridHighlightPurpose`는 하이라이트 목적 구분이 필요해질 때 추가한다. 필요하면 `PlayerData` 같은 데이터 에셋에서 목적별 색상/프리팹 값을 들고 갈 수 있다.
-- `IGridHighlightTarget`은 공격 대상, 해킹 대상, 검 오브젝트처럼 하이라이트 대상이 되는 오브젝트가 필요해질 때 추가한다.
-- `IGridHighlightTarget`은 렌더링을 직접 만지기보다 대상의 그리드 위치, 표시 앵커, 하이라이트 가능 여부를 제공하는 규약으로 둔다.
-- 대상 투명도 조절, 점멸, 색조 변경 같은 실제 표현은 별도 View 컴포넌트나 대상별 표시 컴포넌트에서 처리한다.
-- 서로 성격이 다른 표시가 동시에 필요하면 같은 오브젝트에 `GridCellHighlighter`를 여러 개 붙이거나, 별도 표시 오브젝트에 붙여 색상과 정렬 순서를 분리한다.
-
-## 코드 주석 기준
-
-2026-05-30 기준 S2-T 코드 작성 시 변수 주석 기준을 명시했다.
-
-- 새로 추가하거나 의미가 바뀌는 멤버 변수, 인스펙터 노출 필드, 주요 런타임 상태 변수에는 어떤 값인지 한국어 주석을 붙인다.
-- 새로 추가하거나 의미가 바뀌는 함수에는 무엇을 하는 함수인지 한국어 XML 주석을 붙인다.
-- 지역 변수는 계산 과정이 복잡하거나 이름만으로 의미가 부족한 경우에만 주석을 붙인다.
-- 주석은 값의 역할과 사용 기준을 설명하고, 코드 이름을 그대로 풀어쓰는 수준의 중복 설명은 피한다.
-- `Debug.Log`, `Debug.LogWarning`, `Debug.LogError`로 출력하는 런타임 로그 문장은 기본적으로 한국어로 작성한다.
-- 클래스명, 컴포넌트명, 변수명은 로그 추적을 위해 그대로 남겨도 되지만, 원인과 조치 설명은 한국어로 적는다.
-
-## 이동불가 칸 구조
-
-2026-06-04 기준 `GridManager`에 고정 이동불가 칸 구조를 추가했다.
-
-- `blockedPositions`는 인스펙터에서 설정하는 이동불가 칸 좌표 목록이다.
-- 런타임에서는 `HashSet<GridPosition>` 기반 `blockedPositionSet`으로 변환해 빠르게 조회한다.
-- `IsBlocked()`는 지정한 칸이 고정 이동불가 칸인지 확인한다.
-- `SetBlocked()`는 런타임에서 특정 칸의 이동불가 상태를 바꿀 때 사용한다.
-- `CanEnter()`는 이제 보드 범위, 이동불가 칸, 점유 칸을 함께 검사한다.
-- `GridPathfinder`는 `GridManager.CanEnter()`를 사용하므로 별도 수정 없이 이동불가 칸을 피해 도달 가능 칸과 경로를 계산한다.
-- Scene 뷰에서는 이동불가 칸을 `blockedColor`로 표시한다.
-
-### 현재 사용 기준
-
-- 1차 테스트에서는 `GridManager.blockedPositions`에 좌표를 직접 입력해 장애물 배치를 검증한다.
-- 타일맵이나 `GridObstacle` 컴포넌트 기반 자동 등록은 스테이지 제작 방식이 정해진 뒤 검토한다.
-
-## GridCellState 1차 구조
-
-2026-06-04 기준 `GridCellState`를 추가해 칸 상태 저장 책임을 `GridManager` 내부 딕셔너리에서 분리했다.
-
-### 역할
-
-- `GridCellState`는 한 칸의 현재 상태를 보관하는 데이터 주머니다.
-- 현재 포함 상태는 `Position`, `IsBlocked`, `OccupiedActor`, `IsOccupied`, `CanEnter`다.
-- `GridCellState`는 게임 규칙을 판단하지 않고, `GridManager`가 승인한 상태만 기록한다.
-- 외부 시스템은 `GridCellState`를 직접 수정하지 않고 `GridManager`에 상태 변경을 요청한다.
-
-### GridManager 기준
-
-- `GridManager`는 `Dictionary<GridPosition, GridCellState>`로 보드 칸 상태를 소유한다.
-- 기존 외부 API인 `CanEnter()`, `IsBlocked()`, `IsOccupied()`, `TryGetActorAt()`, `RegisterActor()`, `UnregisterActor()`, `TryMoveActor()`는 유지한다.
-- 내부 구현만 `GridCellState` 조회/수정 기준으로 변경했다.
-- `GridManager`는 좌표 유효성, 점유 슬롯 충돌, 이동불가 칸 여부 같은 기본 무결성을 검사한다.
-- 화염, 독, 엄폐, 특수 오브젝트 같은 세부 규칙은 추후 전용 시스템이 판단하고, `GridManager`는 상태 기록 관문 역할을 맡는다.
-
-### 확장 보류
-
-- 칸 효과 목록, 엄폐 정보, 특수 오브젝트 슬롯은 아직 추가하지 않는다.
-- 실제 기능 요구가 생길 때 `GridCellState`에 슬롯을 단계적으로 추가한다.
-
-## 이동 경로 미리보기 1차 구조
-
-2026-06-07 기준 `PlayerGridMoveAction`에 Scene 뷰 Gizmo 기반 이동 경로 미리보기를 추가했다.
-
-- 이동 행동 선택 중 현재 마우스 칸이 바뀌면 경로 미리보기를 갱신한다.
-- 목표 칸이 현재 이동 가능한 칸이면 `GridPathfinder.TryFindPath()`로 실제 이동 경로를 계산한다.
-- 계산한 경로는 `pathPreviewPositions`에 보관한다.
-- `OnDrawGizmos()`에서 `pathPreviewPositions`의 각 칸을 `pathPreviewColor`와 `pathPreviewCellScale` 기준으로 표시한다.
-- 이동 선택 취소나 이동 완료 시 `ClearPathPreview()`로 미리보기 상태를 비운다.
-- 현재 단계에서는 런타임 UI/프리팹 표시가 아니라 Scene 뷰 검증용 Gizmo 표시만 제공한다.
-
-### 이동 경로 미리보기 표시 방식 변경
-
-2026-06-07 추가 기준으로 경로 미리보기는 `Gizmos`가 아니라 런타임 하이라이트 오브젝트로 표시한다.
-
-- `PlayerGridMoveAction`은 이동 경로 미리보기 전용 `GridCellHighlighter`를 런타임에 생성한다.
-- 경로 미리보기 색상, 칸 크기 비율, 정렬 순서, Z 오프셋은 `PlayerGridMoveAction`의 Path Preview 설정값을 사용한다.
-- `GridCellHighlighter.ConfigureFallbackStyle()`로 런타임 생성 하이라이터의 임시 스프라이트 표시 스타일을 설정한다.
-- 이 방식은 Game 뷰에서도 표시되며, Play Maximized가 아니어도 마우스 조작 중 경로를 확인할 수 있게 하기 위한 것이다.
-
-
-## 적 시야 계산 1차 구조
-
-2026-06-08 기준 적의 기본 감지 칸 계산 구조를 추가했다.
-
-### 방향 기준
-
-- `GridDirection`은 적이 바라보는 방향을 상하좌우 4방향으로 제한한다.
-- 대각선 방향을 바라보는 상태는 만들지 않는다.
-- `GridDirectionUtility`는 방향을 전방 오프셋과 오른쪽 오프셋으로 변환한다.
-
-### EnemyData
-
-- `EnemyData`는 적 시야 계산에 필요한 튜닝 데이터를 보관하는 `ScriptableObject`다.
-- 현재 포함 값은 정면 시야 거리, 근접 감지 사용 여부, 근접 감지 반경이다.
-- 기본 정면 시야 거리는 5칸이다.
-- 기본 근접 감지 반경은 1칸이며, 적 주변 8칸을 감지한다.
-- `EnemyData` 자체는 값 보관만 담당하고, 실제 데이터 유효성 검사는 데이터를 사용하는 스크립트가 수행한다.
-
-### EnemyContext
-
-- `EnemyContext`는 적 루트의 참조 주머니 역할만 한다.
-- 현재 참조는 `EnemyData`, `GridActor`, `EnemyGridSight`다.
-- 적 전용 컴포넌트는 같은 루트의 핵심 컴포넌트를 직접 찾지 않고 `EnemyContext`에서 꺼내 쓰는 방향으로 둔다.
-
-### EnemyGridSight
-
-- `EnemyGridSight`는 적의 정면 부채꼴 시야와 근접 감지 칸을 계산한다.
-- 정면 시야는 바라보는 방향 기준으로 거리 1에서 1칸, 거리 2에서 3칸, 거리 3에서 5칸처럼 전방 거리에 따라 좌우 폭이 넓어진다.
-- 장애물 칸은 정면 시야에 포함하지 않는다.
-- 장애물을 만나면 같은 레인의 그 뒤 칸은 보이지 않는 것으로 처리한다.
-- 근접 감지는 바라보는 방향과 장애물 영향 없이 주변 8칸을 감지한다.
-- 계산 결과는 `DetectedPositions`로 읽을 수 있고, `SightRefreshed` 이벤트로 표시 컴포넌트가 연결될 수 있다.
-
-### 다음 연결 대상
-
-- 테스트 씬에 임시 적 오브젝트를 배치하고 `EnemyData`, `EnemyContext`, `EnemyGridSight` 참조를 연결한다.
-- `GridCellHighlighter`를 재사용해 적 시야 칸 표시를 붙인다.
-- 이후 플레이어 이동 중 `MoveStepEntered`에서 적 시야 포함 여부를 검사해 발각 판정을 연결한다.
-
-
-## 이동 판정 책임 정리
-
-2026-06-08 기준 `PlayerGridMoveAction`의 이동 목표 판정 책임을 정리했다.
-
-- `IsValidMoveTarget()`은 제거했다.
-- 실제 이동 실행 가능 여부와 경로 프리뷰 유효성은 `GridPathfinder.TryFindPath()`를 단일 기준으로 사용한다.
-- `movablePositions`는 이동 가능 범위 하이라이트 표시용 캐시로만 사용한다.
-- `PlayerGridMoveAction`은 이동 행동 선택 상태, 턴/AP 조건, AP 소비, 이동 실행, 이벤트 발생을 담당한다.
-- 경로 존재 여부, 장애물/점유/범위 기준 도달 가능 여부는 `GridPathfinder`가 담당한다.
-
-## 적 시야 계산 보강 기준
-
-2026-06-08 추가 기준으로 적 시야 계산의 1차 코드 구조를 확정했다.
-
-- `GridDirection`은 상하좌우 4방향만 제공한다.
-- `GridDirectionUtility`는 방향을 전방 오프셋과 오른쪽 오프셋으로 변환한다.
-- `EnemyData`는 기본 정면 시야 거리 5, 근접 감지 사용 여부, 근접 감지 반경을 보관한다.
-- `EnemyContext`는 `EnemyData`, `GridActor`, `EnemyGridSight` 참조 주머니 역할만 한다.
-- `EnemyGridSight`는 정면 부채꼴 시야와 주변 8칸 근접 감지를 합쳐 `DetectedPositions`에 보관한다.
-- 정면 시야는 거리 1에서 1칸, 거리 2에서 3칸, 거리 3에서 5칸처럼 전방 거리에 따라 좌우 폭이 넓어진다.
-- 장애물 칸은 정면 시야에 포함하지 않고, 같은 레인에서 그 뒤 칸은 보이지 않는 것으로 처리한다.
-- 근접 감지는 방향과 장애물 영향 없이 주변 8칸을 감지한다.
-- `SightRefreshed` 이벤트는 이후 시야 하이라이트 표시 컴포넌트 연결 지점으로 사용한다.
-
-### 다음 구현 후보
-
-- `EnemyGridSight`의 감지 칸을 `GridCellHighlighter`로 표시하는 어댑터를 추가한다.
-- 테스트 씬에 임시 적 오브젝트와 `EnemyData` 에셋을 연결한다.
-- 플레이어 이동 중 `MoveStepEntered`에서 적 시야 포함 여부를 검사해 발각 판정을 붙인다.
-
-## 장기 전투/잠입 방향성: 2D XCOM식 규칙
-
-2026-06-10 기준 S2-T의 장기 방향성은 2D XCOM식 턴제 잠입 전술로 잡는다.
-
-### 핵심 방향
-
-- S2-T는 단순 그리드 이동 게임이 아니라, 이동 경로를 평가하고 위험을 감수해 침투하는 2D XCOM식 잠입 전술을 목표로 한다.
-- 플레이어 이동은 한 칸씩 끊어 누르는 방식이 아니라, 목표 칸을 선택하면 경로를 따라 슬라이드하듯 이동하는 방식으로 간다.
-- 플레이어 AP가 많을수록 한 번에 더 먼 거리까지 이동할 수 있다.
-- 예를 들어 AP가 3이고 AP 1당 이동량이 3칸이면, 이동 행동으로 최대 9칸까지 이동할 수 있다.
-- 이동 가능 범위는 AP 소비 구간별로 색을 나누어 표시한다.
-- 예시 기준은 1~3칸 파랑, 4~6칸 노랑, 7~9칸 빨강이다.
-
-### 이동 중 애드 기준
-
-- 플레이어가 이동 경로를 따라가는 중 적 시야 범위에 들어오면 이동을 즉시 끝내지 않고, 해당 지점에서 일시 정지한다.
-- 일시 정지 시 카메라 줌, 컷인, 경고 UI 같은 애드 연출을 재생한다.
-- 애드 연출 이후 적 AI가 반응한다.
-- 적 반응 예시는 엄폐물 위치로 이동, 경계 방향 전환, 전투 태세 진입, 주변 조사 같은 행동이다.
-- 적 반응이 끝나면 플레이어는 남은 이동 경로를 마저 이동할 수 있다.
-- 따라서 이동 실행은 즉시 좌표 변경이 아니라, 경로를 순차적으로 처리하고 중간 이벤트를 끼울 수 있는 액션 시퀀스 구조가 필요하다.
-
-### 적 시야 표시와 경고 정보
-
-- 적 시야 범위 자체를 항상 화면에 직접 표시하지 않는다.
-- 대신 플레이어가 이동을 선택할 때, 현재 알 수 있는 정보 기준으로 어느 지점에서 애드가 발생하는지 경고 표시를 제공한다.
-- 경고 표시는 XCOM식 노란 경고 아이콘처럼 이동 경로 또는 목표 칸에 붙는 방식이 후보이다.
-- 플레이어 시야 안에 있는 적의 감지 위험은 이동 전 경고로 보여줄 수 있다.
-- 플레이어 시야 밖에 있는 적은 경고 표시를 보여주지 않고, 실제 이동 중 해당 적의 시야에 들어가면 바로 애드 이벤트를 발생시킨다.
-- 즉, 실제 애드 판정과 플레이어에게 공개되는 경고 정보는 분리한다.
-
-### 공격과 해킹 반응 기준
-
-- 플레이어가 적을 직접 공격하면 즉시 애드가 발생한다.
-- 해킹 등으로 적이나 환경에 피해, 교란, 상태 변화를 주는 경우에는 적이 바로 플레이어 위치를 파악하지 않는다.
-- 해킹으로 변화가 발생하면 적은 경계 태세로 전환될 수 있다.
-- 경계 태세는 플레이어 위치를 아는 상태가 아니라, 이상 징후를 감지하고 엄폐, 수색, 방향 전환 같은 반응을 준비하는 상태다.
-- 장기적으로 적 상태는 평상, 경계, 전투/발견 상태처럼 나누어 관리한다.
-
-### 구현상 분리 기준
-
-- 실제 애드 판정은 게임 규칙이다. 적 시야, 플레이어 위치, 이동 경로, 공격, 해킹, 소리 같은 정보를 기준으로 계산한다.
-- 경고 표시는 정보 공개 UI다. 플레이어가 현재 볼 수 있거나 알 수 있는 위험만 표시한다.
-- 플레이어 시야 시스템이 추가되면, 보이지 않는 적의 위험은 사전 경고에서 제외한다.
-- 이동 경로 평가, 애드 판정, 경고 표시는 서로 다른 책임으로 분리한다.
-- 이 기준을 유지해야 나중에 플레이어 시야, 은신, 엄폐, 감시장치, 해킹 교란, 적 경계 상태를 확장해도 구조가 꼬이지 않는다.
-
-## AP 기반 다구간 이동 범위 1차 구조
-
-2026-06-10 기준 플레이어 이동 범위를 현재 AP와 AP당 이동량 기준으로 확장했다.
-
-### PlayerTurnData
-
-- `moveDistancePerActionPoint`를 추가했다.
-- 기본값은 3칸이다.
-- `moveActionPointCost`는 이동 거리 구간 1개가 소비하는 AP 비용으로 사용한다.
-- 기본값 1 기준으로 1~3칸 이동은 AP 1, 4~6칸 이동은 AP 2, 7~9칸 이동은 AP 3을 소비한다.
-- 기존 `moveRange`는 호환용 값으로 남겨두고, 새 이동 구조에서는 직접 사용하지 않는다.
-
-### PlayerGridMoveAction
-
-- `MoveRange`는 현재 AP로 감당할 수 있는 이동 구간 수와 `MoveDistancePerActionPoint`를 곱해 계산한다.
-- 예를 들어 현재 AP가 3이고 이동 구간 비용이 1, AP당 이동량이 3이면 최대 9칸까지 탐색한다.
-- 실제 이동 실행 시에는 `GridPathfinder.TryFindPath()`로 계산한 경로 길이를 기준으로 소비 AP를 계산한다.
-- 이동 비용은 `Ceil(경로 길이 / AP당 이동량) * 이동 구간 AP 비용`이다.
-- 이동 가능 칸은 AP 1개 구간, AP 2개 구간, AP 3개 이상 구간으로 나누어 캐시한다.
-- `MoveRangeSegmentsShown` 이벤트를 추가해 구간별 하이라이트 표시 컴포넌트가 연결될 수 있게 했다.
+- 현재 `GridPosition` 보관.
+- 활성화 시 `GridManager`에 점유 등록.
+- `TryMoveTo()`, `TryMoveBy()`로 이동 요청.
+- 이동 성공 시 Transform을 그리드 월드 좌표로 스냅.
 
 ### GridPathfinder
 
-- `FindReachablePositionDistances()`를 추가했다.
-- 기존 도달 가능 칸 목록뿐 아니라 시작 칸에서 각 칸까지의 실제 최단 이동 거리도 함께 계산한다.
-- `FindReachablePositions()`는 새 거리 계산 API를 사용해 기존 동작을 유지한다.
+`GridPathfinder`는 BFS 기반 경로 탐색 도구다.
+턴, AP, 입력 정책은 포함하지 않는다.
 
-### GridMoveRangeHighlighter
+주요 API:
 
-- 이동 가능 칸 하이라이트를 AP 소비 구간별로 표시한다.
-- AP 1개 구간은 파랑, AP 2개 구간은 노랑, AP 3개 이상 구간은 빨강으로 표시한다.
-- 기존 `cellHighlighter` 참조는 `blueRangeHighlighter`로 의미를 바꾸되, `FormerlySerializedAs`로 기존 씬 연결이 유지되게 했다.
-- 노랑/빨강 구간 하이라이터는 런타임에 생성한다.
+- `FindReachablePositions()`: 최대 거리 안의 도달 가능 칸 계산.
+- `FindReachablePositionDistances()`: 도달 가능 칸과 실제 최단 거리 계산.
+- `TryFindPath()`: 시작 칸에서 목표 칸까지의 최단 경로 계산.
+
+현재 이동은 상하좌우 4방향만 허용한다.
+
+## Turn / AP
+
+### TurnManager
+
+`TurnManager`는 현재 턴 주체를 `TurnSide.Player`, `TurnSide.Enemy`로 관리한다.
+
+책임:
+
+- 현재 턴 진영 보관.
+- 턴 시작/종료 이벤트 발행.
+- 임시 디버그 턴 종료 키 입력 처리.
+
+현재 적 턴 행동 AI는 아직 구현하지 않았다.
+
+### ActionPoint
+
+`ActionPoint`는 플레이어의 AP를 관리한다.
+
+책임:
+
+- 플레이어 턴 시작 시 AP 보충.
+- `CanSpend()`, `TrySpend()`로 AP 소비 처리.
+- AP 변경 이벤트 발행.
+
+AP 수치는 `PlayerContext.TurnData`의 `PlayerTurnData`에서 읽는다.
+필수 참조나 데이터가 없으면 fallback 없이 오류를 남기고 컴포넌트를 비활성화한다.
+
+## Player 구조
+
+### PlayerTurnData
+
+`PlayerTurnData`는 플레이어 턴 기반 수치를 보관하는 `ScriptableObject`다.
+
+현재 값:
+
+- `MaxActionPoint`: 최대 AP.
+- `StartTurnActionPoint`: 턴 시작 시 보충 AP.
+- `MoveDistancePerActionPoint`: AP 1개 구간당 이동 가능 칸 수.
+- `MoveRange`: 기존 호환용 이동 범위 값. 새 이동 구조에서는 직접 사용하지 않는다.
+- `MoveActionPointCost`: 이동 거리 구간 1개가 소비하는 AP 비용.
+
+데이터 에셋 자체에는 `HasValidData()` 책임을 두지 않는다.
+데이터를 사용하는 컴포넌트가 필요한 값의 유효성을 직접 검사한다.
+
+### PlayerContext
+
+`PlayerContext`는 플레이어 루트의 참조 주머니다.
+정책 계산이나 상태 변경을 직접 하지 않는다.
+
+현재 참조:
+
+- `PlayerTurnData TurnData`
+- `GridActor GridActor`
+- `ActionPoint ActionPoint`
+- `PlayerGridMoveAction GridMoveAction`
+- `GridMoveRiskEvaluator GridMoveRiskEvaluator`
+- `GridMoveRangeHighlighter GridMoveRangeHighlighter`
+
+플레이어 계열 컴포넌트는 같은 루트의 핵심 컴포넌트를 직접 `GetComponent<T>()`로 찾지 않고 `PlayerContext`에서 꺼내 쓴다.
+
+## Player 이동
+
+### PlayerGridMoveAction
+
+`PlayerGridMoveAction`은 플레이어의 마우스 기반 그리드 이동 행동을 담당한다.
+
+현재 임시 입력:
+
+- `M` 키로 이동 행동 선택.
+- 좌클릭으로 목표 칸 선택.
+- 우클릭 또는 Escape로 선택 취소.
+
+책임:
+
+- 플레이어 턴과 AP 조건 확인.
+- 현재 AP 기준 이동 가능 거리 계산.
+- `GridPathfinder`로 이동 가능 칸과 목표 경로 계산.
+- 이동 시작 시 AP 소비.
+- 경로 칸을 순서대로 이동 처리.
+- 이동 중 각 칸 진입마다 `MoveStepEntered` 이벤트 발행.
+- 이동 완료 시 `MoveCompleted` 이벤트 발행.
+- 경로 미리보기 이벤트 발행.
+
+현재 이동은 즉시 순차 처리이며, 중간 발각 시 이동 일시 정지는 아직 구현하지 않았다.
+
+### 이동 범위 표시
+
+`GridMoveRangeHighlighter`는 `PlayerGridMoveAction.MoveRangeSegmentsShown` 이벤트를 받아 이동 가능 칸을 AP 소비 구간별로 표시한다.
+
+현재 표시 기준:
+
+- AP 1개 구간: 파랑.
+- AP 2개 구간: 노랑.
+- AP 3개 이상 구간: 빨강.
+
+각 구간은 런타임 `GridCellHighlighter`를 내부 생성해 표시한다.
 
 ### GridCellHighlighter
 
-- 표시 직전에 연결된 `SpriteRenderer`에 현재 색상과 정렬 순서를 적용한다.
-- 임시 fallback 스프라이트뿐 아니라 단순 SpriteRenderer 프리팹을 쓰는 경우에도 구간별 색상이 반영된다.
+`GridCellHighlighter`는 그리드 칸 목록을 받아 런타임 하이라이트 오브젝트로 표시하는 저수준 표시기다.
+이동 범위, 경로 미리보기, 위험 칸 표시 등에 재사용한다.
 
-## 이동 경로 위험 평가 1차 구조
+프리팹이 없으면 임시 1픽셀 사각형 스프라이트를 생성한다.
 
-2026-06-10 기준 이동 경로 미리보기 중 애드 위험 칸을 평가하는 1차 구조를 추가했다.
-
-### PlayerGridMoveAction 이벤트 확장
-
-- `MovePathPreviewShown` 이벤트를 추가했다.
-- 이동 행동 선택 중 마우스 목표 칸까지 유효한 경로가 계산되면 현재 경로 칸 목록을 전달한다.
-- `MovePathPreviewHidden` 이벤트를 추가했다.
-- 경로 미리보기가 사라지거나 무효 경로가 되면 외부 표시 컴포넌트가 경고 표시를 지울 수 있게 했다.
+## 이동 경로 위험 평가
 
 ### GridMoveRiskEvaluator
 
-- `GridMoveRiskEvaluator`를 추가했다.
-- 플레이어 이동 경로와 인스펙터에 연결된 `EnemyGridSight` 목록을 비교해 처음 감지되는 칸을 찾는다.
-- 경로 미리보기 중 위험 칸이 있으면 런타임 `GridCellHighlighter`로 경고 하이라이트를 표시한다.
-- 실제 이동 중 `MoveStepEntered`에서 감지 칸에 들어가면 1차 애드 로그를 출력한다.
-- 현재 단계에서는 이동 중단, 카메라 줌, 적 AI 반응을 실행하지 않고, 후속 액션 시퀀스 연결 지점만 만든다.
-- 적 시야 목록은 임의 검색하지 않고 인스펙터에서 명시 연결한다.
+`GridMoveRiskEvaluator`는 플레이어 이동 경로가 적 감지 칸에 들어가는지 평가한다.
 
-### 현재 한계
+책임:
+
+- `PlayerGridMoveAction.MovePathPreviewShown`을 받아 경로 중 첫 위험 칸 계산.
+- 위험 칸을 경고 하이라이트로 표시.
+- `MoveStepEntered`를 받아 실제 이동 중 감지 여부 확인.
+- 발각 시 `AlertTriggered(GridPosition, EnemyGridSight)` 이벤트 발행.
+- 한 번의 이동 안에서는 첫 발각만 처리.
+
+적 시야 조회 기준:
+
+- `EnemyRegistry.Instance.Enemies`를 순회한다.
+- 각 `EnemyContext.GridSight.CanDetect(position)`으로 감지 여부를 확인한다.
+- 현재 같은 칸을 여러 적이 동시에 볼 경우 등록 순서상 먼저 발견된 적이 최초 감지 적이 된다.
+
+현재 한계:
 
 - 플레이어 시야 밖 적의 경고 숨김은 아직 구현하지 않았다.
-- 실제 애드 연출과 이동 일시 정지는 아직 구현하지 않았다.
-- 적 시야가 이동/회전으로 바뀌는 경우에는 해당 적 컴포넌트가 `RefreshSight()`를 적절히 호출해야 한다.
+- 감지 시 이동 일시 정지, 카메라 줌, 경고 UI는 아직 구현하지 않았다.
 
-### PlayerContext 위험 평가 참조 추가
+## Enemy 구조
 
-- `PlayerContext`에 `GridMoveRiskEvaluator` 참조를 추가했다.
-- 플레이어 계열 컴포넌트가 이동 위험 평가 컴포넌트를 필요로 할 때 같은 루트에서 직접 찾지 않고 `PlayerContext.GridMoveRiskEvaluator`를 통해 접근할 수 있게 한다.
-- `PlayerContext.HasValidReference()`는 `GridMoveRiskEvaluator` 누락도 필수 참조 오류로 보고한다.
+### EnemyData
 
-### GridMoveRiskEvaluator Context 참조 기준
+`EnemyData`는 적 튜닝 수치를 보관하는 `ScriptableObject`다.
 
-- `GridMoveRiskEvaluator`는 `PlayerGridMoveAction`을 직접 인스펙터 참조로 들지 않고 `PlayerContext.GridMoveAction`에서 꺼내 사용한다.
-- `GridMoveRiskEvaluator`는 `PlayerContext`를 필수 참조로 가지며, `PlayerContext.HasValidReference()`를 통해 플레이어 핵심 참조 연결 상태를 확인한다.
-- 이 기준은 플레이어 계열 컴포넌트가 같은 루트의 핵심 컴포넌트를 직접 찾거나 별도로 중복 참조하지 않고 `PlayerContext`를 통하도록 하기 위함이다.
+현재 값:
 
-## 애드 전파 규칙
+- `SightRange`: 정면 부채꼴 시야 최대 거리.
+- `UseAdjacentDetection`: 주변 근접 감지 사용 여부.
+- `AdjacentDetectionRange`: 근접 감지 반경.
+- `AlertSpreadRange`: 이 적이 플레이어를 발견했을 때 주변 적에게 애드를 전파하는 맨해튼 거리.
 
-2026-06-10 기준 애드는 최초 감지 적 1명만 반응하는 사건이 아니라, 주변 적 집단으로 전파되는 사건으로 본다.
+`AlertSpreadRange`는 전역 고정값이 아니라 최초 감지 적의 데이터에서 읽는다.
 
-### 기본 규칙
+### EnemyContext
 
-- 플레이어가 적 시야에 들어가면 최초 감지자가 생긴다.
-- 최초 감지자는 실제로 플레이어를 본 `EnemyGridSight` 또는 해당 적이다.
-- 최초 감지자가 애드되면 그 주변 일정 범위 안의 적들도 함께 애드된다.
-- 애드 전파 범위는 고정값으로 두지 않고 별도 값으로 관리한다.
-- 전파 범위 후보는 적 데이터의 `alertSpreadRange` 또는 별도 경계/알림 시스템 데이터다.
-- 범위 안의 적은 전투/발견 상태로 전환되고, 범위 밖의 적은 평상 또는 경계 상태를 유지할 수 있다.
+`EnemyContext`는 적 루트의 참조 주머니다.
 
-### 구현 방향
+현재 참조:
 
-- `GridMoveRiskEvaluator`는 경로 중 첫 감지 칸과 최초 감지 적을 찾는 역할까지만 맡긴다.
-- 실제 애드 전파는 후속 `EnemyAlertCoordinator`, `EnemyAlertManager`, `GridAlertPropagator` 같은 별도 시스템에서 처리한다.
-- 애드 전파 시스템은 최초 감지 적을 기준으로 주변 적을 검색하고, 범위 안 적들에게 Alert 전환을 요청한다.
-- 카메라 연출, UI 경고, 적 AI 반응은 최초 감지 적과 전파 대상 목록을 함께 받을 수 있어야 한다.
-- 해킹/교란으로 발생하는 경계 태세 전파는 즉시 애드 전파와 다른 규칙으로 분리할 수 있다.
+- `EnemyData EnemyData`
+- `GridActor GridActor`
+- `EnemyGridSight GridSight`
+- `EnemyAlertState AlertState`
 
-### GridMoveRangeHighlighter 하이라이터 소유 기준 정리
+역할:
 
-- `GridMoveRangeHighlighter`는 이동 범위 표시 전용 프레젠터로 보고, AP 구간별 `GridCellHighlighter`를 내부 런타임 인스턴스로 소유한다.
-- 파랑, 노랑, 빨강 이동 범위 표시가 모두 같은 방식으로 생성되고 관리된다.
-- 따라서 플레이어 오브젝트에 이동 범위 표시용 `GridCellHighlighter`를 별도로 붙이는 것은 필수가 아니다.
-- `GridCellHighlighter`는 실제 칸 표시를 수행하는 저수준 표시기이고, `GridMoveRangeHighlighter`는 이동 범위 데이터를 받아 AP 구간별 표시기에 전달하는 역할이다.
-- 나중에 전용 하이라이트 프리팹이 필요해지면 `GridMoveRangeHighlighter`에 프리팹 설정을 추가하고, 내부에서 생성하는 `GridCellHighlighter`에 전달하는 방식으로 확장한다.
-
-### PlayerContext 이동 범위 표시 참조 추가
-
-- `PlayerContext`에 `GridMoveRangeHighlighter` 참조를 추가했다.
-- 이동 가능 범위 표시 컴포넌트도 플레이어 루트의 핵심 표시 컴포넌트로 보고 `PlayerContext.GridMoveRangeHighlighter`에서 꺼내 쓸 수 있게 한다.
-- `PlayerContext.HasValidReference()`는 `GridMoveRangeHighlighter` 누락도 필수 참조 오류로 보고한다.
-
-### EnemyGridSight 시작 시점 재계산
-
-- `EnemyGridSight`는 `Awake()`에서 1차 시야를 계산하지만, 다른 오브젝트의 실행 순서 때문에 `GridManager` 또는 `GridActor` 등록이 아직 준비되지 않았을 수 있다.
-- 이 경우 감지 칸 목록이 비어 있을 수 있으므로 `Start()`에서 `RefreshSight()`를 한 번 더 호출한다.
-- 이는 인스펙터 참조를 보정하는 fallback이 아니라, 씬 초기화 순서로 인한 시야 계산 타이밍을 보정하기 위한 재계산이다.
-
-## 2026-06-10 테스트 확인 및 다음 작업 기준
-
-- AP 기반 다구간 이동 범위 표시를 플레이 모드에서 확인했다.
-- 이동 경로 중 적 시야에 들어가는 위험 칸 경고 표시를 확인했다.
-- 실제 이동 중 위험 칸에 들어갔을 때 애드 로그가 출력되는 것을 확인했다.
-- 현재 `GridMoveRiskEvaluator.enemySights`는 인스펙터 수동 배열 연결 방식이다.
-- 다음 작업은 `EnemyRegistry`를 추가해 적 시야 목록을 수동 배열이 아니라 등록/해제 기반으로 관리하는 것이다.
-- `EnemyRegistry` 이후에는 `GridMoveRiskEvaluator`가 레지스트리의 현재 적 시야 목록을 기준으로 위험 평가를 수행하게 한다.
-- 그 다음 단계에서 `AddTriggered` 이벤트와 애드 전파 전담 시스템을 붙인다.
-
-## 추가 핵심
-- `EnemyRegistry`를 추가해 현재 씬의 활성 적 시야 목록을 등록/해제 기반으로 관리하게 했다.
-- `EnemyGridSight`가 활성화 시 `EnemyRegistry`에 등록하고 비활성화 시 해제되게 연결했다.
-- 씬 초기화 순서 때문에 등록소가 아직 준비되지 않은 경우를 고려해 `Start()`에서 한 번 더 등록을 시도한다.
-- `GridMoveRiskEvaluator.enemySights` 수동 배열을 제거하고 `EnemyRegistry.Instance.GridSights` 기준으로 이동 경로 위험을 평가하게 했다.
-- `GridMoveRiskEvaluator`의 초기화 순서를 정리해 `PlayerContext` 누락 시 NullReference보다 명확한 오류 로그가 먼저 나오도록 했다.
-
-## 추가 검증
-- `dotnet build Assembly-CSharp.csproj --no-restore` 통과.
-- 경고 0개, 오류 0개.
-
-## 다음
-- 테스트 씬에 `EnemyRegistry` 오브젝트를 추가하고 플레이 모드에서 적 시야 자동 등록, 이동 경로 위험 표시, 위험 칸 진입 애드 로그를 확인한다.
-- 이후 `AddTriggered` 이벤트와 애드 전파 전담 시스템을 설계한다.
-
-## EnemyRegistry 기반 적 시야 등록 구조
-
-2026-06-11 기준 적 시야 목록 관리는 `GridMoveRiskEvaluator`의 인스펙터 수동 배열이 아니라 `EnemyRegistry`를 기준으로 한다.
+- 적 하나를 대표하는 진입점이다.
+- 활성화 시 `EnemyRegistry`에 자기 자신을 등록한다.
+- 비활성화 시 `EnemyRegistry`에서 해제한다.
+- 필수 참조가 비어 있으면 오류를 남기고 비활성화한다.
 
 ### EnemyRegistry
 
-- `EnemyRegistry`는 현재 씬에 활성화된 적 시야 컴포넌트를 모아 두는 씬 단위 싱글톤 등록소다.
-- 역할은 목록 관리만이며, 적 AI, 애드 판정, 시야 계산, 경고 표시를 직접 처리하지 않는다.
-- 현재 공개 목록은 `GridSights`이며, 외부 시스템은 이 목록을 읽어 현재 활성 적 시야를 조회한다.
-- 등록은 `RegisterGridSight()`, 해제는 `UnregisterGridSight()`로 처리한다.
-- 후속 `EnemyAlertCoordinator` 같은 애드 전파 시스템도 이 등록소를 읽어 주변 적 탐색에 사용할 수 있다.
+`EnemyRegistry`는 현재 씬의 활성 적 목록을 관리하는 씬 단위 싱글톤 등록소다.
 
-### EnemyGridSight 등록 기준
+현재 공개 목록:
 
-- `EnemyGridSight`는 활성화될 때 `EnemyRegistry`에 자기 자신을 등록한다.
-- 비활성화될 때는 등록소에서 자기 자신을 해제한다.
-- `OnEnable()` 시점에 등록소가 아직 준비되지 않았을 수 있으므로 `Start()`에서 한 번 더 등록을 시도한다.
-- `Start()` 시점에도 `EnemyRegistry`가 없으면 오류 로그를 남기고 컴포넌트를 비활성화한다.
-- 이 처리는 필수 참조를 임의로 찾아 보정하는 fallback이 아니라, 씬 단위 필수 매니저 누락을 명확히 드러내기 위한 검증이다.
+- `IReadOnlyList<EnemyContext> Enemies`
 
-### GridMoveRiskEvaluator 기준
+역할:
 
-- `GridMoveRiskEvaluator`는 더 이상 `enemySights` 인스펙터 배열을 갖지 않는다.
-- 이동 경로 위험 평가는 `EnemyRegistry.Instance.GridSights`를 기준으로 수행한다.
-- 경로 미리보기 중 처음 감지되는 칸을 찾고, 실제 이동 중 감지 칸에 들어가면 기존처럼 1차 애드 로그를 남긴다.
-- `Awake()`에서는 `PlayerContext` 같은 플레이어 핵심 참조만 검증하고, `EnemyRegistry` 준비 여부는 이벤트 구독 시점에 확인한다.
-- `OnEnable()`에서 등록소가 아직 준비되지 않았을 수 있으므로 `Start()`에서 이동 행동 이벤트 구독을 한 번 더 시도한다.
+- 적 목록 관리만 담당한다.
+- 적 AI, 애드 판정, 시야 계산, 상태 전환은 담당하지 않는다.
+- `GridMoveRiskEvaluator`, `EnemyAlertCoordinator`가 이 목록을 조회한다.
 
-### 씬 구성 기준
+## Enemy 시야
 
-- S2-T 플레이 테스트 씬에는 `EnemyRegistry` 컴포넌트를 가진 오브젝트가 하나 있어야 한다.
-- `EnemyRegistry`는 적 프리팹이나 플레이어 오브젝트가 아니라 씬 매니저 계열 오브젝트에 두는 것을 기본으로 한다.
-- 중복 `EnemyRegistry`가 있으면 뒤에 활성화된 중복 인스턴스는 비활성화된다.
+### GridDirection
 
-### 현재 한계와 다음 작업
+`GridDirection`은 적이 바라보는 방향을 상하좌우 4방향으로 제한한다.
+대각선 방향은 현재 바라보는 방향으로 사용하지 않는다.
 
-- 아직 Unity 씬 인스펙터에는 `EnemyRegistry` 오브젝트를 직접 추가하지 않았다.
-- 다음 Unity 확인 작업은 `Tset` 씬에 `EnemyRegistry`를 배치하고 자동 등록 흐름을 플레이 모드에서 검증하는 것이다.
-- 이후 `GridMoveRiskEvaluator`는 감지 로그만 남기는 단계에서 `AddTriggered` 이벤트를 발행하는 단계로 확장한다.
-- 애드 전파, 카메라 연출, 적 AI 반응은 별도 Alert 전담 시스템에서 처리한다.
+`GridDirectionUtility`는 방향을 전방 오프셋과 오른쪽 오프셋으로 변환한다.
 
-## AlertTriggered 발각 이벤트 1차 구조
+### EnemyGridSight
 
-2026-06-12 기준 `GridMoveRiskEvaluator`는 실제 이동 중 적 시야에 처음 들어갔을 때 `AlertTriggered` 이벤트를 발행한다.
+`EnemyGridSight`는 적의 감지 칸을 계산한다.
 
-### 이벤트 기준
+책임:
 
-- 이벤트 이름은 문서의 기존 `AddTriggered` 후보보다 의미가 명확한 `AlertTriggered`로 정했다.
-- `AlertTriggered`는 감지된 칸 `GridPosition`과 최초 감지 적 시야 `EnemyGridSight`를 함께 전달한다.
-- 이동 1회 안에서는 기존 `didLogAddInCurrentMove` 기준을 유지해 첫 감지에 대해서만 이벤트를 발행한다.
-- 현재 단계에서는 이벤트 발행과 로그까지만 담당하고, 이동 중단이나 카메라 연출은 실행하지 않는다.
+- 현재 적 위치와 방향 기준 정면 부채꼴 시야 계산.
+- 주변 근접 감지 칸 계산.
+- `DetectedPositions` 목록과 내부 HashSet 갱신.
+- `CanDetect(GridPosition)`으로 지정 칸 감지 여부 반환.
+- `SightRefreshed` 이벤트 발행.
 
-### 책임 분리
+시야 규칙:
 
-- `GridMoveRiskEvaluator`는 경로 위험 평가, 첫 감지 적 탐색, 경고 하이라이트, 발각 이벤트 발행까지만 맡는다.
-- 애드 전파, 적 상태 전환, 카메라 줌, 경고 UI, 이동 일시 정지는 후속 시스템이 `AlertTriggered`를 구독해 처리한다.
-- 후속 시스템 후보는 `EnemyAlertCoordinator`이며, 이 시스템은 `EnemyRegistry`를 읽어 최초 감지 적 주변으로 발각을 전파할 수 있다.
+- 정면 시야는 전방 거리 1에서 1칸, 거리 2에서 3칸, 거리 3에서 5칸처럼 좌우 폭이 넓어진다.
+- 장애물 칸은 정면 시야에 포함하지 않는다.
+- 같은 레인에서 장애물을 만나면 그 뒤 칸은 차단한다.
+- 근접 감지는 방향과 장애물 영향 없이 주변 칸을 감지한다.
 
-### 다음 작업
+`EnemyGridSight`는 등록소를 직접 알지 않는다.
+등록/해제 책임은 `EnemyContext`가 가진다.
 
-- `EnemyAlertCoordinator`를 추가해 `GridMoveRiskEvaluator.AlertTriggered`를 구독한다.
-- 최초 감지 적과 감지 칸을 받아 애드 전파 대상 적 목록을 계산한다.
-- 실제 이동 일시 정지와 연출 연결은 애드 전파 이벤트 이후 단계로 둔다.
+## Enemy Alert 구조
 
-## EnemyContext 중심 EnemyRegistry 정리
+### AlertTriggered 이벤트
 
-2026-06-12 추가 기준으로 `EnemyRegistry`는 `EnemyGridSight` 목록이 아니라 `EnemyContext` 목록만 관리한다.
+`GridMoveRiskEvaluator.AlertTriggered`는 플레이어가 실제 이동 중 적 시야에 처음 들어갔을 때 발생한다.
 
-### 변경 이유
+전달 값:
 
-- 적 하나의 대표 진입점은 `EnemyContext`로 통일한다.
-- `EnemyGridSight`는 시야 계산 컴포넌트일 뿐이며, 등록소 생명주기 관리를 맡지 않는다.
-- 후속 애드 전파, 적 상태 전환, 적 AI 요청은 시야뿐 아니라 위치, 데이터, 상태 컴포넌트까지 필요하므로 `EnemyContext`를 기준으로 접근하는 편이 단순하다.
+- 발각 칸 `GridPosition`
+- 최초 감지 적 시야 `EnemyGridSight`
 
-### 현재 구조
+현재 기준:
 
-- `EnemyRegistry.Enemies`는 현재 씬에 활성화된 `EnemyContext` 목록이다.
-- `EnemyContext`는 `OnEnable()`에서 `EnemyRegistry.RegisterEnemy(this)`를 시도하고, `OnDisable()`에서 `UnregisterEnemy(this)`를 호출한다.
-- 씬 초기화 순서 때문에 `OnEnable()`에서 등록소를 못 잡을 수 있으므로 `Start()`에서 한 번 더 등록을 시도한다.
-- `EnemyGridSight`에서는 `EnemyRegistry` 등록/해제 코드를 제거했고, 시야 계산과 `CanDetect()`만 담당한다.
+- 이동 1회당 첫 발각만 이벤트를 발행한다.
+- 여러 적이 동시에 감지할 때 대표 감지자 선택 규칙은 아직 단순 등록 순서 기반이다.
 
-### GridMoveRiskEvaluator 기준
+### EnemyAlertCoordinator
 
-- 위험 평가는 `EnemyRegistry.Instance.Enemies`를 순회한다.
-- 각 `EnemyContext`에서 `GridSight`를 꺼내 `enemy.GridSight.CanDetect(position)`으로 감지 여부를 확인한다.
-- 최초 감지 적은 기존처럼 `EnemyGridSight`로 반환해 `AlertTriggered(GridPosition, EnemyGridSight)` 이벤트에 전달한다.
+`EnemyAlertCoordinator`는 씬 단위 애드 전파 조정자다.
 
-### 후속 확장 기준
+책임:
 
-- `EnemyAlertCoordinator`도 `EnemyRegistry.Enemies`를 사용해 최초 감지 적 주변의 전파 대상 적을 계산한다.
-- 적 상태 컴포넌트가 추가되면 `EnemyContext`에 참조를 추가하고, Coordinator가 Context를 통해 상태 전환 요청을 보낸다.
-
-## EnemyAlertCoordinator 1차 구조
-
-2026-06-12 기준 `EnemyAlertCoordinator`를 추가해 `GridMoveRiskEvaluator.AlertTriggered` 이벤트를 구독하고 애드 전파 대상 적을 계산한다.
-
-### EnemyData Alert 수치
-
-- `EnemyData`에 `alertSpreadRange`를 추가했다.
-- 이 값은 최초 감지 적이 플레이어를 발견했을 때 주변 적에게 애드를 전파하는 맨해튼 거리다.
-- `EnemyAlertCoordinator`는 전역 고정값이 아니라 최초 감지 적의 `EnemyData.AlertSpreadRange`를 읽어 전파 범위를 정한다.
-- `alertSpreadRange`가 0이면 최초 감지 적만 전파 대상이 될 수 있다.
-- `alertSpreadRange`가 음수이면 데이터 오류로 보고 전파를 중단한다.
-
-### EnemyAlertCoordinator 책임
-
-- `EnemyAlertCoordinator`는 씬 단위 애드 전파 조정자다.
 - `PlayerContext.GridMoveRiskEvaluator.AlertTriggered`를 구독한다.
-- 이벤트에서 받은 `EnemyGridSight`를 기준으로 `EnemyRegistry.Enemies`에서 최초 감지 적 `EnemyContext`를 찾는다.
-- 최초 감지 적의 위치를 기준으로 등록된 모든 적의 `GridActor.GridPosition`과 맨해튼 거리를 계산한다.
-- 최초 감지 적의 `AlertSpreadRange` 안에 있는 적을 전파 대상으로 본다.
-- 현재 단계에서는 전파 대상 로그만 출력하고 실제 적 상태 전환은 하지 않는다.
+- 이벤트의 `EnemyGridSight`를 기준으로 `EnemyRegistry.Enemies`에서 최초 감지 적 `EnemyContext`를 찾는다.
+- 최초 감지 적의 `EnemyData.AlertSpreadRange`를 읽는다.
+- 최초 감지 적 위치 기준으로 등록된 모든 적과의 맨해튼 거리를 계산한다.
+- 범위 안의 적에게 `EnemyAlertState.RequestAlert()`를 호출한다.
 
-### 다음 확장 기준
+현재 전파 방식:
 
-- 다음 단계에서 `EnemyAlertState` 또는 비슷한 적 상태 컴포넌트를 추가한다.
-- `EnemyContext`에 적 상태 컴포넌트 참조를 추가한다.
-- `EnemyAlertCoordinator`는 전파 대상 로그 대신 각 적 Context를 통해 상태 전환 요청을 보낸다.
-- 카메라 줌, 경고 UI, 이동 일시 정지는 상태 전환 이벤트 이후 별도 시스템으로 연결한다.
+- 단일 단계 전파다.
+- 연쇄 전파는 아직 구현하지 않았다.
+- 연쇄 전파는 맵 크기, 적 밀도, 경계 규칙이 정해진 뒤 BFS/큐 기반으로 확장한다.
+
+### EnemyAlertState
+
+`EnemyAlertState`는 적 하나의 현재 경계 상태를 보관한다.
+
+현재 상태 단계:
+
+- `Normal`: 평상 상태.
+- `Alerted`: 플레이어 발각 또는 애드 전파로 발각된 상태.
+
+책임:
+
+- `CurrentLevel` 보관.
+- `RequestAlert(GridPosition detectedPosition, EnemyContext sourceEnemy)`로 발각 요청 처리.
+- 이미 같은 상태이면 중복 전환을 하지 않는다.
+- 상태 변경 시 `AlertLevelChanged` 이벤트 발행.
+- 현재는 상태 변경 로그를 출력한다.
+
+후속 확장 후보:
+
+- `Suspicious`
+- `Combat`
+- 적 AI 행동 전환
+- 경고 UI/색상 변경
+
+## Data 에셋
+
+### PlayerTurnData
+
+플레이어의 AP와 이동 관련 수치를 보관한다.
+실제 유효성 검사는 데이터를 사용하는 컴포넌트가 담당한다.
+
+### EnemyData
+
+적의 시야와 애드 전파 관련 수치를 보관한다.
+실제 유효성 검사는 데이터를 사용하는 컴포넌트가 담당한다.
+
+### HackableData
+
+해킹 가능한 대상의 기본 데이터 형태다.
+현재 S2-T 핵심 루프에는 아직 직접 연결되어 있지 않다.
+
+### Dialogue 데이터
+
+- `DialogueSequenceData`
+- `DialogueStepData`
+- `DialogueLineData`
+
+인게임 말풍선 또는 추후 스토리 화면에서 사용할 대사 데이터 후보로 유지한다.
+
+## Dialogue / VFX 유지 구조
+
+### Dialogue
+
+현재 말풍선 시스템은 S2-T에서도 유지한다.
+
+주요 구성:
+
+- `DialogueManager`: 대사 시퀀스 재생과 진행.
+- `DialogueBubblePresenter`: 한 스텝의 말풍선 표시와 풀링.
+- `DialogueSpeaker`: 발화자 태그와 말풍선 앵커 제공.
+- `SpeechBubbleView`: 말풍선 UI, 한글 폰트, 타자기식 출력.
+
+현재 대사 시스템은 S2-T 턴/이동 루프와 강하게 결합되어 있지 않다.
+외부 시스템이 `TryPlay()`와 `Advance()`를 호출하는 방식이다.
+
+### VfxManager
+
+`VfxManager`는 공용 VFX 풀이다.
+현재 S2-T 핵심 루프와 직접 연결된 상태는 아니지만, 공격/해킹/경고 연출 확장 후보로 유지한다.
+
+## Combat / Hacking 인터페이스
+
+### IDamageable
+
+피해를 받을 수 있는 대상의 공통 규약이다.
+현재 S2-T의 실제 피해 루프는 아직 구현하지 않았다.
+
+### IHackable
+
+해킹 가능한 대상의 공통 규약이다.
+현재 S2-T의 검 투척/해킹 루프는 아직 구현하지 않았다.
+
+## 현재 한계
+
+- 플레이어 이동 중 발각 시 이동을 일시 정지하지 않는다.
+- 발각 시 카메라 줌, 경고 UI, 컷인 연출은 없다.
+- 적 상태는 `Normal`, `Alerted` 두 단계뿐이다.
+- 적 AI 반응은 아직 없다.
+- 애드 전파는 단일 단계이며 연쇄 전파는 아직 없다.
+- 플레이어 시야/정보 공개 기준이 없어 보이지 않는 적의 위험 경고 숨김은 아직 없다.
+- 공격, 해킹, 검 투척, 검 회수는 아직 핵심 루프에 연결되지 않았다.
+- 승리 조건, 스테이지 목표, 메뉴/스토리 화면은 아직 구현하지 않았다.
+
+## 다음 작업
+
+1. Unity 씬에서 모든 적 오브젝트에 `EnemyAlertState`를 추가하고 `EnemyContext.AlertState`에 연결한다.
+2. 플레이 모드에서 발각 시 적 상태가 `Normal`에서 `Alerted`로 바뀌는지 확인한다.
+3. `EnemyAlertState.AlertLevelChanged`를 이용해 색상 변경 또는 임시 UI 표시를 연결한다.
+4. 발각 시 플레이어 이동을 일시 정지할 수 있는 액션 시퀀스 구조를 검토한다.
+5. 맵 크기와 적 배치 밀도 기준이 잡히면 애드 연쇄 전파 구조를 BFS/큐 기반으로 확장한다.
+6. 이후 검 투척/해킹/해킹 대상 오브젝트 루프로 넘어간다.

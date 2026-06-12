@@ -3,7 +3,7 @@ using UnityEngine;
 
 /// <summary>
 /// 플레이어 발각 이벤트를 받아 최초 감지 적 기준으로 주변 적에게 애드를 전파하는 조정자다.
-/// 현재 단계에서는 전파 대상 계산과 로그 출력만 담당한다.
+/// 현재 단계에서는 전파 대상 계산과 적 상태 전환 요청을 담당한다.
 /// </summary>
 public class EnemyAlertCoordinator : MonoBehaviour
 {
@@ -12,7 +12,7 @@ public class EnemyAlertCoordinator : MonoBehaviour
     [SerializeField] private PlayerContext playerContext;
 
     [Header("Log")]
-    // true면 애드 전파 대상 계산 결과를 Unity 콘솔에 출력한다.
+    // true면 애드 전파 대상 계산과 상태 전환 요청 결과를 Unity 콘솔에 출력한다.
     [SerializeField] private bool logAlertSpread = true;
 
     // 발각 이벤트를 발행하는 플레이어 이동 위험 평가 컴포넌트다.
@@ -126,9 +126,10 @@ public class EnemyAlertCoordinator : MonoBehaviour
                 continue;
             }
 
-            if (logAlertSpread)
+            bool changed = enemy.AlertState.RequestAlert(detectedPosition, detectingEnemy);
+            if (logAlertSpread && changed)
             {
-                Debug.Log($"{nameof(EnemyAlertCoordinator)}: {detectedPosition} 칸 발각이 {detectingEnemy.name} 기준 {distance}칸 거리의 {enemy.name} 적에게 전파됐습니다.", this);
+                Debug.Log($"{nameof(EnemyAlertCoordinator)}: {detectedPosition} 칸 발각을 {detectingEnemy.name} 기준 {distance}칸 거리의 {enemy.name} 적에게 전파했습니다.", this);
             }
         }
     }
@@ -161,7 +162,7 @@ public class EnemyAlertCoordinator : MonoBehaviour
     /// </summary>
     private static bool CanReceiveAlert(EnemyContext enemy)
     {
-        return enemy != null && enemy.enabled && enemy.HasValidReference();
+        return enemy != null && enemy.enabled && enemy.HasValidReference() && enemy.AlertState != null && enemy.AlertState.enabled;
     }
 
     /// <summary>

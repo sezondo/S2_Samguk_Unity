@@ -15,6 +15,8 @@ public class EnemyContext : MonoBehaviour
     [SerializeField] private GridActor gridActor;
     // 적의 그리드 시야 칸 계산을 담당하는 컴포넌트다.
     [SerializeField] private EnemyGridSight gridSight;
+    // 적의 현재 경계 상태를 보관하고 전환 요청을 처리하는 컴포넌트다.
+    [SerializeField] private EnemyAlertState alertState;
 
     // 현재 EnemyRegistry에 등록되어 있는지 나타낸다.
     private bool registeredToRegistry;
@@ -22,6 +24,7 @@ public class EnemyContext : MonoBehaviour
     public EnemyData EnemyData => enemyData;
     public GridActor GridActor => gridActor;
     public EnemyGridSight GridSight => gridSight;
+    public EnemyAlertState AlertState => alertState;
 
     /// <summary>
     /// 적 Context에 필요한 참조를 확인한다.
@@ -111,6 +114,12 @@ public class EnemyContext : MonoBehaviour
         if (gridSight == null)
         {
             Debug.LogError($"{nameof(EnemyContext)} on {name}에는 {nameof(EnemyGridSight)} 참조가 필요합니다.", this);
+            return false;
+        }
+
+        if (alertState == null)
+        {
+            Debug.LogError($"{nameof(EnemyContext)} on {name}에는 {nameof(EnemyAlertState)} 참조가 필요합니다.", this);
             return false;
         }
 
