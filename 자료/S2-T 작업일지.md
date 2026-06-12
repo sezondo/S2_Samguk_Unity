@@ -432,3 +432,55 @@
 ## 다음
 - 테스트 씬에 `EnemyRegistry` 오브젝트를 추가하고 플레이 모드에서 적 시야 자동 등록, 이동 경로 위험 표시, 위험 칸 진입 애드 로그를 확인한다.
 - 이후 `AddTriggered` 이벤트와 애드 전파 전담 시스템을 설계한다.
+
+## 추가 문서 정리
+- `S2-T 현재 구현 구조.md`에 `EnemyRegistry 기반 적 시야 등록 구조` 섹션을 추가했다.
+- `EnemyRegistry`, `EnemyGridSight`, `GridMoveRiskEvaluator`의 책임 분리와 씬 구성 기준을 명확히 정리했다.
+- 기존 `GridMoveRiskEvaluator.enemySights` 수동 배열 기준은 현재 구현 기준에서 폐기하고, `EnemyRegistry.Instance.GridSights` 조회 기준으로 정리했다.
+- 다음 Unity 확인 작업은 `Tset` 씬에 `EnemyRegistry` 오브젝트를 배치하고 자동 등록/위험 평가 흐름을 검증하는 것으로 남겼다.
+
+## 2026-06-12
+
+## 핵심
+- `GridMoveRiskEvaluator`에 `AlertTriggered` 이벤트를 추가했다.
+- 실제 이동 중 적 시야에 처음 들어갔을 때 감지 칸 `GridPosition`과 최초 감지 적 `EnemyGridSight`를 함께 전달하게 했다.
+- 기존 애드 로그는 유지하되, 후속 시스템이 로그가 아니라 이벤트를 구독해 처리할 수 있는 연결 지점을 만들었다.
+- 기존 문서의 `AddTriggered` 후보 이름은 코드에서는 의미가 더 명확한 `AlertTriggered`로 정리했다.
+
+## 검증
+- `dotnet build Assembly-CSharp.csproj --no-restore` 통과.
+- 경고 0개, 오류 0개.
+
+## 다음
+- `EnemyAlertCoordinator`를 추가해 `AlertTriggered`를 구독한다.
+- 최초 감지 적 기준으로 주변 적에게 애드 전파하는 구조를 설계한다.
+
+## 추가 핵심
+- `EnemyRegistry`를 `EnemyGridSight` 목록 기반에서 `EnemyContext` 목록 기반으로 정리했다.
+- `EnemyContext`가 활성화/비활성화 생명주기에 맞춰 `EnemyRegistry`에 등록/해제되게 했다.
+- `EnemyGridSight`에서는 등록소 등록/해제 책임을 제거하고 시야 계산 책임만 남겼다.
+- `GridMoveRiskEvaluator`는 `EnemyRegistry.Enemies`를 순회하며 각 `EnemyContext.GridSight`로 감지 여부를 확인하게 했다.
+- 이 구조는 후속 `EnemyAlertCoordinator`가 같은 적 목록을 사용해 애드 전파 대상을 계산하기 위한 기준이다.
+
+## 추가 검증
+- `dotnet build Assembly-CSharp.csproj --no-restore` 통과.
+- 경고 0개, 오류 0개.
+
+## 다음
+- `EnemyAlertCoordinator`를 추가해 `GridMoveRiskEvaluator.AlertTriggered`를 구독한다.
+- `EnemyRegistry.Enemies` 기준으로 최초 감지 적 주변의 전파 대상 적을 계산한다.
+
+## 추가 핵심
+- `EnemyData`에 `alertSpreadRange`를 추가했다.
+- 애드 전파 범위는 전역 고정값이 아니라 최초 감지 적의 데이터에서 읽도록 기준을 잡았다.
+- `EnemyAlertCoordinator`를 추가했다.
+- `EnemyAlertCoordinator`는 `GridMoveRiskEvaluator.AlertTriggered`를 구독하고, 최초 감지 적 기준으로 `EnemyRegistry.Enemies`를 순회해 전파 대상 적을 계산한다.
+- 현재 단계에서는 전파 대상 로그 출력까지만 구현하고 실제 적 상태 전환은 아직 하지 않는다.
+
+## 추가 검증
+- `dotnet build Assembly-CSharp.csproj --no-restore` 통과.
+- 경고 0개, 오류 0개.
+
+## 다음
+- Unity 씬에 `EnemyAlertCoordinator`를 배치하고 `PlayerContext`를 연결해 전파 로그를 확인한다.
+- 이후 `EnemyAlertState`를 추가해 로그 대신 실제 적 상태 전환 요청을 연결한다.

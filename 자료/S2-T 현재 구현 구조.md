@@ -761,3 +761,123 @@ Notion에는 목표, 방향, 남은 작업만 짧게 두고, 상세 구현 구�
 ## 다음
 - 테스트 씬에 `EnemyRegistry` 오브젝트를 추가하고 플레이 모드에서 적 시야 자동 등록, 이동 경로 위험 표시, 위험 칸 진입 애드 로그를 확인한다.
 - 이후 `AddTriggered` 이벤트와 애드 전파 전담 시스템을 설계한다.
+
+## EnemyRegistry 기반 적 시야 등록 구조
+
+2026-06-11 기준 적 시야 목록 관리는 `GridMoveRiskEvaluator`의 인스펙터 수동 배열이 아니라 `EnemyRegistry`를 기준으로 한다.
+
+### EnemyRegistry
+
+- `EnemyRegistry`는 현재 씬에 활성화된 적 시야 컴포넌트를 모아 두는 씬 단위 싱글톤 등록소다.
+- 역할은 목록 관리만이며, 적 AI, 애드 판정, 시야 계산, 경고 표시를 직접 처리하지 않는다.
+- 현재 공개 목록은 `GridSights`이며, 외부 시스템은 이 목록을 읽어 현재 활성 적 시야를 조회한다.
+- 등록은 `RegisterGridSight()`, 해제는 `UnregisterGridSight()`로 처리한다.
+- 후속 `EnemyAlertCoordinator` 같은 애드 전파 시스템도 이 등록소를 읽어 주변 적 탐색에 사용할 수 있다.
+
+### EnemyGridSight 등록 기준
+
+- `EnemyGridSight`는 활성화될 때 `EnemyRegistry`에 자기 자신을 등록한다.
+- 비활성화될 때는 등록소에서 자기 자신을 해제한다.
+- `OnEnable()` 시점에 등록소가 아직 준비되지 않았을 수 있으므로 `Start()`에서 한 번 더 등록을 시도한다.
+- `Start()` 시점에도 `EnemyRegistry`가 없으면 오류 로그를 남기고 컴포넌트를 비활성화한다.
+- 이 처리는 필수 참조를 임의로 찾아 보정하는 fallback이 아니라, 씬 단위 필수 매니저 누락을 명확히 드러내기 위한 검증이다.
+
+### GridMoveRiskEvaluator 기준
+
+- `GridMoveRiskEvaluator`는 더 이상 `enemySights` 인스펙터 배열을 갖지 않는다.
+- 이동 경로 위험 평가는 `EnemyRegistry.Instance.GridSights`를 기준으로 수행한다.
+- 경로 미리보기 중 처음 감지되는 칸을 찾고, 실제 이동 중 감지 칸에 들어가면 기존처럼 1차 애드 로그를 남긴다.
+- `Awake()`에서는 `PlayerContext` 같은 플레이어 핵심 참조만 검증하고, `EnemyRegistry` 준비 여부는 이벤트 구독 시점에 확인한다.
+- `OnEnable()`에서 등록소가 아직 준비되지 않았을 수 있으므로 `Start()`에서 이동 행동 이벤트 구독을 한 번 더 시도한다.
+
+### 씬 구성 기준
+
+- S2-T 플레이 테스트 씬에는 `EnemyRegistry` 컴포넌트를 가진 오브젝트가 하나 있어야 한다.
+- `EnemyRegistry`는 적 프리팹이나 플레이어 오브젝트가 아니라 씬 매니저 계열 오브젝트에 두는 것을 기본으로 한다.
+- 중복 `EnemyRegistry`가 있으면 뒤에 활성화된 중복 인스턴스는 비활성화된다.
+
+### 현재 한계와 다음 작업
+
+- 아직 Unity 씬 인스펙터에는 `EnemyRegistry` 오브젝트를 직접 추가하지 않았다.
+- 다음 Unity 확인 작업은 `Tset` 씬에 `EnemyRegistry`를 배치하고 자동 등록 흐름을 플레이 모드에서 검증하는 것이다.
+- 이후 `GridMoveRiskEvaluator`는 감지 로그만 남기는 단계에서 `AddTriggered` 이벤트를 발행하는 단계로 확장한다.
+- 애드 전파, 카메라 연출, 적 AI 반응은 별도 Alert 전담 시스템에서 처리한다.
+
+## AlertTriggered 발각 이벤트 1차 구조
+
+2026-06-12 기준 `GridMoveRiskEvaluator`는 실제 이동 중 적 시야에 처음 들어갔을 때 `AlertTriggered` 이벤트를 발행한다.
+
+### 이벤트 기준
+
+- 이벤트 이름은 문서의 기존 `AddTriggered` 후보보다 의미가 명확한 `AlertTriggered`로 정했다.
+- `AlertTriggered`는 감지된 칸 `GridPosition`과 최초 감지 적 시야 `EnemyGridSight`를 함께 전달한다.
+- 이동 1회 안에서는 기존 `didLogAddInCurrentMove` 기준을 유지해 첫 감지에 대해서만 이벤트를 발행한다.
+- 현재 단계에서는 이벤트 발행과 로그까지만 담당하고, 이동 중단이나 카메라 연출은 실행하지 않는다.
+
+### 책임 분리
+
+- `GridMoveRiskEvaluator`는 경로 위험 평가, 첫 감지 적 탐색, 경고 하이라이트, 발각 이벤트 발행까지만 맡는다.
+- 애드 전파, 적 상태 전환, 카메라 줌, 경고 UI, 이동 일시 정지는 후속 시스템이 `AlertTriggered`를 구독해 처리한다.
+- 후속 시스템 후보는 `EnemyAlertCoordinator`이며, 이 시스템은 `EnemyRegistry`를 읽어 최초 감지 적 주변으로 발각을 전파할 수 있다.
+
+### 다음 작업
+
+- `EnemyAlertCoordinator`를 추가해 `GridMoveRiskEvaluator.AlertTriggered`를 구독한다.
+- 최초 감지 적과 감지 칸을 받아 애드 전파 대상 적 목록을 계산한다.
+- 실제 이동 일시 정지와 연출 연결은 애드 전파 이벤트 이후 단계로 둔다.
+
+## EnemyContext 중심 EnemyRegistry 정리
+
+2026-06-12 추가 기준으로 `EnemyRegistry`는 `EnemyGridSight` 목록이 아니라 `EnemyContext` 목록만 관리한다.
+
+### 변경 이유
+
+- 적 하나의 대표 진입점은 `EnemyContext`로 통일한다.
+- `EnemyGridSight`는 시야 계산 컴포넌트일 뿐이며, 등록소 생명주기 관리를 맡지 않는다.
+- 후속 애드 전파, 적 상태 전환, 적 AI 요청은 시야뿐 아니라 위치, 데이터, 상태 컴포넌트까지 필요하므로 `EnemyContext`를 기준으로 접근하는 편이 단순하다.
+
+### 현재 구조
+
+- `EnemyRegistry.Enemies`는 현재 씬에 활성화된 `EnemyContext` 목록이다.
+- `EnemyContext`는 `OnEnable()`에서 `EnemyRegistry.RegisterEnemy(this)`를 시도하고, `OnDisable()`에서 `UnregisterEnemy(this)`를 호출한다.
+- 씬 초기화 순서 때문에 `OnEnable()`에서 등록소를 못 잡을 수 있으므로 `Start()`에서 한 번 더 등록을 시도한다.
+- `EnemyGridSight`에서는 `EnemyRegistry` 등록/해제 코드를 제거했고, 시야 계산과 `CanDetect()`만 담당한다.
+
+### GridMoveRiskEvaluator 기준
+
+- 위험 평가는 `EnemyRegistry.Instance.Enemies`를 순회한다.
+- 각 `EnemyContext`에서 `GridSight`를 꺼내 `enemy.GridSight.CanDetect(position)`으로 감지 여부를 확인한다.
+- 최초 감지 적은 기존처럼 `EnemyGridSight`로 반환해 `AlertTriggered(GridPosition, EnemyGridSight)` 이벤트에 전달한다.
+
+### 후속 확장 기준
+
+- `EnemyAlertCoordinator`도 `EnemyRegistry.Enemies`를 사용해 최초 감지 적 주변의 전파 대상 적을 계산한다.
+- 적 상태 컴포넌트가 추가되면 `EnemyContext`에 참조를 추가하고, Coordinator가 Context를 통해 상태 전환 요청을 보낸다.
+
+## EnemyAlertCoordinator 1차 구조
+
+2026-06-12 기준 `EnemyAlertCoordinator`를 추가해 `GridMoveRiskEvaluator.AlertTriggered` 이벤트를 구독하고 애드 전파 대상 적을 계산한다.
+
+### EnemyData Alert 수치
+
+- `EnemyData`에 `alertSpreadRange`를 추가했다.
+- 이 값은 최초 감지 적이 플레이어를 발견했을 때 주변 적에게 애드를 전파하는 맨해튼 거리다.
+- `EnemyAlertCoordinator`는 전역 고정값이 아니라 최초 감지 적의 `EnemyData.AlertSpreadRange`를 읽어 전파 범위를 정한다.
+- `alertSpreadRange`가 0이면 최초 감지 적만 전파 대상이 될 수 있다.
+- `alertSpreadRange`가 음수이면 데이터 오류로 보고 전파를 중단한다.
+
+### EnemyAlertCoordinator 책임
+
+- `EnemyAlertCoordinator`는 씬 단위 애드 전파 조정자다.
+- `PlayerContext.GridMoveRiskEvaluator.AlertTriggered`를 구독한다.
+- 이벤트에서 받은 `EnemyGridSight`를 기준으로 `EnemyRegistry.Enemies`에서 최초 감지 적 `EnemyContext`를 찾는다.
+- 최초 감지 적의 위치를 기준으로 등록된 모든 적의 `GridActor.GridPosition`과 맨해튼 거리를 계산한다.
+- 최초 감지 적의 `AlertSpreadRange` 안에 있는 적을 전파 대상으로 본다.
+- 현재 단계에서는 전파 대상 로그만 출력하고 실제 적 상태 전환은 하지 않는다.
+
+### 다음 확장 기준
+
+- 다음 단계에서 `EnemyAlertState` 또는 비슷한 적 상태 컴포넌트를 추가한다.
+- `EnemyContext`에 적 상태 컴포넌트 참조를 추가한다.
+- `EnemyAlertCoordinator`는 전파 대상 로그 대신 각 적 Context를 통해 상태 전환 요청을 보낸다.
+- 카메라 줌, 경고 UI, 이동 일시 정지는 상태 전환 이벤트 이후 별도 시스템으로 연결한다.

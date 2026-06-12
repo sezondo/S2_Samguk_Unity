@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using UnityEngine;
 
@@ -42,6 +43,9 @@ public class GridMoveRiskEvaluator : MonoBehaviour
     private bool didLogAddInCurrentMove;
     // 이동 행동 이벤트를 현재 구독 중인지 나타낸다.
     private bool subscribedMoveAction;
+
+    // 실제 이동 중 적 시야에 처음 들어갔을 때 감지 칸과 최초 감지 적을 전달한다.
+    public event Action<GridPosition, EnemyGridSight> AlertTriggered;
 
     /// <summary>
     /// 이동 위험 평가에 필요한 참조를 확인하고 경고 하이라이터를 준비한다.
@@ -155,7 +159,7 @@ public class GridMoveRiskEvaluator : MonoBehaviour
     }
 
     /// <summary>
-    /// 실제 이동 중 감지 칸에 들어가면 1차 애드 로그를 남긴다.
+    /// 실제 이동 중 감지 칸에 들어가면 1차 발각 이벤트를 알린다.
     /// </summary>
     private void HandleMoveStepEntered(GridPosition stepPosition)
     {
@@ -169,6 +173,8 @@ public class GridMoveRiskEvaluator : MonoBehaviour
         {
             Debug.Log($"{nameof(GridMoveRiskEvaluator)}: {stepPosition} 칸에서 {detectingEnemy.name} 시야에 들어와 애드가 발생했습니다.", this);
         }
+
+        AlertTriggered?.Invoke(stepPosition, detectingEnemy);
     }
 
     /// <summary>
@@ -215,10 +221,11 @@ public class GridMoveRiskEvaluator : MonoBehaviour
             return false;
         }
 
-        IReadOnlyList<EnemyGridSight> enemySights = EnemyRegistry.Instance.GridSights;
-        for (int i = 0; i < enemySights.Count; i++)
+        IReadOnlyList<EnemyContext> enemies = EnemyRegistry.Instance.Enemies;
+        for (int i = 0; i < enemies.Count; i++)
         {
-            EnemyGridSight enemySight = enemySights[i];
+            EnemyContext enemy = enemies[i];
+            EnemyGridSight enemySight = enemy != null ? enemy.GridSight : null;
             if (enemySight != null && enemySight.enabled && enemySight.CanDetect(position))
             {
                 detectingEnemy = enemySight;

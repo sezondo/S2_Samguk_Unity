@@ -24,8 +24,6 @@ public class EnemyGridSight : MonoBehaviour
 
     // 같은 오브젝트의 적 말 컴포넌트다.
     private GridActor actor;
-    // 현재 EnemyRegistry에 등록되어 있는지 나타낸다.
-    private bool registeredToRegistry;
 
     public GridDirection FacingDirection => facingDirection;
     public IReadOnlyList<GridPosition> DetectedPositions => detectedPositions;
@@ -49,35 +47,11 @@ public class EnemyGridSight : MonoBehaviour
     }
 
     /// <summary>
-    /// 컴포넌트가 활성화될 때 적 등록소에 시야 컴포넌트를 등록한다.
-    /// </summary>
-    private void OnEnable()
-    {
-        TryRegisterToRegistry(false);
-    }
-
-    /// <summary>
     /// 다른 오브젝트의 Awake 순서 때문에 GridManager 준비 전 시야 계산이 비었을 수 있어 시작 시점에 한 번 더 갱신한다.
     /// </summary>
     private void Start()
     {
-        TryRegisterToRegistry(true);
         RefreshSight();
-    }
-
-    /// <summary>
-    /// 컴포넌트가 비활성화될 때 적 등록소에서 시야 컴포넌트를 제거한다.
-    /// </summary>
-    private void OnDisable()
-    {
-        if (!registeredToRegistry || EnemyRegistry.Instance == null)
-        {
-            registeredToRegistry = false;
-            return;
-        }
-
-        EnemyRegistry.Instance.UnregisterGridSight(this);
-        registeredToRegistry = false;
     }
 
     /// <summary>
@@ -222,32 +196,6 @@ public class EnemyGridSight : MonoBehaviour
     private static GridPosition Multiply(GridPosition position, int multiplier)
     {
         return new GridPosition(position.x * multiplier, position.y * multiplier);
-    }
-
-    /// <summary>
-    /// 현재 씬의 EnemyRegistry에 이 시야 컴포넌트를 등록한다.
-    /// </summary>
-    private void TryRegisterToRegistry(bool logMissingRegistry)
-    {
-        if (registeredToRegistry)
-        {
-            return;
-        }
-
-        EnemyRegistry registry = EnemyRegistry.Instance;
-        if (registry == null)
-        {
-            if (logMissingRegistry)
-            {
-                Debug.LogError($"{nameof(EnemyGridSight)} on {name}에는 씬의 {nameof(EnemyRegistry)}가 필요합니다.", this);
-                enabled = false;
-            }
-
-            return;
-        }
-
-        registry.RegisterGridSight(this);
-        registeredToRegistry = true;
     }
 
     /// <summary>

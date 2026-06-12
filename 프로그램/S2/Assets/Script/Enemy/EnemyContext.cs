@@ -16,9 +16,80 @@ public class EnemyContext : MonoBehaviour
     // 적의 그리드 시야 칸 계산을 담당하는 컴포넌트다.
     [SerializeField] private EnemyGridSight gridSight;
 
+    // 현재 EnemyRegistry에 등록되어 있는지 나타낸다.
+    private bool registeredToRegistry;
+
     public EnemyData EnemyData => enemyData;
     public GridActor GridActor => gridActor;
     public EnemyGridSight GridSight => gridSight;
+
+    /// <summary>
+    /// 적 Context에 필요한 참조를 확인한다.
+    /// </summary>
+    private void Awake()
+    {
+        if (!HasValidReference())
+        {
+            enabled = false;
+        }
+    }
+
+    /// <summary>
+    /// Context가 활성화될 때 적 등록소에 자기 자신을 등록한다.
+    /// </summary>
+    private void OnEnable()
+    {
+        TryRegisterToRegistry(false);
+    }
+
+    /// <summary>
+    /// 씬 초기화 순서 때문에 OnEnable에서 등록소를 못 잡은 경우 시작 시점에 한 번 더 등록한다.
+    /// </summary>
+    private void Start()
+    {
+        TryRegisterToRegistry(true);
+    }
+
+    /// <summary>
+    /// Context가 비활성화될 때 적 등록소에서 자기 자신을 해제한다.
+    /// </summary>
+    private void OnDisable()
+    {
+        if (!registeredToRegistry || EnemyRegistry.Instance == null)
+        {
+            registeredToRegistry = false;
+            return;
+        }
+
+        EnemyRegistry.Instance.UnregisterEnemy(this);
+        registeredToRegistry = false;
+    }
+
+    /// <summary>
+    /// 현재 씬의 EnemyRegistry에 이 적 Context를 등록한다.
+    /// </summary>
+    private void TryRegisterToRegistry(bool logMissingRegistry)
+    {
+        if (registeredToRegistry)
+        {
+            return;
+        }
+
+        EnemyRegistry registry = EnemyRegistry.Instance;
+        if (registry == null)
+        {
+            if (logMissingRegistry)
+            {
+                Debug.LogError($"{nameof(EnemyContext)} on {name}에는 씬의 {nameof(EnemyRegistry)}가 필요합니다.", this);
+                enabled = false;
+            }
+
+            return;
+        }
+
+        registry.RegisterEnemy(this);
+        registeredToRegistry = true;
+    }
 
     /// <summary>
     /// 적 Context에 필수 참조가 모두 연결되어 있는지 확인한다.
