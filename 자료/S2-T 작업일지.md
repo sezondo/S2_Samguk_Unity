@@ -516,3 +516,61 @@
 - 과거 작업 흐름, 완료된 다음 작업, 현재 코드와 충돌하는 예전 기준은 제거했다.
 - 문서 구조를 Grid, Turn/AP, Player 이동, Enemy 구조, Enemy Alert, Data, Dialogue/VFX, 현재 한계, 다음 작업 중심으로 재구성했다.
 - 상세 작업 이력은 `S2-T 작업일지.md`에 남기고, 현재 구현 구조 문서는 현재 상태와 앞으로 할 일만 담는 기준으로 정리했다.
+
+## 문서 / Notion 기준 정리
+- S2-T를 더 이상 임시 실험 분기가 아니라 현재 S2의 메인 개발 방향으로 정리했다.
+- `AGENTS.md`의 S2-T 문서/Notion 규칙을 새 기준으로 갱신했다.
+- Notion `프로젝트 S2`는 세계관, 설정, 시나리오 문서로 사용한다.
+- Notion `프로젝트 S2-T`는 현재 게임 방향, 핵심 규칙, 현재 상태, 다음 작업만 짧게 정리하는 간단 설명란으로 사용한다.
+- 날짜별 진행 요약과 상세 구현 내용은 Notion에 쌓지 않고 로컬 작업일지와 현재 구현 구조 문서에 남긴다.
+
+## 2026-06-13
+
+## 핵심
+- `EnemyAlertVisual`을 추가해 `EnemyAlertState.AlertLevelChanged` 이벤트를 적 스프라이트 색상 변경으로 표시하게 했다.
+- 해당 컴포넌트는 게임 규칙에는 관여하지 않고, 발각 상태 확인용 임시 시각 피드백만 담당한다.
+
+## 검증
+- `dotnet build Assembly-CSharp.csproj --no-restore` 통과.
+- 경고 0개, 오류 0개.
+
+## 다음
+- Unity 씬의 각 적 오브젝트에 `EnemyAlertVisual`을 추가하고 `EnemyAlertState`, `SpriteRenderer`를 연결해 발각 시 색상 전환을 확인한다.
+
+## 추가 핵심
+- `EnemyAlertVisual`을 `EnemyContext` 핵심 참조에 추가했다.
+- 이후 적 UI나 발각 연출 시스템이 `EnemyContext.AlertVisual`을 통해 시각 피드백 컴포넌트에 접근할 수 있게 했다.
+- `EnemyContext.HasValidReference()`에서 `EnemyAlertVisual` 누락도 검사하게 했다.
+
+## 추가 검증
+- `dotnet build Assembly-CSharp.csproj --no-restore` 통과.
+- 경고 0개, 오류 0개.
+
+## 다음
+- Unity 씬의 각 적 `EnemyContext.AlertVisual`에 해당 적의 `EnemyAlertVisual`을 연결한다.
+
+## 추가 핵심
+- `EnemyAlertVisual`이 `EnemyAlertState`를 직접 인스펙터 참조로 받지 않고 `EnemyContext.AlertState`에서 꺼내 쓰게 변경했다.
+- 적 시각 피드백도 Context 기준 참조 흐름을 따르도록 정리했다.
+
+## 추가 검증
+- `dotnet build Assembly-CSharp.csproj --no-restore` 통과.
+- 경고 0개, 오류 0개.
+
+## 다음
+- Unity 씬의 각 적 `EnemyAlertVisual.EnemyContext`와 `TargetRenderer`, `EnemyContext.AlertVisual`을 연결한다.
+
+## 2026-06-14
+
+## 핵심
+- `StageGoal`을 추가해 스테이지 목표 그리드 칸을 데이터로 제공하게 했다.
+- `StageGoalManager`를 추가해 `PlayerGridMoveAction.MoveCompleted` 이벤트를 구독하고, 플레이어가 목표 칸에 도착하면 스테이지 클리어 이벤트를 발생시키게 했다.
+- 현재 단계에서는 클리어 로그와 `StageCleared` 이벤트까지만 제공한다.
+- 목표 칸은 Scene 뷰 Gizmo로 표시할 수 있게 했다.
+
+## 검증
+- `dotnet build Assembly-CSharp.csproj --no-restore` 통과.
+- 경고 0개, 오류 0개.
+
+## 다음
+- Unity 씬에 `StageGoal`과 `StageGoalManager`를 배치하고 `PlayerContext`, 목표 칸을 연결해 도착 시 클리어 로그를 확인한다.

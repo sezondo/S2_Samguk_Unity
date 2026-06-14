@@ -17,6 +17,8 @@ public class EnemyContext : MonoBehaviour
     [SerializeField] private EnemyGridSight gridSight;
     // 적의 현재 경계 상태를 보관하고 전환 요청을 처리하는 컴포넌트다.
     [SerializeField] private EnemyAlertState alertState;
+    // 적 경계 상태를 화면에 표시하는 시각 피드백 컴포넌트다.
+    [SerializeField] private EnemyAlertVisual alertVisual;
 
     // 현재 EnemyRegistry에 등록되어 있는지 나타낸다.
     private bool registeredToRegistry;
@@ -25,6 +27,7 @@ public class EnemyContext : MonoBehaviour
     public GridActor GridActor => gridActor;
     public EnemyGridSight GridSight => gridSight;
     public EnemyAlertState AlertState => alertState;
+    public EnemyAlertVisual AlertVisual => alertVisual;
 
     /// <summary>
     /// 적 Context에 필요한 참조를 확인한다.
@@ -120,6 +123,12 @@ public class EnemyContext : MonoBehaviour
         if (alertState == null)
         {
             Debug.LogError($"{nameof(EnemyContext)} on {name}에는 {nameof(EnemyAlertState)} 참조가 필요합니다.", this);
+            return false;
+        }
+
+        if (alertVisual == null)
+        {
+            Debug.LogError($"{nameof(EnemyContext)} on {name}에는 {nameof(EnemyAlertVisual)} 참조가 필요합니다.", this);
             return false;
         }
 
