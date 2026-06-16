@@ -2,8 +2,8 @@ using System;
 using UnityEngine;
 
 /// <summary>
-/// 플레이어 이동 완료를 감시해 목표 칸 도달 시 스테이지 클리어를 알린다.
-/// 현재 단계에서는 최소 루프 검증을 위해 클리어 이벤트와 로그만 담당한다.
+/// 플레이어 이동 완료를 감시해 목표 칸 도달을 알린다.
+/// 스테이지 클리어 확정은 StageStateManager가 처리한다.
 /// </summary>
 public class StageGoalManager : MonoBehaviour
 {
@@ -14,7 +14,7 @@ public class StageGoalManager : MonoBehaviour
     [SerializeField] private StageGoal stageGoal;
 
     [Header("Log")]
-    // true면 목표 도달과 클리어 결과를 Unity 콘솔에 출력한다.
+    // true면 목표 도달 결과를 Unity 콘솔에 출력한다.
     [SerializeField] private bool logStageClear = true;
 
     // 이미 클리어 처리를 완료했는지 나타낸다.
@@ -123,7 +123,7 @@ public class StageGoalManager : MonoBehaviour
 
         if (logStageClear)
         {
-            Debug.Log($"{nameof(StageGoalManager)}: 플레이어가 {playerPosition} 목표 칸에 도착해 스테이지를 클리어했습니다.", this);
+            Debug.Log($"{nameof(StageGoalManager)}: 플레이어가 {playerPosition} 목표 칸에 도착했습니다.", this);
         }
 
         StageCleared?.Invoke(stageGoal);

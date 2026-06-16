@@ -574,3 +574,43 @@
 
 ## 다음
 - Unity 씬에 `StageGoal`과 `StageGoalManager`를 배치하고 `PlayerContext`, 목표 칸을 연결해 도착 시 클리어 로그를 확인한다.
+
+## 2026-06-15
+
+## 핵심
+- `StageStateManager`를 추가해 스테이지 전체 진행 상태를 `Playing`, `Cleared`, `Failed`로 관리하게 했다.
+- `StageStateManager`는 `StageGoalManager.StageCleared` 이벤트를 구독하고 목표 달성 시 `Playing`에서 `Cleared`로 상태를 전환한다.
+- 후속 실패 조건 연결을 위해 `RequestFail()` 진입점을 열어뒀다.
+- `StageGoalManager` 로그 문장을 스테이지 클리어 확정이 아니라 목표 칸 도착 감지로 정리했다.
+
+## 검증
+- `dotnet build Assembly-CSharp.csproj --no-restore` 통과.
+- 경고 0개, 오류 0개.
+
+## 다음
+- Unity 씬에 `StageStateManager`를 배치하고 `StageGoalManager`를 연결해 목표 도달 시 `Playing -> Cleared` 상태 전환 로그를 확인한다.
+- 이후 클리어 UI 또는 입력 잠금/결과 화면 연결을 검토한다.
+
+## 2026-06-16
+
+## 핵심
+- S2-T의 행동 처리 기준을 판정과 연출 분리 구조로 정했다.
+- 판정 시스템은 논리 오브젝트 기준으로 결과를 먼저 계산하고, 연출 시스템은 계산된 결과를 큐에서 순서대로 재생하는 기준으로 정리했다.
+- 논리 오브젝트와 연출 오브젝트를 분리하기로 했다. `GridActor`, `Context`, AP/상태 컴포넌트는 판정 기준이고, 향후 `GridActorView` 같은 연출 컴포넌트는 화면 표시만 담당한다.
+- 판정 결과는 `PresentationEvent` 형태로 연출 큐에 넣기로 했다.
+- 연출 큐는 씬 단위 싱글톤 후보 `ActionPresentationQueue`로 두고, 큐 보관, 순서 실행, 완료 대기, `IsPlaying` 제공만 담당하게 한다.
+- 이벤트 처리 방식은 A안인 브로드캐스트 + bool 반환 방식으로 정했다.
+- 구독자는 자신이 처리할 이벤트이면 `true`를 반환하고, 연출 종료 시 `PresentationEventHandle.Complete()`를 호출한다.
+- 아무도 처리하지 않는 이벤트는 큐 매니저가 경고 로그 후 자동 완료 처리하는 기준으로 정했다.
+- 연출 큐 실행 중에는 플레이어 입력과 인게임 UI 조작을 막는 기준을 세웠다.
+
+## 설계 기준
+- 입력 가능 조건은 `StageStateManager.IsPlaying == true && ActionPresentationQueue.IsPlaying == false`로 잡는다.
+- 연출 오브젝트는 판정에 관여하지 않는다.
+- 큐 매니저는 판정과 실제 연출 내용을 알지 않고 순서 제어만 담당한다.
+- 공격, 해킹, 검 투척, 검 회수, 오브젝트 조작, 적 AI 반응도 같은 연출 큐 기준으로 확장한다.
+
+## 다음
+- `PresentationEventType`, `PresentationEvent`, `PresentationEventHandle`, `ActionPresentationQueue`의 1차 뼈대를 추가한다.
+- 처음에는 실제 연출 대신 로그 기반 테스트 리시버로 큐 순서와 완료 신호 흐름을 검증한다.
+- 이후 `PlayerGridMoveAction`의 즉시 이동 구조를 논리 이동과 연출 이동 분리 구조로 바꾼다.
