@@ -1,0 +1,87 @@
+/// <summary>
+/// 연출 큐에 들어가는 단일 연출 이벤트 데이터다.
+/// 판정 결과를 화면에 어떤 순서로 보여줄지 설명한다.
+/// </summary>
+public readonly struct PresentationEvent
+{
+    public PresentationEventType Type { get; }
+    public GridActor Actor { get; }
+    public EnemyContext Enemy { get; }
+    public GridPosition FromPosition { get; }
+    public GridPosition ToPosition { get; }
+    public GridPosition EventPosition { get; }
+    public string Message { get; }
+
+    /// <summary>
+    /// 지정한 값으로 연출 이벤트를 만든다.
+    /// 직접 생성보다 정적 생성 함수를 우선 사용한다.
+    /// </summary>
+    public PresentationEvent(
+        PresentationEventType type,
+        GridActor actor,
+        EnemyContext enemy,
+        GridPosition fromPosition,
+        GridPosition toPosition,
+        GridPosition eventPosition,
+        string message)
+    {
+        Type = type;
+        Actor = actor;
+        Enemy = enemy;
+        FromPosition = fromPosition;
+        ToPosition = toPosition;
+        EventPosition = eventPosition;
+        Message = message;
+    }
+
+    /// <summary>
+    /// 액터 이동 연출 이벤트를 만든다.
+    /// </summary>
+    public static PresentationEvent MoveActor(GridActor actor, GridPosition fromPosition, GridPosition toPosition, string message = null)
+    {
+        return new PresentationEvent(PresentationEventType.MoveActor, actor, null, fromPosition, toPosition, toPosition, message);
+    }
+
+    /// <summary>
+    /// 발각 연출 이벤트를 만든다.
+    /// </summary>
+    public static PresentationEvent AlertDetected(GridPosition eventPosition, EnemyContext enemy, string message = null)
+    {
+        return new PresentationEvent(PresentationEventType.AlertDetected, null, enemy, default, default, eventPosition, message);
+    }
+
+    /// <summary>
+    /// 적 반응 이동 연출 이벤트를 만든다.
+    /// </summary>
+    public static PresentationEvent EnemyReactionMove(EnemyContext enemy, GridPosition fromPosition, GridPosition toPosition, string message = null)
+    {
+        GridActor actor = enemy != null ? enemy.GridActor : null;
+        return new PresentationEvent(PresentationEventType.EnemyReactionMove, actor, enemy, fromPosition, toPosition, toPosition, message);
+    }
+
+    /// <summary>
+    /// 스테이지 클리어 연출 이벤트를 만든다.
+    /// </summary>
+    public static PresentationEvent StageCleared(string message = null)
+    {
+        return new PresentationEvent(PresentationEventType.StageCleared, null, null, default, default, default, message);
+    }
+
+    /// <summary>
+    /// 스테이지 실패 연출 이벤트를 만든다.
+    /// </summary>
+    public static PresentationEvent StageFailed(string message = null)
+    {
+        return new PresentationEvent(PresentationEventType.StageFailed, null, null, default, default, default, message);
+    }
+
+    /// <summary>
+    /// 로그에서 읽기 쉬운 이벤트 문자열을 반환한다.
+    /// </summary>
+    public override string ToString()
+    {
+        string actorName = Actor != null ? Actor.name : "없음";
+        string enemyName = Enemy != null ? Enemy.name : "없음";
+        return $"{Type} Actor:{actorName} Enemy:{enemyName} From:{FromPosition} To:{ToPosition} Event:{EventPosition}";
+    }
+}

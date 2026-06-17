@@ -680,3 +680,128 @@ StageStateManager.IsPlaying == true
 ```
 
 현재 `PlayerGridMoveAction`은 아직 즉시 이동 구조이므로, 후속 작업에서 이 기준에 맞춰 논리 이동과 연출 이동을 분리한다.
+
+## Presentation / 연출 큐 구현
+
+### PresentationEventType
+
+`PresentationEventType`은 연출 큐에서 처리할 이벤트 종류를 나타내는 enum이다.
+
+현재 값:
+
+- `None`
+- `MoveActor`
+- `AlertDetected`
+- `EnemyReactionMove`
+- `Attack`
+- `Hack`
+- `Interact`
+- `StageCleared`
+- `StageFailed`
+
+### PresentationEvent
+
+`PresentationEvent`는 연출 큐에 들어가는 단일 연출 이벤트 데이터다.
+
+현재 보관 값:
+
+- `Type`: 연출 이벤트 종류.
+- `Actor`: 움직이거나 연출 대상이 되는 `GridActor`.
+- `Enemy`: 발각 또는 적 반응 대상 `EnemyContext`.
+- `FromPosition`: 시작 그리드 좌표.
+- `ToPosition`: 목표 그리드 좌표.
+- `EventPosition`: 사건이 발생한 그리드 좌표.
+- `Message`: 임시 로그나 UI 표시용 문장.
+
+현재 정적 생성 함수:
+
+- `MoveActor()`
+- `AlertDetected()`
+- `EnemyReactionMove()`
+- `StageCleared()`
+- `StageFailed()`
+
+### PresentationEventHandle
+
+`PresentationEventHandle`은 이벤트 처리자가 연출 완료를 큐 매니저에 알리는 손잡이다.
+
+규칙:
+
+- 이벤트를 처리하겠다고 `true`를 반환한 구독자는 반드시 `Complete()`를 호출한다.
+- `Complete()`는 한 번만 유효하다.
+- 중복 완료 호출은 무시한다.
+
+### ActionPresentationQueue
+
+`ActionPresentationQueue`는 씬 단위 싱글톤 연출 큐다.
+
+책임:
+
+- `PresentationEvent`를 큐에 추가한다.
+- `PlayQueuedEvents()` 요청 시 큐를 순서대로 실행한다.
+- 현재 이벤트를 `PresentationEventStarted` 이벤트로 브로드캐스트한다.
+- 처리자가 `PresentationEventHandle.Complete()`를 호출할 때까지 기다린다.
+- 처리자가 없으면 경고 로그 후 자동 완료한다.
+- 완료 신호가 오래 오지 않으면 경고 로그를 남긴다.
+- 큐가 비면 `QueueEmptied` 이벤트를 발행한다.
+- `IsPlaying`으로 연출 실행 중 여부를 제공한다.
+
+이벤트 구독 규칙:
+
+```csharp
+public event Func<PresentationEvent, PresentationEventHandle, bool> PresentationEventStarted;
+```
+
+- 자기 이벤트가 아니면 `false`를 반환한다.
+- 자기 이벤트이면 `true`를 반환하고 연출 종료 시 `handle.Complete()`를 호출한다.
+- 현재 구조에서는 이벤트별 책임 처리자를 하나로 두는 것을 권장한다.
+
+### DebugPresentationEventReceiver
+
+`DebugPresentationEventReceiver`는 연출 큐 흐름 확인용 임시 컴포넌트다.
+
+역할:
+
+- 모든 이벤트를 처리 대상으로 받을 수 있다.
+- 받은 이벤트를 로그로 출력한다.
+- 설정에 따라 즉시 `Complete()`를 호출한다.
+
+### DebugPresentationQueueTester
+
+`DebugPresentationQueueTester`는 연출 큐에 샘플 이벤트를 넣는 임시 테스트 컴포넌트다.
+
+현재 샘플 이벤트:
+
+- `MoveActor`
+- `AlertDetected`
+- `StageCleared`
+
+사용 기준:
+
+- `ActionPresentationQueue`와 `DebugPresentationEventReceiver`가 씬에 있어야 한다.
+- `enqueueOnStart`를 켜면 시작 시 샘플 이벤트를 큐에 넣는다.
+- `playAfterEnqueue`가 켜져 있으면 샘플 이벤트 추가 후 바로 큐 실행을 요청한다.
+
+현재 한계:
+
+- 실제 이동, 카메라, UI, 애니메이션 연출은 아직 연결하지 않았다.
+- `PlayerGridMoveAction`, `EnemyAlertCoordinator`, `StageStateManager`는 아직 `ActionPresentationQueue`에 실제 이벤트를 넣지 않는다.
+- 다음 단계에서 이동 연출 이벤트부터 실제 게임 흐름에 연결한다.
+
+### 연출 큐 테스트 상태
+
+2026-06-17 기준 Unity 플레이 모드에서 디버그 연출 큐 흐름을 확인했다.
+
+확인 내용:
+
+- `DebugPresentationQueueTester`가 샘플 `MoveActor`, `AlertDetected`, `StageCleared` 이벤트를 큐에 추가한다.
+- `ActionPresentationQueue`가 이벤트를 순서대로 꺼내 `PresentationEventStarted`로 브로드캐스트한다.
+- `DebugPresentationEventReceiver`가 이벤트를 수신하고 `PresentationEventHandle.Complete()`를 호출한다.
+- 완료 신호를 받은 뒤 다음 이벤트가 실행된다.
+- 모든 이벤트가 끝나면 큐 종료 로그가 출력된다.
+
+현재 상태:
+
+- 연출 큐의 기본 순차 실행과 완료 신호 흐름은 확인됐다.
+- 실제 게임 시스템과의 연결은 아직 없다.
+- 다음 작업은 `PlayerGridMoveAction`의 이동 결과를 `PresentationEvent.MoveActor`로 큐에 넣고, 실제 화면 이동용 View 컴포넌트를 연결하는 것이다.

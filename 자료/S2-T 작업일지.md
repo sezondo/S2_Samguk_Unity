@@ -614,3 +614,32 @@
 - `PresentationEventType`, `PresentationEvent`, `PresentationEventHandle`, `ActionPresentationQueue`의 1차 뼈대를 추가한다.
 - 처음에는 실제 연출 대신 로그 기반 테스트 리시버로 큐 순서와 완료 신호 흐름을 검증한다.
 - 이후 `PlayerGridMoveAction`의 즉시 이동 구조를 논리 이동과 연출 이동 분리 구조로 바꾼다.
+
+## 추가 핵심
+- 연출 큐 1차 뼈대를 `Assets/Script/Presentation` 폴더에 추가했다.
+- `PresentationEventType`을 추가해 `MoveActor`, `AlertDetected`, `EnemyReactionMove`, `Attack`, `Hack`, `Interact`, `StageCleared`, `StageFailed` 이벤트 종류를 정의했다.
+- `PresentationEvent`를 추가해 연출 큐에 들어갈 이벤트 데이터 구조를 만들었다.
+- `PresentationEventHandle`을 추가해 이벤트 처리자가 완료 신호를 보낼 수 있게 했다.
+- `ActionPresentationQueue`를 추가해 씬 단위 싱글톤 큐, 이벤트 추가, 순차 실행, 완료 대기, 처리자 없음 자동 완료, 큐 종료 이벤트를 제공하게 했다.
+- `DebugPresentationEventReceiver`를 추가해 큐 이벤트 수신과 완료 신호 흐름을 로그로 검증할 수 있게 했다.
+- `DebugPresentationQueueTester`를 추가해 샘플 `MoveActor`, `AlertDetected`, `StageCleared` 이벤트를 큐에 넣어 테스트할 수 있게 했다.
+
+## 추가 검증
+- `dotnet build Assembly-CSharp.csproj --no-restore` 통과.
+- 경고 0개, 오류 0개.
+
+## 다음
+- Unity 씬에 `ActionPresentationQueue`, `DebugPresentationEventReceiver`, `DebugPresentationQueueTester`를 배치해 샘플 이벤트가 순서대로 실행되고 완료되는지 확인한다.
+- 이후 `PlayerGridMoveAction`에서 이동 결과를 `PresentationEvent.MoveActor`로 큐에 넣는 흐름을 연결한다.
+
+## 2026-06-17
+
+## 테스트 확인
+- Unity 플레이 모드에서 `ActionPresentationQueue`, `DebugPresentationEventReceiver`, `DebugPresentationQueueTester`를 이용한 연출 큐 샘플 이벤트 흐름을 확인했다.
+- 샘플 `MoveActor`, `AlertDetected`, `StageCleared` 이벤트가 큐에 들어가고 순서대로 실행되는 것을 확인했다.
+- `DebugPresentationEventReceiver`가 이벤트를 수신하고 `PresentationEventHandle.Complete()`를 호출해 다음 이벤트로 넘어가는 흐름을 확인했다.
+- 연출 큐가 모두 비면 큐 종료 로그가 출력되는 것을 확인했다.
+
+## 다음
+- `PlayerGridMoveAction`의 이동 결과를 `PresentationEvent.MoveActor`로 큐에 넣는 흐름을 검토한다.
+- 이후 실제 연출용 `GridActorView` 또는 `GridActorVisual`을 추가해 논리 이동과 화면 이동을 분리한다.
