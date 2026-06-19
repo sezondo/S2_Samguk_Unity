@@ -1,0 +1,91 @@
+/// <summary>
+/// 액터가 이동 경로의 한 칸에 진입했음을 알리는 논리 이벤트다.
+/// </summary>
+public sealed class MoveStepEnteredLogicEvent : IActionLogicEvent
+{
+    public GridActor Actor { get; }
+    public GridPosition StepPosition { get; }
+
+    /// <summary>
+    /// 지정한 액터가 한 칸에 진입한 이벤트를 만든다.
+    /// </summary>
+    public MoveStepEnteredLogicEvent(GridActor actor, GridPosition stepPosition)
+    {
+        Actor = actor;
+        StepPosition = stepPosition;
+    }
+}
+
+/// <summary>
+/// 액터의 이동 행동이 최종 칸에서 끝났음을 알리는 논리 이벤트다.
+/// </summary>
+public sealed class MoveCompletedLogicEvent : IActionLogicEvent
+{
+    public GridActor Actor { get; }
+    public GridPosition CompletedPosition { get; }
+
+    /// <summary>
+    /// 지정한 액터가 이동을 완료한 이벤트를 만든다.
+    /// </summary>
+    public MoveCompletedLogicEvent(GridActor actor, GridPosition completedPosition)
+    {
+        Actor = actor;
+        CompletedPosition = completedPosition;
+    }
+}
+
+/// <summary>
+/// 플레이어가 적 시야에 들어와 발각됐음을 알리는 논리 이벤트다.
+/// </summary>
+public sealed class AlertTriggeredLogicEvent : IActionLogicEvent
+{
+    public GridPosition DetectedPosition { get; }
+    public EnemyContext DetectingEnemy { get; }
+    public EnemyGridSight DetectingSight { get; }
+
+    /// <summary>
+    /// 지정한 칸에서 발생한 발각 이벤트를 만든다.
+    /// </summary>
+    public AlertTriggeredLogicEvent(GridPosition detectedPosition, EnemyContext detectingEnemy, EnemyGridSight detectingSight)
+    {
+        DetectedPosition = detectedPosition;
+        DetectingEnemy = detectingEnemy;
+        DetectingSight = detectingSight;
+    }
+}
+
+/// <summary>
+/// 적 하나가 발각 상태로 전환됐음을 알리는 논리 이벤트다.
+/// </summary>
+public sealed class EnemyAlertedLogicEvent : IActionLogicEvent
+{
+    public EnemyContext Enemy { get; }
+    public EnemyContext SourceEnemy { get; }
+    public GridPosition DetectedPosition { get; }
+
+    /// <summary>
+    /// 지정한 적의 발각 상태 전환 이벤트를 만든다.
+    /// </summary>
+    public EnemyAlertedLogicEvent(EnemyContext enemy, EnemyContext sourceEnemy, GridPosition detectedPosition)
+    {
+        Enemy = enemy;
+        SourceEnemy = sourceEnemy;
+        DetectedPosition = detectedPosition;
+    }
+}
+
+/// <summary>
+/// 스테이지 목표가 달성됐음을 알리는 논리 이벤트다.
+/// </summary>
+public sealed class StageClearedLogicEvent : IActionLogicEvent
+{
+    public StageGoal StageGoal { get; }
+
+    /// <summary>
+    /// 지정한 목표 달성 이벤트를 만든다.
+    /// </summary>
+    public StageClearedLogicEvent(StageGoal stageGoal)
+    {
+        StageGoal = stageGoal;
+    }
+}

@@ -1,7 +1,6 @@
 using System;
 using System.Collections.Generic;
 using UnityEngine;
-using UnityEngine.InputSystem;
 
 /// <summary>
 /// 플레이어의 정식 그리드 이동 행동을 담당한다.
@@ -15,18 +14,6 @@ public class PlayerGridMoveAction : MonoBehaviour
     [SerializeField] private PlayerContext playerContext;
     // true면 플레이어 턴일 때만 이동 행동을 선택하고 실행할 수 있다.
     [SerializeField] private bool requirePlayerTurn = true;
-
-    [Header("Input")]
-    // 마우스 화면 좌표를 월드 좌표로 바꿀 카메라다. 비어 있으면 Camera.main을 사용한다.
-    [SerializeField] private Camera worldCamera;
-    // UI 버튼이 붙기 전까지 키보드로 이동 행동 선택을 검증할지 정한다.
-    [SerializeField] private bool allowDebugKeyboardSelect = true;
-    // 디버그 이동 행동 선택에 사용할 키다.
-    [SerializeField] private Key debugSelectMoveKey = Key.M;
-    // true면 우클릭으로 현재 이동 행동 선택을 취소한다.
-    [SerializeField] private bool cancelByRightClick = true;
-    // true면 Escape 키로 현재 이동 행동 선택을 취소한다.
-    [SerializeField] private bool cancelByEscape = true;
 
     [Header("Path Preview")]
     // 이동 행동 선택 중 마우스를 올린 목표 칸까지의 경로를 런타임 하이라이트로 표시할지 정한다.
@@ -89,11 +76,6 @@ public class PlayerGridMoveAction : MonoBehaviour
     public event Action<IReadOnlyList<GridPosition>> MovePathPreviewShown;
     // 이동 경로 미리보기를 지워야 할 때 발생한다.
     public event Action MovePathPreviewHidden;
-    // 플레이어가 경로상의 한 칸에 진입할 때마다 발생한다. 적 시야 검사 연결 지점이다.
-    public event Action<GridPosition> MoveStepEntered;
-    // 이동 행동이 최종 도착 칸까지 끝났을 때 발생한다.
-    public event Action<GridPosition> MoveCompleted;
-
     /// <summary>
     /// 이동 행동에 필요한 같은 오브젝트의 컴포넌트 참조를 준비한다.
     /// </summary>
@@ -127,28 +109,6 @@ public class PlayerGridMoveAction : MonoBehaviour
             Destroy(pathPreviewHighlighter.gameObject);
             pathPreviewHighlighter = null;
         }
-    }
-
-    /// <summary>
-    /// 디버그 행동 선택, 행동 취소, 목표 칸 클릭 입력을 매 프레임 확인한다.
-    /// </summary>
-    private void Update()
-    {
-        HandleDebugSelectInput();
-
-        if (!isMoveSelected)
-        {
-            return;
-        }
-
-        HandleCancelInput();
-        if (!isMoveSelected)
-        {
-            return;
-        }
-
-        UpdatePathPreview();
-        HandleTargetClickInput();
     }
 
     /// <summary>
@@ -195,12 +155,18 @@ public class PlayerGridMoveAction : MonoBehaviour
     }
 
     /// <summary>
-    /// 선택된 목표 칸으로 이동 행동을 실행한다.
+    /// 선택된 목표 칸으로 이동 행동을 실행하고 논리/연출 이벤트를 지정한 문맥에 기록한다.
     /// </summary>
-    public bool TryExecuteMoveTo(GridPosition targetPosition)
+    public bool TryExecuteMoveTo(GridPosition targetPosition, ActionResolutionContext resolutionContext)
     {
         if (!isMoveSelected)
         {
+            return false;
+        }
+
+        if (resolutionContext == null)
+        {
+            Debug.LogError($"{nameof(PlayerGridMoveAction)} on {name}에는 이동 행동을 처리할 {nameof(ActionResolutionContext)}가 필요합니다.", this);
             return false;
         }
 
@@ -225,7 +191,7 @@ public class PlayerGridMoveAction : MonoBehaviour
             return false;
         }
 
-        GridPosition startPosition = actor.GridPosition;
+        GridPosition previousPosition = actor.GridPosition;
         foreach (GridPosition step in movePathBuffer)
         {
             if (!actor.TryMoveTo(step))
@@ -235,7 +201,11 @@ public class PlayerGridMoveAction : MonoBehaviour
                 return false;
             }
 
-            MoveStepEntered?.Invoke(step);
+            resolutionContext.EnqueuePresentation(PresentationEvent.MoveActor(actor, previousPosition, step, "플레이어 이동 연출"));
+            resolutionContext.Publish(new MoveStepEnteredLogicEvent(actor, step));
+            // 이동 연출 사이에 발각 같은 후속 연출 이벤트가 끼어들 수 있도록 칸 단위로 논리 이벤트를 즉시 처리한다.
+            resolutionContext.Resolve();
+            previousPosition = step;
         }
 
         isMoveSelected = false;
@@ -243,8 +213,9 @@ public class PlayerGridMoveAction : MonoBehaviour
         ClearMoveRangeSegments();
         ClearPathPreview();
         MoveRangeHidden?.Invoke();
-        MoveCompleted?.Invoke(actor.GridPosition);
-        EnqueueMovePresentationEvents(startPosition, movePathBuffer);
+        resolutionContext.Publish(new MoveCompletedLogicEvent(actor, actor.GridPosition));
+        // 이동 완료 후 목표 달성 같은 후속 논리 이벤트를 연출 큐 재생 전에 확정한다.
+        resolutionContext.Resolve();
 
         if (logActionState)
         {
@@ -252,57 +223,6 @@ public class PlayerGridMoveAction : MonoBehaviour
         }
 
         return true;
-    }
-
-    /// <summary>
-    /// UI 버튼이 없을 때 사용할 디버그 이동 행동 선택 키 입력을 처리한다.
-    /// </summary>
-    private void HandleDebugSelectInput()
-    {
-        if (!allowDebugKeyboardSelect || debugSelectMoveKey == Key.None || Keyboard.current == null)
-        {
-            return;
-        }
-
-        if (Keyboard.current[debugSelectMoveKey].wasPressedThisFrame)
-        {
-            SelectMoveAction();
-        }
-    }
-
-    /// <summary>
-    /// 이동 행동 선택 상태에서 취소 입력을 처리한다.
-    /// </summary>
-    private void HandleCancelInput()
-    {
-        if (cancelByEscape && Keyboard.current != null && Keyboard.current.escapeKey.wasPressedThisFrame)
-        {
-            CancelMoveAction();
-            return;
-        }
-
-        if (cancelByRightClick && Mouse.current != null && Mouse.current.rightButton.wasPressedThisFrame)
-        {
-            CancelMoveAction();
-        }
-    }
-
-    /// <summary>
-    /// 이동 행동 선택 상태에서 마우스 좌클릭 목표 칸 입력을 처리한다.
-    /// </summary>
-    private void HandleTargetClickInput()
-    {
-        if (Mouse.current == null || !Mouse.current.leftButton.wasPressedThisFrame)
-        {
-            return;
-        }
-
-        if (!TryGetMouseGridPosition(out GridPosition targetPosition))
-        {
-            return;
-        }
-
-        TryExecuteMoveTo(targetPosition);
     }
 
     /// <summary>
@@ -363,29 +283,6 @@ public class PlayerGridMoveAction : MonoBehaviour
     }
 
     /// <summary>
-    /// 판정으로 확정된 이동 경로를 1칸 단위 이동 연출 이벤트로 큐에 추가하고 실행한다.
-    /// </summary>
-    private void EnqueueMovePresentationEvents(GridPosition startPosition, IReadOnlyList<GridPosition> path)
-    {
-        ActionPresentationQueue presentationQueue = ActionPresentationQueue.Instance;
-        if (presentationQueue == null)
-        {
-            Debug.LogError($"{nameof(PlayerGridMoveAction)} on {name}에는 이동 연출을 큐에 넣을 {nameof(ActionPresentationQueue)}가 필요합니다.", this);
-            return;
-        }
-
-        GridPosition previousPosition = startPosition;
-        for (int i = 0; i < path.Count; i++)
-        {
-            GridPosition nextPosition = path[i];
-            presentationQueue.Enqueue(PresentationEvent.MoveActor(actor, previousPosition, nextPosition, "플레이어 이동 연출"));
-            previousPosition = nextPosition;
-        }
-
-        presentationQueue.PlayQueuedEvents();
-    }
-
-    /// <summary>
     /// 현재 플레이어 위치 기준으로 이동 가능한 칸 목록을 다시 계산한다.
     /// </summary>
     private void RefreshMovablePositions()
@@ -415,14 +312,8 @@ public class PlayerGridMoveAction : MonoBehaviour
     /// <summary>
     /// 이동 선택 상태에서 현재 마우스 칸까지의 경로 미리보기를 갱신한다.
     /// </summary>
-    private void UpdatePathPreview()
+    public void RefreshPathPreview(GridPosition targetPosition)
     {
-        if (!TryGetMouseGridPosition(out GridPosition targetPosition))
-        {
-            ClearPathPreview();
-            return;
-        }
-
         if (hasPreviewTargetPosition && lastPreviewTargetPosition == targetPosition)
         {
             return;
@@ -459,6 +350,14 @@ public class PlayerGridMoveAction : MonoBehaviour
     }
 
     /// <summary>
+    /// 외부 입력 컨트롤러가 현재 이동 경로 미리보기를 지우도록 요청한다.
+    /// </summary>
+    public void ClearMovePathPreview()
+    {
+        ClearPathPreview();
+    }
+
+    /// <summary>
     /// 현재 계산된 이동 경로 미리보기를 런타임 하이라이트 오브젝트로 표시한다.
     /// </summary>
     private void ShowPathPreview()
@@ -469,30 +368,6 @@ public class PlayerGridMoveAction : MonoBehaviour
         }
 
         pathPreviewHighlighter.Show(pathPreviewPositions);
-    }
-
-    /// <summary>
-    /// 현재 마우스 화면 좌표를 보드 칸 좌표로 변환한다.
-    /// </summary>
-    private bool TryGetMouseGridPosition(out GridPosition gridPosition)
-    {
-        if (Mouse.current == null)
-        {
-            gridPosition = GridPosition.Zero;
-            return false;
-        }
-
-        Camera cameraToUse = worldCamera != null ? worldCamera : Camera.main;
-        if (cameraToUse == null)
-        {
-            gridPosition = GridPosition.Zero;
-            return false;
-        }
-
-        Vector2 screenPosition = Mouse.current.position.ReadValue();
-        Vector3 worldPosition = cameraToUse.ScreenToWorldPoint(new Vector3(screenPosition.x, screenPosition.y, -cameraToUse.transform.position.z));
-        gridPosition = GridManager.Instance.WorldToGrid(worldPosition);
-        return true;
     }
 
     /// <summary>

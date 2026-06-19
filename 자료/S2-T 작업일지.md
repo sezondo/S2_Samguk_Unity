@@ -684,3 +684,77 @@
 ## 추가 검증
 - `dotnet build Assembly-CSharp.csproj --no-restore` 통과.
 - 경고 0개, 오류 0개.
+
+## 추가 핵심
+- `ActionResolutionContext`를 추가해 행동 하나에서 파생되는 논리 이벤트를 큐로 처리하는 1차 통로를 만들었다.
+- `ActionLogicEventBus`, `IActionLogicEvent`, `IActionLogicEventHandler`를 추가해 활성 논리 시스템이 자신이 처리할 이벤트만 받도록 했다.
+- `MoveStepEnteredLogicEvent`, `MoveCompletedLogicEvent`, `AlertTriggeredLogicEvent`, `EnemyAlertedLogicEvent`, `StageClearedLogicEvent`를 추가했다.
+- `PlayerActionFlowController`를 추가해 플레이어 이동 행동 실행, 논리 이벤트 처리 완료, 연출 큐 실행 순서를 조정하게 했다.
+- `PlayerGridMoveAction`은 이제 이동 경로의 각 칸을 논리 이동하면서 1칸 단위 `PresentationEvent.MoveActor`를 큐에 넣고, 논리 이벤트를 `ActionResolutionContext`에 발행한다.
+- `GridMoveRiskEvaluator`는 기존 `MoveStepEntered` 직접 구독 대신 `MoveStepEnteredLogicEvent`를 처리해 발각 판정, `AlertDetected` 연출 이벤트, `AlertTriggeredLogicEvent` 발행을 담당한다.
+- `EnemyAlertCoordinator`는 기존 `GridMoveRiskEvaluator.AlertTriggered` 직접 구독 대신 `AlertTriggeredLogicEvent`를 처리해 애드 전파와 적 상태 전환을 담당한다.
+- `StageGoalManager`는 `MoveCompletedLogicEvent`를 처리해 목표 도착을 판정하고, 클리어 시 `StageClearedLogicEvent`와 `StageCleared` 연출 이벤트를 발행한다.
+- `StageStateManager`는 `StageClearedLogicEvent`를 받아 스테이지 상태를 `Cleared`로 전환한다. 기존 `StageGoalManager.StageCleared` 직접 이벤트는 시작 위치 클리어 같은 보조 흐름을 위해 유지했다.
+- `ActorPresentationSynchronizer`를 추가해 씬 시작 시 `VisualRoot` 위치를 논리 `GridActor.GridPosition` 기준 월드 위치로 동기화할 수 있게 했다.
+
+## 추가 검증
+- `dotnet build Assembly-CSharp.csproj --no-restore` 통과.
+- 경고 0개, 오류 0개.
+
+## 다음
+- Unity 씬에 `PlayerActionFlowController`를 배치하고 `PlayerContext`, `ActionPresentationQueue`를 연결한다.
+- ActorPresentation 계층에 `ActorPresentationSynchronizer`를 추가해 `TargetActor`와 `VisualRoot`를 연결한다.
+- 플레이 모드에서 M 이동 입력 후 논리 이벤트 처리, 1칸 단위 이동 연출, 발각/애드/클리어 이벤트 순서를 확인한다.
+
+## 추가 핵심
+- `PlayerMoveInputController`를 추가해 M 키 이동 선택, 마우스 목표 칸 변환, 좌클릭 실행, 우클릭/Escape 취소 입력을 `PlayerGridMoveAction`에서 분리했다.
+- `PlayerGridMoveAction`은 입력 처리 `Update()`를 제거하고 이동 선택 상태, 경로 미리보기 갱신, AP 소비, 논리 이동, 논리/연출 이벤트 발행 책임만 남겼다.
+- 이동 목표 실행은 `PlayerMoveInputController`가 `PlayerActionFlowController`를 우선 호출하고, 연결이 없으면 기존 `PlayerGridMoveAction.TryExecuteMoveTo()` 경로를 사용하게 했다.
+
+## 추가 검증
+- `dotnet build Assembly-CSharp.csproj --no-restore` 통과.
+- 경고 0개, 오류 0개.
+
+## 다음
+- Unity 씬의 플레이어 입력 담당 오브젝트에 `PlayerMoveInputController`를 추가하고 `PlayerContext`, 필요 시 `PlayerActionFlowController`, `WorldCamera`를 연결한다.
+
+## 추가 정리
+- `PlayerGridMoveAction.TryExecuteMoveTo(GridPosition)` 직접 실행 경로를 제거했다.
+- 이제 이동 실행은 `PlayerMoveInputController -> PlayerActionFlowController -> PlayerGridMoveAction.TryExecuteMoveTo(GridPosition, ActionResolutionContext)` 흐름으로만 들어간다.
+- `PlayerMoveInputController`는 `PlayerActionFlowController` 참조를 필수로 검사한다.
+
+## 추가 검증
+- `dotnet build Assembly-CSharp.csproj --no-restore` 통과.
+- 경고 0개, 오류 0개.
+
+## 추가 정리
+- `PlayerGridMoveAction`에 남아 있던 `MoveStepEntered`, `MoveCompleted` 직접 C# 이벤트를 제거했다.
+- 이동 중 판정과 목표 판정은 `MoveStepEnteredLogicEvent`, `MoveCompletedLogicEvent` 논리 이벤트 통로만 사용하게 정리했다.
+- `PlayerGridMoveAction` 안의 `ActionResolutionContext.Resolve()` 호출은 칸 단위 이동 연출 사이에 발각/클리어 같은 후속 연출 이벤트를 정확한 순서로 끼워 넣기 위한 규칙으로 명시했다.
+
+## 추가 검증
+- `dotnet build Assembly-CSharp.csproj --no-restore` 통과.
+- 경고 0개, 오류 0개.
+
+## 2026-06-20 테스트 확인
+
+## 핵심
+- 오늘 작업은 S2-T 행동 처리의 핵심 규칙을 세운 작업으로 정리한다.
+- `ActionResolutionContext` 기반 논리 이벤트 통로, `PlayerActionFlowController`, `PlayerMoveInputController`, `ActorPresentationSynchronizer`를 실제 씬 테스트 기준으로 연결했다.
+- 플레이어 이동 입력은 `PlayerMoveInputController -> PlayerActionFlowController -> PlayerGridMoveAction` 흐름으로 정리했다.
+- 이동 판정은 논리 위치를 먼저 확정하고, 화면 이동은 `ActionPresentationQueue`에 쌓인 1칸 단위 `MoveActor` 연출 이벤트로 따라오게 했다.
+- 이동 경로 중 칸 진입 판정은 `MoveStepEnteredLogicEvent`, 이동 완료 판정은 `MoveCompletedLogicEvent`로 통일했다.
+- `MoveStepEntered`, `MoveCompleted` 직접 C# 이벤트는 제거해 게임 규칙 판정 통로를 `ActionResolutionContext`로 모았다.
+- 칸 단위 `Resolve()` 호출 규칙을 정했다. 이동 연출 사이에 발각, 클리어 같은 후속 연출 이벤트를 정확한 순서로 끼워 넣기 위한 처리다.
+- `ActorPresentationSynchronizer`로 씬 시작 시 VisualRoot 위치를 논리 `GridActor.GridPosition` 기준 위치에 동기화하는 흐름을 확인했다.
+- 현재 구조는 논리 선처리 / 연출 후재생 구조로 유지한다. 중간 연출 결과를 보고 규칙을 바꾸는 단계형 액션 시퀀서는 후속 확장으로 남긴다.
+
+## 검증
+- Unity 플레이 모드에서 새 입력/행동/논리 이벤트/연출 큐 연결을 테스트했다.
+- `dotnet build Assembly-CSharp.csproj --no-restore` 통과.
+- 경고 0개, 오류 0개.
+
+## 다음
+- `AlertDetected`를 실제로 처리할 `AlertDetectedPresenter` 또는 적 발각 Presenter를 추가한다.
+- `EnemyAlertVisual`은 현재 디버그 즉시 표시로 유지하되, 정식 발각 연출 시점에는 큐 기반 Presenter로 이전한다.
+- 공격, 해킹, 검 투척도 같은 `ActionResolutionContext -> PresentationEvent -> Presenter` 기준으로 확장한다.

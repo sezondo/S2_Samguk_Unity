@@ -8,7 +8,7 @@ using UnityEngine;
 /// </summary>
 [RequireComponent(typeof(PlayerContext))]
 [RequireComponent(typeof(PlayerGridMoveAction))]
-public class GridMoveRiskEvaluator : MonoBehaviour
+public class GridMoveRiskEvaluator : MonoBehaviour, IActionLogicEventHandler
 {
     [Header("Source")]
     // 플레이어 공통 참조와 이동 행동 컴포넌트를 제공하는 필수 Context다.
@@ -44,9 +44,6 @@ public class GridMoveRiskEvaluator : MonoBehaviour
     // 이동 행동 이벤트를 현재 구독 중인지 나타낸다.
     private bool subscribedMoveAction;
 
-    // 실제 이동 중 적 시야에 처음 들어갔을 때 감지 칸과 최초 감지 적을 전달한다.
-    public event Action<GridPosition, EnemyGridSight> AlertTriggered;
-
     /// <summary>
     /// 이동 위험 평가에 필요한 참조를 확인하고 경고 하이라이터를 준비한다.
     /// </summary>
@@ -67,6 +64,7 @@ public class GridMoveRiskEvaluator : MonoBehaviour
     /// </summary>
     private void OnEnable()
     {
+        ActionLogicEventBus.Register(this);
         TrySubscribeMoveAction(false);
     }
 
@@ -108,8 +106,6 @@ public class GridMoveRiskEvaluator : MonoBehaviour
         moveAction = playerContext.GridMoveAction;
         moveAction.MovePathPreviewShown += HandleMovePathPreviewShown;
         moveAction.MovePathPreviewHidden += HidePreviewRisk;
-        moveAction.MoveStepEntered += HandleMoveStepEntered;
-        moveAction.MoveCompleted += HandleMoveCompleted;
         moveAction.MoveRangeHidden += HidePreviewRisk;
         subscribedMoveAction = true;
     }
@@ -119,12 +115,12 @@ public class GridMoveRiskEvaluator : MonoBehaviour
     /// </summary>
     private void OnDisable()
     {
+        ActionLogicEventBus.Unregister(this);
+
         if (moveAction != null)
         {
             moveAction.MovePathPreviewShown -= HandleMovePathPreviewShown;
             moveAction.MovePathPreviewHidden -= HidePreviewRisk;
-            moveAction.MoveStepEntered -= HandleMoveStepEntered;
-            moveAction.MoveCompleted -= HandleMoveCompleted;
             moveAction.MoveRangeHidden -= HidePreviewRisk;
         }
 
@@ -161,28 +157,62 @@ public class GridMoveRiskEvaluator : MonoBehaviour
     /// <summary>
     /// 실제 이동 중 감지 칸에 들어가면 1차 발각 이벤트를 알린다.
     /// </summary>
-    private void HandleMoveStepEntered(GridPosition stepPosition)
+    private void HandleMoveStepEntered(MoveStepEnteredLogicEvent logicEvent, ActionResolutionContext context)
     {
-        if (didLogAddInCurrentMove || !TryFindDetectingEnemy(stepPosition, out EnemyGridSight detectingEnemy))
+        if (logicEvent.Actor != playerContext.GridActor ||
+            didLogAddInCurrentMove ||
+            !TryFindDetectingEnemy(logicEvent.StepPosition, out EnemyGridSight detectingSight))
         {
             return;
         }
 
         didLogAddInCurrentMove = true;
+        TryFindEnemyContext(detectingSight, out EnemyContext detectingEnemy);
         if (logAddTriggered)
         {
-            Debug.Log($"{nameof(GridMoveRiskEvaluator)}: {stepPosition} 칸에서 {detectingEnemy.name} 시야에 들어와 애드가 발생했습니다.", this);
+            Debug.Log($"{nameof(GridMoveRiskEvaluator)}: {logicEvent.StepPosition} 칸에서 {detectingSight.name} 시야에 들어와 애드가 발생했습니다.", this);
         }
 
-        AlertTriggered?.Invoke(stepPosition, detectingEnemy);
+        context.EnqueuePresentation(PresentationEvent.AlertDetected(logicEvent.StepPosition, detectingEnemy, "플레이어 발각 연출"));
+        context.Publish(new AlertTriggeredLogicEvent(logicEvent.StepPosition, detectingEnemy, detectingSight));
     }
 
     /// <summary>
     /// 이동 완료 후 이동 실행 중 애드 로그 상태를 초기화한다.
     /// </summary>
-    private void HandleMoveCompleted(GridPosition _)
+    private void HandleMoveCompleted(MoveCompletedLogicEvent logicEvent)
     {
+        if (logicEvent.Actor != playerContext.GridActor)
+        {
+            return;
+        }
+
         didLogAddInCurrentMove = false;
+    }
+
+    /// <summary>
+    /// 지정한 논리 이벤트를 이 컴포넌트가 처리할 수 있는지 확인한다.
+    /// </summary>
+    public bool CanHandle(IActionLogicEvent logicEvent)
+    {
+        return logicEvent is MoveStepEnteredLogicEvent or MoveCompletedLogicEvent;
+    }
+
+    /// <summary>
+    /// 이동 칸 진입과 이동 완료 논리 이벤트를 처리한다.
+    /// </summary>
+    public void Handle(IActionLogicEvent logicEvent, ActionResolutionContext context)
+    {
+        if (logicEvent is MoveStepEnteredLogicEvent moveStepEntered)
+        {
+            HandleMoveStepEntered(moveStepEntered, context);
+            return;
+        }
+
+        if (logicEvent is MoveCompletedLogicEvent moveCompleted)
+        {
+            HandleMoveCompleted(moveCompleted);
+        }
     }
 
     /// <summary>
@@ -234,6 +264,29 @@ public class GridMoveRiskEvaluator : MonoBehaviour
         }
 
         detectingEnemy = null;
+        return false;
+    }
+
+    /// <summary>
+    /// 지정한 적 시야 컴포넌트를 가진 EnemyContext를 현재 등록소에서 찾는다.
+    /// </summary>
+    private bool TryFindEnemyContext(EnemyGridSight gridSight, out EnemyContext enemyContext)
+    {
+        if (gridSight != null && EnemyRegistry.Instance != null)
+        {
+            IReadOnlyList<EnemyContext> enemies = EnemyRegistry.Instance.Enemies;
+            for (int i = 0; i < enemies.Count; i++)
+            {
+                EnemyContext enemy = enemies[i];
+                if (enemy != null && enemy.GridSight == gridSight)
+                {
+                    enemyContext = enemy;
+                    return true;
+                }
+            }
+        }
+
+        enemyContext = null;
         return false;
     }
 

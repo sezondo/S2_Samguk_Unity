@@ -5,7 +5,7 @@ using UnityEngine;
 /// 플레이어 발각 이벤트를 받아 최초 감지 적 기준으로 주변 적에게 애드를 전파하는 조정자다.
 /// 현재 단계에서는 전파 대상 계산과 적 상태 전환 요청을 담당한다.
 /// </summary>
-public class EnemyAlertCoordinator : MonoBehaviour
+public class EnemyAlertCoordinator : MonoBehaviour, IActionLogicEventHandler
 {
     [Header("Source")]
     // 플레이어의 이동 위험 평가 이벤트를 제공하는 필수 Context다.
@@ -14,11 +14,6 @@ public class EnemyAlertCoordinator : MonoBehaviour
     [Header("Log")]
     // true면 애드 전파 대상 계산과 상태 전환 요청 결과를 Unity 콘솔에 출력한다.
     [SerializeField] private bool logAlertSpread = true;
-
-    // 발각 이벤트를 발행하는 플레이어 이동 위험 평가 컴포넌트다.
-    private GridMoveRiskEvaluator riskEvaluator;
-    // 발각 이벤트를 현재 구독 중인지 나타낸다.
-    private bool subscribedAlertEvent;
 
     /// <summary>
     /// 애드 전파에 필요한 플레이어 참조를 확인한다.
@@ -36,7 +31,7 @@ public class EnemyAlertCoordinator : MonoBehaviour
     /// </summary>
     private void OnEnable()
     {
-        TrySubscribeAlertEvent(false);
+        ActionLogicEventBus.Register(this);
     }
 
     /// <summary>
@@ -44,32 +39,6 @@ public class EnemyAlertCoordinator : MonoBehaviour
     /// </summary>
     private void Start()
     {
-        TrySubscribeAlertEvent(true);
-    }
-
-    /// <summary>
-    /// 컴포넌트가 비활성화될 때 발각 이벤트 구독을 해제한다.
-    /// </summary>
-    private void OnDisable()
-    {
-        if (riskEvaluator != null)
-        {
-            riskEvaluator.AlertTriggered -= HandleAlertTriggered;
-        }
-
-        subscribedAlertEvent = false;
-    }
-
-    /// <summary>
-    /// 플레이어 이동 위험 평가 컴포넌트의 발각 이벤트를 구독한다.
-    /// </summary>
-    private void TrySubscribeAlertEvent(bool logMissingRegistry)
-    {
-        if (subscribedAlertEvent)
-        {
-            return;
-        }
-
         if (!HasValidReference())
         {
             enabled = false;
@@ -78,26 +47,26 @@ public class EnemyAlertCoordinator : MonoBehaviour
 
         if (EnemyRegistry.Instance == null)
         {
-            if (logMissingRegistry)
-            {
-                Debug.LogError($"{nameof(EnemyAlertCoordinator)} on {name}에는 애드 전파 대상 조회에 사용할 씬의 {nameof(EnemyRegistry)}가 필요합니다.", this);
-                enabled = false;
-            }
-
-            return;
+            Debug.LogError($"{nameof(EnemyAlertCoordinator)} on {name}에는 애드 전파 대상 조회에 사용할 씬의 {nameof(EnemyRegistry)}가 필요합니다.", this);
+            enabled = false;
         }
+    }
 
-        riskEvaluator = playerContext.GridMoveRiskEvaluator;
-        riskEvaluator.AlertTriggered += HandleAlertTriggered;
-        subscribedAlertEvent = true;
+    /// <summary>
+    /// 컴포넌트가 비활성화될 때 논리 이벤트 핸들러 등록을 해제한다.
+    /// </summary>
+    private void OnDisable()
+    {
+        ActionLogicEventBus.Unregister(this);
     }
 
     /// <summary>
     /// 발각 이벤트를 받아 최초 감지 적 기준 전파 대상 적을 계산한다.
     /// </summary>
-    private void HandleAlertTriggered(GridPosition detectedPosition, EnemyGridSight detectingSight)
+    private void HandleAlertTriggered(AlertTriggeredLogicEvent logicEvent, ActionResolutionContext context)
     {
-        if (!TryFindEnemyContext(detectingSight, out EnemyContext detectingEnemy))
+        EnemyContext detectingEnemy = logicEvent.DetectingEnemy;
+        if (detectingEnemy == null && !TryFindEnemyContext(logicEvent.DetectingSight, out detectingEnemy))
         {
             Debug.LogError($"{nameof(EnemyAlertCoordinator)}: 최초 감지 적 Context를 찾지 못해 애드 전파를 중단합니다.", this);
             return;
@@ -126,11 +95,35 @@ public class EnemyAlertCoordinator : MonoBehaviour
                 continue;
             }
 
-            bool changed = enemy.AlertState.RequestAlert(detectedPosition, detectingEnemy);
+            bool changed = enemy.AlertState.RequestAlert(logicEvent.DetectedPosition, detectingEnemy);
             if (logAlertSpread && changed)
             {
-                Debug.Log($"{nameof(EnemyAlertCoordinator)}: {detectedPosition} 칸 발각을 {detectingEnemy.name} 기준 {distance}칸 거리의 {enemy.name} 적에게 전파했습니다.", this);
+                Debug.Log($"{nameof(EnemyAlertCoordinator)}: {logicEvent.DetectedPosition} 칸 발각을 {detectingEnemy.name} 기준 {distance}칸 거리의 {enemy.name} 적에게 전파했습니다.", this);
             }
+
+            if (changed)
+            {
+                context.Publish(new EnemyAlertedLogicEvent(enemy, detectingEnemy, logicEvent.DetectedPosition));
+            }
+        }
+    }
+
+    /// <summary>
+    /// 지정한 논리 이벤트를 이 컴포넌트가 처리할 수 있는지 확인한다.
+    /// </summary>
+    public bool CanHandle(IActionLogicEvent logicEvent)
+    {
+        return logicEvent is AlertTriggeredLogicEvent;
+    }
+
+    /// <summary>
+    /// 발각 논리 이벤트를 처리해 주변 적에게 애드를 전파한다.
+    /// </summary>
+    public void Handle(IActionLogicEvent logicEvent, ActionResolutionContext context)
+    {
+        if (logicEvent is AlertTriggeredLogicEvent alertTriggered)
+        {
+            HandleAlertTriggered(alertTriggered, context);
         }
     }
 
@@ -178,12 +171,6 @@ public class EnemyAlertCoordinator : MonoBehaviour
 
         if (!playerContext.HasValidReference())
         {
-            return false;
-        }
-
-        if (playerContext.GridMoveRiskEvaluator == null)
-        {
-            Debug.LogError($"{nameof(EnemyAlertCoordinator)} on {name}에는 {nameof(PlayerContext)}에 연결된 {nameof(GridMoveRiskEvaluator)} 참조가 필요합니다.", this);
             return false;
         }
 

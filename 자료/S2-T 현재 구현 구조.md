@@ -1,4 +1,4 @@
-# S2-T 현재 구현 구조
+﻿# S2-T 현재 구현 구조
 
 최신 기준: 2026-06-17
 브랜치: `turn-based-stealth`
@@ -941,3 +941,147 @@ public event Func<PresentationEvent, PresentationEventHandle, bool> Presentation
 - 다음 작업은 Unity 씬에서 `MovePresentationData`, `ActorVisualController`, `GridActorMovePresenter`를 연결해 실제 VisualRoot 이동을 확인하는 것이다.
 - 이후 `PlayerGridMoveAction`의 이동 결과를 `PresentationEvent.MoveActor`로 큐에 넣는 실제 게임 흐름 연결로 넘어간다.
 
+
+## Action Resolution / 논리 이벤트 처리 구조
+
+S2-T의 행동 처리는 최초 명령에서 파생되는 논리 사건을 `ActionResolutionContext` 안에서 처리한 뒤, 논리 처리가 끝나면 `ActionPresentationQueue`를 재생하는 기준으로 확장한다.
+
+핵심 기준:
+
+- 상위 실행자는 개별 논리 시스템을 직접 감시하지 않는다.
+- 행동 중 발생한 논리 사건은 `IActionLogicEvent`로 `ActionResolutionContext`에 발행한다.
+- `ActionResolutionContext.Resolve()`는 논리 이벤트 큐가 빌 때까지 `ActionLogicEventBus`를 통해 활성 핸들러에 이벤트를 전달한다.
+- 처리 중 새 논리 이벤트가 생기면 같은 문맥 안에서 이어서 처리한다.
+- 논리 이벤트 큐가 비면 해당 행동의 논리 처리가 끝난 것으로 본다.
+- 시간이 걸리는 화면 표현은 `PresentationEvent`로 `ActionPresentationQueue`에 넣고, 논리 처리 종료 후 재생한다.
+
+현재 1차 구성:
+
+- `ActionResolutionContext`: 행동 하나의 논리 이벤트 큐와 연출 이벤트 추가 통로.
+- `ActionLogicEventBus`: 활성 `IActionLogicEventHandler` 목록에 논리 이벤트를 전달하는 정적 통로.
+- `MoveStepEnteredLogicEvent`: 액터가 이동 경로의 한 칸에 진입했음을 알린다.
+- `MoveCompletedLogicEvent`: 액터의 이동 행동이 최종 칸에서 끝났음을 알린다.
+- `AlertTriggeredLogicEvent`: 플레이어가 적 시야에 들어와 발각됐음을 알린다.
+- `EnemyAlertedLogicEvent`: 적 하나가 발각 상태로 바뀌었음을 알린다.
+- `StageClearedLogicEvent`: 스테이지 목표 달성이 확인됐음을 알린다.
+- `PlayerActionFlowController`: 플레이어 이동 행동 실행, 논리 이벤트 처리, 연출 큐 재생 시점을 조정한다.
+
+현재 연결:
+
+- `PlayerGridMoveAction`은 이동 경로를 계산하고 AP를 소비한 뒤, 각 칸 이동마다 `MoveActor` 연출 이벤트와 `MoveStepEnteredLogicEvent`를 추가한다.
+- `GridMoveRiskEvaluator`는 `MoveStepEnteredLogicEvent`를 처리해 위험 칸 진입을 확인하고, 발각 시 `AlertDetected` 연출 이벤트와 `AlertTriggeredLogicEvent`를 추가한다.
+- `EnemyAlertCoordinator`는 `AlertTriggeredLogicEvent`를 처리해 최초 감지 적 기준 애드 전파와 `EnemyAlertState.RequestAlert()`를 수행한다.
+- `StageGoalManager`는 `MoveCompletedLogicEvent`를 처리해 목표 도착을 확인하고, 클리어 시 `StageClearedLogicEvent`와 `StageCleared` 연출 이벤트를 추가한다.
+- `StageStateManager`는 `StageClearedLogicEvent`를 처리해 스테이지 상태를 `Cleared`로 바꾼다.
+
+현재 한계:
+
+- 이동 입력은 `PlayerMoveInputController`로 분리했다. `PlayerGridMoveAction`은 입력을 직접 처리하지 않고, 이동 선택 상태와 이동 판정/실행 책임만 가진다.
+- 적 AI 반응 논리와 연출 이벤트 삽입은 아직 연결하지 않았다.
+- `EnemyAlertedLogicEvent`는 후속 적 반응/시각 연출 확장용으로 발행되지만, 현재 별도 핸들러는 없다.
+
+## ActorPresentationSynchronizer
+
+`ActorPresentationSynchronizer`는 논리 `GridActor`와 화면 표시용 `VisualRoot`의 시작 위치를 맞추는 컴포넌트다.
+
+역할:
+
+- `TargetActor.GridPosition`을 `GridManager.GridToWorld()`로 변환한다.
+- `VisualRoot.position`을 논리 Actor의 현재 칸 위치로 맞춘다.
+- `syncOnStart`를 켜면 씬 시작 시 자동 동기화한다.
+- 필요하면 `ForceSyncToActorPosition()`으로 강제 동기화할 수 있다.
+
+배치 기준:
+
+- `ActorPresentation` 계층 또는 해당 Actor의 연출 관리 오브젝트에 붙인다.
+- `TargetActor`에는 논리 계층의 `GridActor`를 연결한다.
+- `VisualRoot`에는 실제 스프라이트/애니메이터가 붙은 표시 루트를 연결한다.
+
+### PlayerMoveInputController
+
+`PlayerMoveInputController`는 플레이어 이동 행동의 임시 입력 담당 컴포넌트다.
+
+현재 책임:
+
+- M 키로 이동 행동 선택 요청.
+- 마우스 화면 좌표를 `GridManager.WorldToGrid()` 기준 목표 칸으로 변환.
+- 이동 선택 중 목표 칸 경로 미리보기 갱신 요청.
+- 좌클릭 시 `PlayerActionFlowController.TryExecuteMove()`를 통해 이동 행동 실행 요청.
+- `PlayerActionFlowController` 참조는 필수이며, `PlayerGridMoveAction`을 직접 실행하지 않는다.
+- 우클릭 또는 Escape로 이동 선택 취소 요청.
+
+분리 기준:
+
+- `PlayerMoveInputController`: 입력 해석과 행동 요청.
+- `PlayerActionFlowController`: 행동 실행 흐름과 연출 큐 실행 시점 조정.
+- `PlayerGridMoveAction`: 이동 가능 범위, 경로 계산, AP 소비, 논리 이동, 논리/연출 이벤트 발행.
+
+`PlayerGridMoveAction`에는 더 이상 `Update()` 기반 입력 처리와 `UnityEngine.InputSystem` 의존성을 두지 않는다.
+
+
+
+
+### ActionResolutionContext Resolve 호출 규칙
+
+`ActionResolutionContext.Resolve()`는 논리 이벤트 큐를 비울 때까지 현재 등록된 `IActionLogicEventHandler`들에게 이벤트를 전달한다.
+
+현재 기준:
+
+- `PlayerActionFlowController`는 행동 실행 함수가 반환된 뒤 마지막으로 `Resolve()`를 호출한다.
+- 이 마지막 호출은 아직 처리되지 않은 논리 이벤트를 정리하는 안전망이다.
+- `PlayerGridMoveAction`은 이동 경로의 각 칸마다 `MoveStepEnteredLogicEvent`를 발행한 직후 `Resolve()`를 호출한다.
+- 이 칸 단위 `Resolve()`는 `MoveActor` 연출 이벤트 사이에 `AlertDetected`, `StageCleared` 같은 후속 연출 이벤트를 올바른 순서로 끼워 넣기 위한 의도적인 처리다.
+
+예:
+
+```text
+MoveActor 2 -> 3
+MoveStepEnteredLogicEvent Resolve
+AlertDetected enqueue
+MoveActor 3 -> 4
+```
+
+규칙:
+
+- 액션은 연출 이벤트 순서가 중요한 지점에서 `Resolve()`를 직접 호출할 수 있다.
+- 상위 `PlayerActionFlowController`의 마지막 `Resolve()`는 누락된 후속 논리 이벤트 처리용으로 유지한다.
+- 새 액션을 만들 때는 논리 이벤트를 발행만 할지, 중간 순서 보장을 위해 즉시 `Resolve()`할지 명확히 정한다.
+
+### PlayerGridMoveAction 직접 이벤트 제거
+
+`PlayerGridMoveAction`의 `MoveStepEntered`, `MoveCompleted` 직접 C# 이벤트는 제거했다.
+
+현재 이동 중 판정 통로:
+
+- 칸 진입: `MoveStepEnteredLogicEvent`
+- 이동 완료: `MoveCompletedLogicEvent`
+
+직접 C# 이벤트는 이동 범위 표시, 경로 미리보기처럼 단순 표시/입력 상태 알림에만 유지한다.
+이동 판정, 발각, 애드, 목표 달성 같은 게임 규칙 처리는 `ActionResolutionContext` 논리 이벤트 통로를 사용한다.
+
+## 2026-06-20 테스트 기준 정리
+
+오늘 기준 S2-T 행동 처리의 핵심 규칙은 다음과 같이 확정한다.
+
+- 행동 판정은 논리 시스템에서 먼저 끝낸다.
+- 논리 처리 중 파생되는 사건은 `ActionResolutionContext`의 논리 이벤트 큐로 처리한다.
+- 논리 이벤트 큐가 비면 해당 행동의 논리 처리가 끝난 것으로 본다.
+- 화면 연출은 `ActionPresentationQueue`에 쌓인 `PresentationEvent`를 순서대로 재생한다.
+- 플레이어 이동은 논리상 먼저 최종 경로를 처리하고, 화면에서는 1칸 단위 `MoveActor` 이벤트가 따라오는 구조다.
+- 이동 중 발각은 `MoveStepEnteredLogicEvent` 처리 시점에 `AlertDetected` 연출 이벤트를 끼워 넣는 방식으로 표현한다.
+- 현재 구조는 논리 선처리 / 연출 후재생이다. 연출 중간 결과를 보고 실제 규칙을 바꾸는 구조는 아직 목표가 아니다.
+
+확인된 현재 한계:
+
+- `AlertDetected` 이벤트 타입은 있지만 정식 Presenter는 아직 없다. 현재는 처리자가 없으면 큐가 경고 후 자동 완료할 수 있다.
+- `EnemyAlertVisual`은 현재 디버그 시각 피드백으로 논리 상태 변경과 동시에 색을 바꾼다. 정식 발각 연출은 추후 큐 기반 Presenter로 분리한다.
+- 적 AI 반응 이동, 카메라 줌, 발각 컷인, UI 경고는 아직 구현하지 않았다.
+- 중간 연출을 본 뒤 남은 이동 경로를 실제 규칙상 변경하는 단계형 액션 시퀀서는 후속 확장 후보로 둔다.
+
+현재 테스트 완료 기준:
+
+- `PlayerMoveInputController`가 입력을 받고 `PlayerActionFlowController`에 이동 행동 실행을 요청한다.
+- `PlayerActionFlowController`가 `ActionResolutionContext`를 만들고 이동 논리 처리 후 연출 큐를 재생한다.
+- `PlayerGridMoveAction`은 이동 경로의 각 칸마다 1칸 단위 `MoveActor` 연출 이벤트와 `MoveStepEnteredLogicEvent`를 발행한다.
+- `GridMoveRiskEvaluator`, `EnemyAlertCoordinator`, `StageGoalManager`, `StageStateManager`는 논리 이벤트 핸들러로 동작한다.
+- `ActorPresentationSynchronizer`는 씬 시작 시 VisualRoot를 논리 `GridActor` 위치에 맞춘다.

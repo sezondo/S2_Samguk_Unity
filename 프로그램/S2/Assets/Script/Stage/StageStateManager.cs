@@ -5,7 +5,7 @@ using UnityEngine;
 /// 스테이지의 현재 진행 상태를 보관하고 클리어/실패 전환을 알린다.
 /// 개별 목표 판정은 StageGoalManager가 맡고, 이 컴포넌트는 전체 스테이지 상태만 관리한다.
 /// </summary>
-public class StageStateManager : MonoBehaviour
+public class StageStateManager : MonoBehaviour, IActionLogicEventHandler
 {
     [Header("Reference")]
     // 목표 달성 이벤트를 제공하는 스테이지 목표 매니저다.
@@ -19,7 +19,7 @@ public class StageStateManager : MonoBehaviour
     // true면 스테이지 상태 변경 결과를 Unity 콘솔에 출력한다.
     [SerializeField] private bool logStateChanges = true;
 
-    // 목표 달성 이벤트를 현재 구독 중인지 나타낸다.
+    // StageGoalManager의 기존 직접 이벤트를 현재 구독 중인지 나타낸다.
     private bool subscribedGoalManager;
 
     public StageState CurrentState => currentState;
@@ -46,6 +46,7 @@ public class StageStateManager : MonoBehaviour
     /// </summary>
     private void OnEnable()
     {
+        ActionLogicEventBus.Register(this);
         TrySubscribeGoalManager();
     }
 
@@ -54,14 +55,22 @@ public class StageStateManager : MonoBehaviour
     /// </summary>
     private void Start()
     {
+        if (!HasValidReference())
+        {
+            enabled = false;
+            return;
+        }
+
         TrySubscribeGoalManager();
     }
 
     /// <summary>
-    /// 목표 달성 이벤트 구독을 해제한다.
+    /// 논리 이벤트 핸들러 등록을 해제한다.
     /// </summary>
     private void OnDisable()
     {
+        ActionLogicEventBus.Unregister(this);
+
         if (stageGoalManager != null)
         {
             stageGoalManager.StageCleared -= HandleStageCleared;
@@ -87,7 +96,15 @@ public class StageStateManager : MonoBehaviour
     }
 
     /// <summary>
-    /// 목표 달성 이벤트를 구독한다.
+    /// 목표 달성 이벤트를 받아 스테이지를 클리어 상태로 전환한다.
+    /// </summary>
+    private void HandleStageCleared(StageClearedLogicEvent _)
+    {
+        RequestClear();
+    }
+
+    /// <summary>
+    /// StageGoalManager의 기존 직접 목표 달성 이벤트를 보조로 구독한다.
     /// </summary>
     private void TrySubscribeGoalManager()
     {
@@ -102,16 +119,36 @@ public class StageStateManager : MonoBehaviour
             return;
         }
 
+        stageGoalManager.StageCleared -= HandleStageCleared;
         stageGoalManager.StageCleared += HandleStageCleared;
         subscribedGoalManager = true;
     }
 
     /// <summary>
-    /// 목표 달성 이벤트를 받아 스테이지를 클리어 상태로 전환한다.
+    /// 기존 직접 목표 달성 이벤트를 받아 스테이지를 클리어 상태로 전환한다.
     /// </summary>
     private void HandleStageCleared(StageGoal _)
     {
         RequestClear();
+    }
+
+    /// <summary>
+    /// 지정한 논리 이벤트를 이 컴포넌트가 처리할 수 있는지 확인한다.
+    /// </summary>
+    public bool CanHandle(IActionLogicEvent logicEvent)
+    {
+        return logicEvent is StageClearedLogicEvent;
+    }
+
+    /// <summary>
+    /// 스테이지 클리어 논리 이벤트를 처리한다.
+    /// </summary>
+    public void Handle(IActionLogicEvent logicEvent, ActionResolutionContext context)
+    {
+        if (logicEvent is StageClearedLogicEvent stageCleared)
+        {
+            HandleStageCleared(stageCleared);
+        }
     }
 
     /// <summary>
