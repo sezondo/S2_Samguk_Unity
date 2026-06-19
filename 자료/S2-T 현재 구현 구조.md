@@ -1,6 +1,6 @@
 # S2-T 현재 구현 구조
 
-최신 기준: 2026-06-16
+최신 기준: 2026-06-17
 브랜치: `turn-based-stealth`
 프로젝트 명칭: `S2-T`
 
@@ -51,6 +51,10 @@ S2-T의 현재 구현 목표는 `이동 -> 위험 경고 -> 발각 이벤트 -> 
 - `Assets/Script/Dialogue`: 말풍선 대사 시스템.
 - `Assets/Script/Common`: 공용 VFX 풀.
 - `Assets/Script/Combat`: 공용 전투/해킹 인터페이스.
+- `Assets/Script/Presentation`: 연출 이벤트, 연출 큐, 연출 테스트 컴포넌트.
+- `Assets/Script/Presentation/Data`: 연출 튜닝 데이터 에셋.
+- `Assets/Script/Presentation/Presenter`: 연출 큐 이벤트를 처리하는 Presenter 컴포넌트.
+- `Assets/Script/Presentation/Visual`: VisualRoot에 붙는 실제 시각 제어 컴포넌트.
 
 ## Grid 시스템
 
@@ -561,6 +565,73 @@ S2-T의 행동 처리는 턴제 전술 게임 기준으로 판정과 연출을 �
 - 연출 오브젝트는 논리 결과를 따라가며 큐 순서대로 화면을 재생한다.
 - 연출 중 다른 시스템이 판정에 필요한 위치나 상태를 확인할 때는 논리 오브젝트와 저장된 결과 데이터를 기준으로 판단한다.
 
+### Actor 계층 기준
+
+플레이어와 향후 NPC/적 Actor는 논리, 연출 이벤트 처리, 실제 시각 표시를 계층으로 나눈다.
+
+기준 계층:
+
+```text
+Actor Root
+- PlayerLogic 또는 EnemyLogic
+  - GridActor
+  - Context
+  - AP, 이동, 시야, 상태 같은 논리 컴포넌트
+
+- ActorPresentation
+  - GridActorMovePresenter
+  - ActorAttackPresenter
+  - ActorHackPresenter
+  - ActorDamagePresenter
+  - 기타 연출 이벤트 처리 컴포넌트
+
+- VisualRoot
+  - SpriteRenderer
+  - Animator
+  - ActorVisualController 같은 시각 제어 컴포넌트
+```
+
+현재 플레이어 오브젝트의 기존 `GridActor` 자식 오브젝트는 역할을 유지하고 이름만 `PlayerLogic`으로 바꾸는 방향으로 한다. `PlayerContext`는 이 논리 계층의 핵심 참조 주머니로 유지한다.
+
+`ActorPresentation`은 연출 큐 이벤트를 직접 구독하고 처리하는 컴포넌트들이 붙는 계층이다. 기존 후보 이름인 `GridActorView`는 단순 표시 Transform처럼 보일 수 있으므로, 이동/공격/해킹/피격 같은 연출 이벤트 처리자들이 모이는 계층 이름으로는 `ActorPresentation`을 우선 후보로 둔다.
+
+`VisualRoot`는 실제 스프라이트, 애니메이터, 시각 제어 컴포넌트를 가지는 표시 루트다. 이동, 공격, 해킹 같은 Presenter는 필요할 때 `VisualRoot` 또는 `ActorVisualController`에 시각 작업을 요청한다.
+
+### Presenter / VisualRoot 완료 책임
+
+연출 큐의 완료 신호는 Presenter가 최종 책임진다.
+
+흐름:
+
+```text
+ActionPresentationQueue
+-> Presenter가 PresentationEvent 수신
+-> Presenter가 VisualRoot 또는 ActorVisualController에 시각 작업 요청
+-> VisualRoot 쪽 작업 완료 콜백
+-> Presenter가 PresentationEventHandle.Complete() 호출
+```
+
+규칙:
+
+- `VisualRoot`는 연출 큐를 직접 알지 않는다.
+- `VisualRoot`는 시각 작업 완료 사실만 Presenter에게 알린다.
+- `PresentationEventHandle.Complete()`는 해당 이벤트를 처리한 Presenter가 호출한다.
+- 큐 입장에서는 Presenter만 이벤트 처리자다.
+- 이 기준을 지키면 VisualRoot의 내부 애니메이션, 스프라이트, 보간 방식이 바뀌어도 큐 구조는 흔들리지 않는다.
+
+### 연출 데이터 기준
+
+연출 데이터는 처음부터 하나의 거대한 공용 Context에 넣지 않고, 기능별 Presenter가 각자 가진다.
+
+예:
+
+- `GridActorMovePresenter`: 이동 시간, 이동 커브, 이동 중 애니메이션 이름.
+- `ActorAttackPresenter`: 공격 딜레이, 타격 타이밍, 공격 애니메이션 이름.
+- `ActorHackPresenter`: 해킹 연출 시간, 이펙트, 완료 타이밍.
+- `ActorDamagePresenter`: 피격 흔들림, 색상 점멸, HP 표시 타이밍.
+
+데이터가 커지면 기능별 `ScriptableObject`로 분리한다. 예를 들어 `MovePresentationData`, `AttackPresentationData`, `HackPresentationData` 같은 식으로 확장한다. `Context`는 계속 참조 주머니로만 유지하고, 튜닝 수치와 연출 정책은 넣지 않는다.
+
 ### 행동 처리 기준
 
 대부분의 행동은 입력 또는 AI 결정 시점에 결과를 먼저 확정한다.
@@ -788,6 +859,69 @@ public event Func<PresentationEvent, PresentationEventHandle, bool> Presentation
 - `PlayerGridMoveAction`, `EnemyAlertCoordinator`, `StageStateManager`는 아직 `ActionPresentationQueue`에 실제 이벤트를 넣지 않는다.
 - 다음 단계에서 이동 연출 이벤트부터 실제 게임 흐름에 연결한다.
 
+### MovePresentationData
+
+`MovePresentationData`는 `GridActorMovePresenter`가 사용하는 이동 연출 튜닝 데이터다.
+
+현재 값:
+
+- `MoveDuration`: 이동 이벤트 하나를 화면에서 재생하는 시간.
+- `MoveCurve`: 이동 시간 진행률을 실제 위치 보간률로 바꾸는 곡선.
+- `UseMoveAnimation`: 이동 시작 시 애니메이션 재생 요청 여부.
+- `MoveAnimationStateName`: 이동 중 재생할 Animator 상태 이름.
+- `MoveAnimationCrossFadeDuration`: 이동 애니메이션 전환 시간.
+- `PlayIdleAnimationOnComplete`: 이동 종료 후 대기 애니메이션 재생 요청 여부.
+- `IdleAnimationStateName`: 이동 종료 후 재생할 Animator 상태 이름.
+- `IdleAnimationCrossFadeDuration`: 대기 애니메이션 전환 시간.
+
+데이터 에셋 자체는 유효성 검사를 맡지 않는다. 실제 검사는 이 데이터를 사용하는 `GridActorMovePresenter.HasValidData()`에서 수행한다.
+
+### ActorVisualController
+
+`ActorVisualController`는 `VisualRoot`에 붙는 시각 제어 컴포넌트다. 연출 큐를 직접 알지 않고, Presenter의 요청에 따라 SpriteRenderer와 Animator 같은 실제 시각 컴포넌트를 제어한다.
+
+현재 책임:
+
+- `SpriteRenderer` 참조 보관.
+- `Animator` 참조 보관.
+- 이동 시작 시 `MovePresentationData` 기준 이동 애니메이션 재생 요청.
+- 이동 종료 시 설정에 따라 대기 애니메이션 재생 요청.
+- Animator 상태 이름이 비어 있거나 Animator가 없으면 오류 로그를 남기고 실패를 반환한다.
+
+규칙:
+
+- `ActorVisualController`는 `PresentationEventHandle`을 직접 알지 않는다.
+- 큐 완료 여부는 Presenter가 판단한다.
+- 현재는 Animator 상태 이름을 직접 재생하는 1차 틀이다. 이후 필요하면 Trigger/Bool 파라미터 방식으로 확장한다.
+
+### GridActorMovePresenter
+
+`GridActorMovePresenter`는 `ActorPresentation` 계층에 붙는 이동 연출 Presenter다.
+
+현재 책임:
+
+- `ActionPresentationQueue.PresentationEventStarted`를 구독한다.
+- `PresentationEventType.MoveActor` 중 자기 `GridActor` 대상 이벤트만 처리한다.
+- 설정에 따라 `PresentationEventType.EnemyReactionMove`도 같은 방식으로 처리한다.
+- `GridManager.GridToWorld()`로 `FromPosition`, `ToPosition`을 월드 좌표로 변환한다.
+- `VisualRoot` Transform을 시작 위치에서 목표 위치까지 `MovePresentationData.MoveCurve` 기준으로 보간한다.
+- 이동 시작/종료 애니메이션은 `ActorVisualController`에 요청한다.
+- 이동 연출이 끝나면 `PresentationEventHandle.Complete()`를 호출한다.
+- 비활성화 중 진행 중인 이벤트가 있으면 큐 정지를 막기 위해 완료 처리한다.
+
+필수 참조:
+
+- `TargetActor`: 이 Presenter가 처리할 논리 `GridActor`.
+- `VisualRoot`: 실제 화면상 이동시킬 Transform.
+- `VisualController`: VisualRoot의 `ActorVisualController`.
+- `MoveData`: 이동 연출 데이터.
+
+현재 한계:
+
+- `PlayerGridMoveAction`의 실제 게임 이동 흐름과는 아직 연결하지 않았다.
+- 디버그 테스트용 `DebugPresentationQueueTester.SampleMoveActor`에 같은 `GridActor`를 연결해야 `MoveActor` 이벤트를 받을 수 있다.
+- 카메라, 발각 지점 중간 정지, 적 반응 삽입은 아직 없다.
+
 ### 연출 큐 테스트 상태
 
 2026-06-17 기준 Unity 플레이 모드에서 디버그 연출 큐 흐름을 확인했다.
@@ -803,5 +937,7 @@ public event Func<PresentationEvent, PresentationEventHandle, bool> Presentation
 현재 상태:
 
 - 연출 큐의 기본 순차 실행과 완료 신호 흐름은 확인됐다.
-- 실제 게임 시스템과의 연결은 아직 없다.
-- 다음 작업은 `PlayerGridMoveAction`의 이동 결과를 `PresentationEvent.MoveActor`로 큐에 넣고, 실제 화면 이동용 View 컴포넌트를 연결하는 것이다.
+- `GridActorMovePresenter` 1차 구현으로 `PresentationEvent.MoveActor`를 받아 `VisualRoot`를 이동시키는 Presenter 틀이 추가됐다.
+- 다음 작업은 Unity 씬에서 `MovePresentationData`, `ActorVisualController`, `GridActorMovePresenter`를 연결해 실제 VisualRoot 이동을 확인하는 것이다.
+- 이후 `PlayerGridMoveAction`의 이동 결과를 `PresentationEvent.MoveActor`로 큐에 넣는 실제 게임 흐름 연결로 넘어간다.
+

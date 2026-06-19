@@ -643,3 +643,44 @@
 ## 다음
 - `PlayerGridMoveAction`의 이동 결과를 `PresentationEvent.MoveActor`로 큐에 넣는 흐름을 검토한다.
 - 이후 실제 연출용 `GridActorView` 또는 `GridActorVisual`을 추가해 논리 이동과 화면 이동을 분리한다.
+
+## 추가 설계 정리
+- Actor 계층 기준을 `PlayerLogic`, `ActorPresentation`, `VisualRoot` 3단 구조로 정했다.
+- 기존 플레이어 자식 `GridActor` 오브젝트는 논리 역할을 유지하고 이름만 `PlayerLogic`으로 바꾸는 방향으로 잡았다.
+- `PlayerContext`는 `PlayerLogic` 계층의 핵심 참조 주머니로 유지한다.
+- `ActorPresentation`에는 `GridActorMovePresenter`, 공격/해킹/피격 Presenter 같은 연출 이벤트 처리 컴포넌트를 둔다.
+- `VisualRoot`에는 `SpriteRenderer`, `Animator`, 시각 제어 컴포넌트를 둔다.
+- 연출 큐 완료 신호는 `VisualRoot`가 아니라 이벤트를 처리한 Presenter가 최종 호출하는 규칙으로 정했다.
+- `VisualRoot`는 큐를 모르고, Presenter에게 시각 작업 완료 콜백만 돌려준다.
+- 이동, 공격, 해킹 등 연출 데이터는 기능별 Presenter가 각자 들고 시작하며, 커지면 기능별 `ScriptableObject`로 분리한다.
+
+## 다음
+- 실제 코드 작업 시 `GridActorMovePresenter`부터 추가해 `PresentationEvent.MoveActor`를 받아 `VisualRoot` 이동/애니메이션 요청 후 완료 신호를 보내는 흐름을 만든다.
+
+## 추가 핵심
+- `MovePresentationData`를 추가해 이동 연출 시간, 보간 곡선, 이동/대기 애니메이션 상태 이름을 데이터 에셋으로 관리하게 했다.
+- `ActorVisualController`를 추가해 VisualRoot의 `SpriteRenderer`, `Animator` 제어 틀을 만들었다.
+- `GridActorMovePresenter`를 추가해 `PresentationEvent.MoveActor`와 선택적으로 `EnemyReactionMove`를 받아 자기 `GridActor` 대상 이동 연출을 처리하게 했다.
+- `GridActorMovePresenter`는 `GridManager.GridToWorld()`로 그리드 좌표를 월드 좌표로 바꾸고, `VisualRoot` Transform을 `MovePresentationData.MoveCurve` 기준으로 보간한다.
+- 이동 애니메이션 시작/종료 요청은 `ActorVisualController`에 맡기고, `PresentationEventHandle.Complete()`는 Presenter가 호출하는 규칙을 코드로 반영했다.
+- `DebugPresentationQueueTester`에 `sampleMoveActor`, 시작/목표 칸 필드를 추가해 디버그 `MoveActor` 이벤트가 실제 Presenter 대상 Actor를 가리킬 수 있게 했다.
+
+## 추가 검증
+- `dotnet build Assembly-CSharp.csproj --no-restore` 통과.
+- 경고 0개, 오류 0개.
+
+## 다음
+- Unity 씬에서 `MovePresentationData` 에셋을 만들고 `ActorPresentation` 계층에 `GridActorMovePresenter`, `VisualRoot`에 `ActorVisualController`를 연결한다.
+- `DebugPresentationQueueTester.SampleMoveActor`에 같은 `GridActor`를 연결해 디버그 MoveActor 이벤트로 VisualRoot가 이동하는지 확인한다.
+- 이후 `PlayerGridMoveAction`의 실제 이동 결과를 연출 큐에 넣는 흐름을 연결한다.
+
+## 추가 정리
+- `Presentation` 폴더 하위 구조를 정리했다.
+- `MovePresentationData`는 `Assets/Script/Presentation/Data`로 이동했다.
+- `GridActorMovePresenter`는 `Assets/Script/Presentation/Presenter`로 이동했다.
+- `ActorVisualController`는 `Assets/Script/Presentation/Visual`로 이동했다.
+- Unity GUID 유지를 위해 기존 `.meta` 파일도 함께 이동했다.
+
+## 추가 검증
+- `dotnet build Assembly-CSharp.csproj --no-restore` 통과.
+- 경고 0개, 오류 0개.

@@ -225,6 +225,7 @@ public class PlayerGridMoveAction : MonoBehaviour
             return false;
         }
 
+        GridPosition startPosition = actor.GridPosition;
         foreach (GridPosition step in movePathBuffer)
         {
             if (!actor.TryMoveTo(step))
@@ -243,6 +244,7 @@ public class PlayerGridMoveAction : MonoBehaviour
         ClearPathPreview();
         MoveRangeHidden?.Invoke();
         MoveCompleted?.Invoke(actor.GridPosition);
+        EnqueueMovePresentationEvents(startPosition, movePathBuffer);
 
         if (logActionState)
         {
@@ -313,6 +315,27 @@ public class PlayerGridMoveAction : MonoBehaviour
             return false;
         }
 
+        ActionPresentationQueue presentationQueue = ActionPresentationQueue.Instance;
+        if (presentationQueue == null)
+        {
+            if (logBlockedTarget)
+            {
+                Debug.LogError($"{nameof(PlayerGridMoveAction)} on {name}에는 이동 연출을 실행할 {nameof(ActionPresentationQueue)}가 필요합니다.", this);
+            }
+
+            return false;
+        }
+
+        if (presentationQueue.IsPlaying)
+        {
+            if (logBlockedTarget)
+            {
+                Debug.Log($"{nameof(PlayerGridMoveAction)}: 연출 큐가 실행 중이라 이동 행동을 선택할 수 없습니다.", this);
+            }
+
+            return false;
+        }
+
         TurnManager turnManager = TurnManager.Instance;
         if (requirePlayerTurn && turnManager != null && !turnManager.IsPlayerTurn)
         {
@@ -337,6 +360,29 @@ public class PlayerGridMoveAction : MonoBehaviour
         }
 
         return true;
+    }
+
+    /// <summary>
+    /// 판정으로 확정된 이동 경로를 1칸 단위 이동 연출 이벤트로 큐에 추가하고 실행한다.
+    /// </summary>
+    private void EnqueueMovePresentationEvents(GridPosition startPosition, IReadOnlyList<GridPosition> path)
+    {
+        ActionPresentationQueue presentationQueue = ActionPresentationQueue.Instance;
+        if (presentationQueue == null)
+        {
+            Debug.LogError($"{nameof(PlayerGridMoveAction)} on {name}에는 이동 연출을 큐에 넣을 {nameof(ActionPresentationQueue)}가 필요합니다.", this);
+            return;
+        }
+
+        GridPosition previousPosition = startPosition;
+        for (int i = 0; i < path.Count; i++)
+        {
+            GridPosition nextPosition = path[i];
+            presentationQueue.Enqueue(PresentationEvent.MoveActor(actor, previousPosition, nextPosition, "플레이어 이동 연출"));
+            previousPosition = nextPosition;
+        }
+
+        presentationQueue.PlayQueuedEvents();
     }
 
     /// <summary>
