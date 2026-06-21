@@ -103,6 +103,10 @@ public class EnemyAlertCoordinator : MonoBehaviour, IActionLogicEventHandler
 
             if (changed)
             {
+                context.EnqueuePresentation(PresentationEvent.AlertDetected(
+                    logicEvent.DetectedPosition,
+                    enemy,
+                    "적 발각 상태 전환 연출"));
                 context.Publish(new EnemyAlertedLogicEvent(enemy, detectingEnemy, logicEvent.DetectedPosition));
             }
         }

@@ -19,7 +19,13 @@ public class ActorVisualController : MonoBehaviour
     public SpriteRenderer TargetRenderer => targetRenderer;
     public Animator Animator => animator;
 
-    
+    /// <summary>
+    /// Presenter가 요청한 색상을 Actor 스프라이트에 적용한다.
+    /// </summary>
+    public void ApplyColor(Color color)
+    {
+        targetRenderer.color = color;
+    }
 
     /// <summary>
     /// 이동 연출 시작 시 필요한 애니메이션을 재생한다.

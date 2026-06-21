@@ -173,7 +173,6 @@ public class GridMoveRiskEvaluator : MonoBehaviour, IActionLogicEventHandler
             Debug.Log($"{nameof(GridMoveRiskEvaluator)}: {logicEvent.StepPosition} 칸에서 {detectingSight.name} 시야에 들어와 애드가 발생했습니다.", this);
         }
 
-        context.EnqueuePresentation(PresentationEvent.AlertDetected(logicEvent.StepPosition, detectingEnemy, "플레이어 발각 연출"));
         context.Publish(new AlertTriggeredLogicEvent(logicEvent.StepPosition, detectingEnemy, detectingSight));
     }
 

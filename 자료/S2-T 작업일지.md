@@ -758,3 +758,23 @@
 - `AlertDetected`를 실제로 처리할 `AlertDetectedPresenter` 또는 적 발각 Presenter를 추가한다.
 - `EnemyAlertVisual`은 현재 디버그 즉시 표시로 유지하되, 정식 발각 연출 시점에는 큐 기반 Presenter로 이전한다.
 - 공격, 해킹, 검 투척도 같은 `ActionResolutionContext -> PresentationEvent -> Presenter` 기준으로 확장한다.
+
+
+## 2026-06-21
+
+## 핵심
+- `AlertDetectedPresenter`를 추가해 담당 적의 발각 점멸과 연출 큐 완료 처리를 구현했다.
+- `AlertDetected` 이벤트 생성 위치를 `GridMoveRiskEvaluator`에서 `EnemyAlertCoordinator`의 실제 상태 전환 지점으로 옮겼다.
+- 최초 감지 적과 애드 전파로 새로 `Alerted`가 된 적 모두 발각 연출 이벤트를 받으며, 이미 발각된 적은 중복 연출하지 않는다.
+- `EnemyAlertVisual`과 `EnemyContext.AlertVisual` 참조를 제거했다.
+- `AlertDetectedPresenter`는 연출 순서와 상태별 색상을 담당하고 `ActorVisualController.ApplyColor()`가 실제 스프라이트 색상을 적용하도록 정리했다.
+- 씬과 인스펙터 참조는 임의 수정하지 않았다.
+
+## 검증
+- 새 Presenter와 삭제된 스크립트 구성을 반영한 `dotnet build Assembly-CSharp.csproj --no-restore` 통과.
+- 경고 0개, 오류 0개.
+
+## 다음
+- 각 적의 `AlertDetectedPresenter.VisualController`에 해당 VisualRoot의 `ActorVisualController`를 연결한다.
+- 기존 `EnemyAlertVisual` 컴포넌트를 씬에서 제거한다.
+- Unity 플레이 모드에서 이동 연출 뒤 최초 감지 적과 전파 적의 점멸 순서를 확인한다.

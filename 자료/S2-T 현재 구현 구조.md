@@ -1,6 +1,6 @@
 ﻿# S2-T 현재 구현 구조
 
-최신 기준: 2026-06-17
+최신 기준: 2026-06-21
 브랜치: `turn-based-stealth`
 프로젝트 명칭: `S2-T`
 
@@ -14,10 +14,12 @@
 - 이동은 목표 칸을 선택하면 BFS 경로를 따라 한 칸씩 처리하는 구조다.
 - 이동 가능 범위는 현재 AP와 AP당 이동 거리 기준으로 계산한다.
 - 적 시야는 `EnemyGridSight`가 그리드 칸 단위로 계산한다.
-- 플레이어 이동 경로가 적 시야에 들어가면 `GridMoveRiskEvaluator.AlertTriggered` 이벤트가 발생한다.
+- 플레이어 이동 경로가 적 시야에 들어가면 `GridMoveRiskEvaluator`가 `AlertTriggeredLogicEvent`를 발행한다.
 - 애드 전파는 `EnemyAlertCoordinator`가 담당한다.
 - 적의 현재 발각 상태는 `EnemyAlertState`가 보관한다.
 - 현재 애드 구조는 단일 단계 전파 기준이며, 연쇄 전파는 맵 크기와 적 밀도 기준이 잡힌 뒤 확장한다.
+- 실제로 새로 발각된 적마다 `AlertDetectedPresenter`가 큐 순서에 맞춰 경고색 점멸을 재생한다.
+- Presenter의 색상 요청은 VisualRoot의 `ActorVisualController`가 실제 스프라이트에 적용한다.
 
 ## 현재 목표
 
@@ -335,9 +337,9 @@ AP 수치는 `PlayerContext.TurnData`의 `PlayerTurnData`에서 읽는다.
 
 ## Enemy Alert 구조
 
-### AlertTriggered 이벤트
+### AlertTriggeredLogicEvent
 
-`GridMoveRiskEvaluator.AlertTriggered`는 플레이어가 실제 이동 중 적 시야에 처음 들어갔을 때 발생한다.
+`AlertTriggeredLogicEvent`는 플레이어가 실제 이동 중 적 시야에 처음 들어갔을 때 `GridMoveRiskEvaluator`가 발행한다.
 
 전달 값:
 
@@ -355,11 +357,12 @@ AP 수치는 `PlayerContext.TurnData`의 `PlayerTurnData`에서 읽는다.
 
 책임:
 
-- `PlayerContext.GridMoveRiskEvaluator.AlertTriggered`를 구독한다.
-- 이벤트의 `EnemyGridSight`를 기준으로 `EnemyRegistry.Enemies`에서 최초 감지 적 `EnemyContext`를 찾는다.
+- `ActionLogicEventBus`를 통해 `AlertTriggeredLogicEvent`를 처리한다.
+- 이벤트의 `DetectingEnemy`를 우선 사용하고, 없으면 `EnemyGridSight`를 기준으로 `EnemyRegistry.Enemies`에서 최초 감지 적 `EnemyContext`를 찾는다.
 - 최초 감지 적의 `EnemyData.AlertSpreadRange`를 읽는다.
 - 최초 감지 적 위치 기준으로 등록된 모든 적과의 맨해튼 거리를 계산한다.
 - 범위 안의 적에게 `EnemyAlertState.RequestAlert()`를 호출한다.
+- 실제로 새로 `Alerted`가 된 적마다 `AlertDetected` 연출 이벤트와 `EnemyAlertedLogicEvent`를 추가한다.
 
 현재 전파 방식:
 
@@ -462,12 +465,11 @@ AP 수치는 `PlayerContext.TurnData`의 `PlayerTurnData`에서 읽는다.
 
 ## 다음 작업
 
-1. Unity 씬에서 모든 적 오브젝트에 `EnemyAlertState`를 추가하고 `EnemyContext.AlertState`에 연결한다.
-2. 플레이 모드에서 발각 시 적 상태가 `Normal`에서 `Alerted`로 바뀌는지 확인한다.
-3. `EnemyAlertState.AlertLevelChanged`를 이용해 색상 변경 또는 임시 UI 표시를 연결한다.
-4. 발각 시 플레이어 이동을 일시 정지할 수 있는 액션 시퀀스 구조를 검토한다.
-5. 맵 크기와 적 배치 밀도 기준이 잡히면 애드 연쇄 전파 구조를 BFS/큐 기반으로 확장한다.
-6. 이후 검 투척/해킹/해킹 대상 오브젝트 루프로 넘어간다.
+1. 각 적의 `AlertDetectedPresenter.VisualController`에 해당 VisualRoot의 `ActorVisualController`를 연결한다.
+2. 플레이 모드에서 최초 감지 적과 애드 전파 적의 발각 점멸 순서를 확인한다.
+3. 발각 시 카메라 줌, 경고 아이콘, 컷인 같은 후속 연출을 Presenter 기준으로 확장한다.
+4. 맵 크기와 적 배치 밀도 기준이 잡히면 애드 연쇄 전파 구조를 BFS/큐 기반으로 확장한다.
+5. 이후 검 투척/해킹/해킹 대상 오브젝트 루프로 넘어간다.
 
 
 ## Stage Goal / 승리 조건
@@ -969,8 +971,8 @@ S2-T의 행동 처리는 최초 명령에서 파생되는 논리 사건을 `Acti
 현재 연결:
 
 - `PlayerGridMoveAction`은 이동 경로를 계산하고 AP를 소비한 뒤, 각 칸 이동마다 `MoveActor` 연출 이벤트와 `MoveStepEnteredLogicEvent`를 추가한다.
-- `GridMoveRiskEvaluator`는 `MoveStepEnteredLogicEvent`를 처리해 위험 칸 진입을 확인하고, 발각 시 `AlertDetected` 연출 이벤트와 `AlertTriggeredLogicEvent`를 추가한다.
-- `EnemyAlertCoordinator`는 `AlertTriggeredLogicEvent`를 처리해 최초 감지 적 기준 애드 전파와 `EnemyAlertState.RequestAlert()`를 수행한다.
+- `GridMoveRiskEvaluator`는 `MoveStepEnteredLogicEvent`를 처리해 위험 칸 진입을 확인하고 `AlertTriggeredLogicEvent`를 추가한다.
+- `EnemyAlertCoordinator`는 `AlertTriggeredLogicEvent`를 처리해 애드 전파와 `EnemyAlertState.RequestAlert()`를 수행하고, 실제 상태가 바뀐 적마다 `AlertDetected` 연출 이벤트를 추가한다.
 - `StageGoalManager`는 `MoveCompletedLogicEvent`를 처리해 목표 도착을 확인하고, 클리어 시 `StageClearedLogicEvent`와 `StageCleared` 연출 이벤트를 추가한다.
 - `StageStateManager`는 `StageClearedLogicEvent`를 처리해 스테이지 상태를 `Cleared`로 바꾼다.
 
@@ -1068,13 +1070,13 @@ MoveActor 3 -> 4
 - 논리 이벤트 큐가 비면 해당 행동의 논리 처리가 끝난 것으로 본다.
 - 화면 연출은 `ActionPresentationQueue`에 쌓인 `PresentationEvent`를 순서대로 재생한다.
 - 플레이어 이동은 논리상 먼저 최종 경로를 처리하고, 화면에서는 1칸 단위 `MoveActor` 이벤트가 따라오는 구조다.
-- 이동 중 발각은 `MoveStepEnteredLogicEvent` 처리 시점에 `AlertDetected` 연출 이벤트를 끼워 넣는 방식으로 표현한다.
+- 이동 중 발각은 `MoveStepEnteredLogicEvent`에서 시작된 논리 처리 중 실제로 `Alerted`가 된 적마다 `AlertDetected` 연출 이벤트를 끼워 넣는 방식으로 표현한다.
 - 현재 구조는 논리 선처리 / 연출 후재생이다. 연출 중간 결과를 보고 실제 규칙을 바꾸는 구조는 아직 목표가 아니다.
 
 확인된 현재 한계:
 
-- `AlertDetected` 이벤트 타입은 있지만 정식 Presenter는 아직 없다. 현재는 처리자가 없으면 큐가 경고 후 자동 완료할 수 있다.
-- `EnemyAlertVisual`은 현재 디버그 시각 피드백으로 논리 상태 변경과 동시에 색을 바꾼다. 정식 발각 연출은 추후 큐 기반 Presenter로 분리한다.
+- `AlertDetectedPresenter`가 담당 적의 발각 이벤트를 받아 경고색 점멸을 재생하고 큐 완료 신호를 보낸다.
+- `EnemyAlertVisual`은 제거했다. 색상 적용은 VisualRoot의 `ActorVisualController`, 연출 순서와 상태별 색상 선택은 `AlertDetectedPresenter`가 담당한다.
 - 적 AI 반응 이동, 카메라 줌, 발각 컷인, UI 경고는 아직 구현하지 않았다.
 - 중간 연출을 본 뒤 남은 이동 경로를 실제 규칙상 변경하는 단계형 액션 시퀀서는 후속 확장 후보로 둔다.
 
@@ -1085,3 +1087,23 @@ MoveActor 3 -> 4
 - `PlayerGridMoveAction`은 이동 경로의 각 칸마다 1칸 단위 `MoveActor` 연출 이벤트와 `MoveStepEnteredLogicEvent`를 발행한다.
 - `GridMoveRiskEvaluator`, `EnemyAlertCoordinator`, `StageGoalManager`, `StageStateManager`는 논리 이벤트 핸들러로 동작한다.
 - `ActorPresentationSynchronizer`는 씬 시작 시 VisualRoot를 논리 `GridActor` 위치에 맞춘다.
+
+
+## AlertDetected 발각 연출
+
+### AlertDetectedPresenter
+
+`AlertDetectedPresenter`는 담당 적의 `AlertDetected` 이벤트만 처리하는 ActorPresentation 계층 컴포넌트다.
+
+- `TargetEnemy`: 연출 대상 `EnemyContext`.
+- `VisualController`: 대상 VisualRoot의 `ActorVisualController`.
+- `NormalColor`, `AlertedColor`, `WarningColor`: 상태와 점멸에 사용할 색상.
+- `FlashInterval`, `FlashCount`: 점멸 간격과 횟수.
+- 경고색과 현재 `EnemyAlertState`에 맞는 색상을 번갈아 적용한 뒤 `PresentationEventHandle.Complete()`를 호출한다.
+- 비활성화될 때 진행 중인 코루틴과 완료 핸들을 정리해 연출 큐 정지를 방지한다.
+
+### ActorVisualController 색상 제어
+
+`ActorVisualController.ApplyColor()`가 Presenter의 색상 적용 요청을 실제 `SpriteRenderer`에 반영한다. `ActorVisualController`는 논리 상태와 연출 큐를 모르며 실제 시각 컴포넌트 제어만 담당한다.
+
+기존 `EnemyAlertVisual`과 `EnemyContext.AlertVisual` 참조는 제거했다.
