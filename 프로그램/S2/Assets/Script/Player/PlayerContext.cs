@@ -11,6 +11,8 @@ public class PlayerContext : MonoBehaviour
     [SerializeField] private PlayerTurnData turnData;
 
     [Header("Core Components")]
+    // 플레이어 원시 입력을 읽어 공개하는 입력 Reader다. 입력 기능을 쓰는 씬에서 연결한다.
+    [SerializeField] private PlayerInputReader inputReader;
     // 플레이어가 보드에서 차지하는 칸과 실제 격자 이동을 관리하는 공용 말 컴포넌트다.
     [SerializeField] private GridActor gridActor;
     // 플레이어 턴 행동에서 소비하는 AP 컴포넌트다.
@@ -21,13 +23,17 @@ public class PlayerContext : MonoBehaviour
     [SerializeField] private GridMoveRiskEvaluator gridMoveRiskEvaluator;
     // 플레이어 이동 가능 범위의 AP 구간별 표시를 담당하는 컴포넌트다.
     [SerializeField] private GridMoveRangeHighlighter gridMoveRangeHighlighter;
+    // 플레이어의 해킹 행동 판정과 실행을 담당하는 컴포넌트다. 해킹 기능을 쓰는 씬에서 연결한다.
+    [SerializeField] private PlayerHackAction hackAction;
 
     public PlayerTurnData TurnData => turnData;
+    public PlayerInputReader InputReader => inputReader;
     public GridActor GridActor => gridActor;
     public ActionPoint ActionPoint => actionPoint;
     public PlayerGridMoveAction GridMoveAction => gridMoveAction;
     public GridMoveRiskEvaluator GridMoveRiskEvaluator => gridMoveRiskEvaluator;
     public GridMoveRangeHighlighter GridMoveRangeHighlighter => gridMoveRangeHighlighter;
+    public PlayerHackAction HackAction => hackAction;
 
     /// <summary>
     /// 플레이어 Context에 필수 참조가 모두 연결되어 있는지 확인한다.
@@ -37,6 +43,12 @@ public class PlayerContext : MonoBehaviour
         if (turnData == null)
         {
             Debug.LogError($"{nameof(PlayerContext)} on {name}에는 {nameof(PlayerTurnData)} 참조가 필요합니다.", this);
+            return false;
+        }
+
+        if (inputReader == null)
+        {
+            Debug.LogError($"{nameof(PlayerContext)} on {name}에는 {nameof(PlayerInputReader)} 참조가 필요합니다.", this);
             return false;
         }
 

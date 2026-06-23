@@ -1,6 +1,6 @@
 ﻿# S2-T 현재 구현 구조
 
-최신 기준: 2026-06-21
+최신 기준: 2026-06-24
 브랜치: `turn-based-stealth`
 프로젝트 명칭: `S2-T`
 
@@ -460,16 +460,17 @@ AP 수치는 `PlayerContext.TurnData`의 `PlayerTurnData`에서 읽는다.
 - 적 AI 반응은 아직 없다.
 - 애드 전파는 단일 단계이며 연쇄 전파는 아직 없다.
 - 플레이어 시야/정보 공개 기준이 없어 보이지 않는 적의 위험 경고 숨김은 아직 없다.
-- 공격, 해킹, 검 투척, 검 회수는 아직 핵심 루프에 연결되지 않았다.
-- 승리 조건, 스테이지 목표, 메뉴/스토리 화면은 아직 구현하지 않았다.
+- 공격, 검 투척, 검 회수는 아직 핵심 루프에 연결되지 않았다.
+- 해킹은 1차 통로만 열려 있으며, 실제 씬 연결과 해킹 대상 효과는 아직 구현 전이다.
+- 클리어 UI, 결과 화면, 다음 스테이지 전환, 메뉴/스토리 화면은 아직 구현하지 않았다.
 
 ## 다음 작업
 
-1. 각 적의 `AlertDetectedPresenter.VisualController`에 해당 VisualRoot의 `ActorVisualController`를 연결한다.
-2. 플레이 모드에서 최초 감지 적과 애드 전파 적의 발각 점멸 순서를 확인한다.
-3. 발각 시 카메라 줌, 경고 아이콘, 컷인 같은 후속 연출을 Presenter 기준으로 확장한다.
-4. 맵 크기와 적 배치 밀도 기준이 잡히면 애드 연쇄 전파 구조를 BFS/큐 기반으로 확장한다.
-5. 이후 검 투척/해킹/해킹 대상 오브젝트 루프로 넘어간다.
+1. 이동/발각/애드/클리어까지의 현재 최소 루프는 유지한다.
+2. 다음 작업은 `Tset` 씬에 `HackableRegistry`, `PlayerHackAction`, `PlayerHackInputController`, `HackableObject`, `HackPresenter`를 연결해 1차 해킹 통로를 플레이 모드에서 확인하는 것이다.
+3. 이후 해킹 대상별 실제 효과와 검 투척/검 회수 루프로 확장한다.
+4. 발각 시 카메라 줌, 경고 아이콘, 컷인 같은 후속 연출은 해킹 루프 이후 Presenter 기준으로 확장한다.
+5. 맵 크기와 적 배치 밀도 기준이 잡히면 애드 연쇄 전파 구조를 BFS/큐 기반으로 확장한다.
 
 
 ## Stage Goal / 승리 조건
@@ -999,7 +1000,7 @@ S2-T의 행동 처리는 최초 명령에서 파생되는 논리 사건을 `Acti
 - `TargetActor`에는 논리 계층의 `GridActor`를 연결한다.
 - `VisualRoot`에는 실제 스프라이트/애니메이터가 붙은 표시 루트를 연결한다.
 
-### PlayerMoveInputController
+### PlayerMoveInputController (제거됨)
 
 `PlayerMoveInputController`는 플레이어 이동 행동의 임시 입력 담당 컴포넌트다.
 
@@ -1107,3 +1108,151 @@ MoveActor 3 -> 4
 `ActorVisualController.ApplyColor()`가 Presenter의 색상 적용 요청을 실제 `SpriteRenderer`에 반영한다. `ActorVisualController`는 논리 상태와 연출 큐를 모르며 실제 시각 컴포넌트 제어만 담당한다.
 
 기존 `EnemyAlertVisual`과 `EnemyContext.AlertVisual` 참조는 제거했다.
+
+## 2026-06-23 씬 세팅 확인
+
+`Assets/Scenes/Tset.unity` 기준으로 다음 연결은 이미 반영되어 있다.
+
+- 각 적의 `AlertDetectedPresenter.VisualController`는 해당 VisualRoot의 `ActorVisualController`에 연결되어 있다.
+- 기존 `EnemyAlertVisual` 스크립트와 씬 컴포넌트는 남아 있지 않다.
+- `PlayerActionFlowController`, `PlayerMoveInputController`, `PlayerContext`, `EnemyContext`, `StageGoalManager`, `StageStateManager`의 핵심 참조는 씬에 연결되어 있다.
+- `GridActorMovePresenter`와 `ActorPresentationSynchronizer`는 플레이어/적 VisualRoot 동기화와 이동 연출 기준으로 배치되어 있다.
+
+따라서 발각 점멸 연결과 기존 `EnemyAlertVisual` 제거는 완료된 상태로 본다.
+
+
+## Hack / 해킹 1차 통로
+
+현재 해킹은 실제 검 비행 아트 없이 행동/논리/연출 통로만 열어둔 상태다.
+
+### PlayerTurnData 해킹 값
+
+`PlayerTurnData`에는 해킹 관련 플레이어 튜닝 값이 추가되어 있다.
+
+- `HackRange`: 플레이어 위치와 해킹 대상 위치 사이의 최대 맨해튼 거리.
+- `HackActionPointCost`: 해킹 행동 1회에 소비하는 AP.
+
+데이터 에셋 자체에는 `HasValidData()` 책임을 두지 않는다. 실제 유효성 검사는 `PlayerHackAction`이 수행한다.
+
+### HackableObject
+
+`HackableObject`는 `IHackable`을 구현하는 해킹 가능 대상의 기본 런타임 컴포넌트다.
+
+현재 책임:
+
+- `HackableData` 참조 보관.
+- 대상 위치를 제공하는 `GridActor` 참조 보관.
+- 해킹 완료 상태 `IsHacked` 보관.
+- 활성화 시 `HackableRegistry`에 등록하고 비활성화 시 해제.
+- `OnHackReady()`, `OnHackStarted()`, `OnHackCompleted()`, `OnHackCanceled()` 생명주기 알림 처리.
+
+필수 데이터나 참조가 비어 있으면 fallback 없이 오류 로그를 남기고 컴포넌트를 비활성화한다.
+
+### HackableRegistry
+
+`HackableRegistry`는 현재 씬의 활성 `HackableObject` 목록을 관리하는 씬 단위 등록소다.
+
+현재 공개 목록과 조회:
+
+- `IReadOnlyList<HackableObject> Hackables`
+- `TryGetHackableAt(GridPosition, out HackableObject)`
+
+역할은 대상 목록 관리뿐이며, 해킹 판정과 효과 처리는 담당하지 않는다.
+
+### PlayerHackAction
+
+`PlayerHackAction`은 플레이어 해킹 행동의 판정과 실행을 담당한다.
+
+현재 기준:
+
+- 해킹 행동 선택 상태를 관리한다.
+- 플레이어 턴, 연출 큐 실행 여부, AP, `HackRange`, 대상 유효성을 검사한다.
+- 해킹 대상 위치와 플레이어 위치의 맨해튼 거리가 `PlayerTurnData.HackRange` 이하여야 한다.
+- 대상 주변 8칸 중 보드 안이고 `GridManager.CanEnter()`가 true인 칸을 해킹 실행 위치로 고른다.
+- 이 실행 위치는 나중에 검이 날아가 도착할 후보 칸이다.
+- 현재는 검 오브젝트나 실제 비행 연출을 만들지 않고 `PresentationEvent.ExecutionPosition`에 통로만 남긴다.
+- 조건이 맞으면 AP를 소비하고 `HackableObject.OnHackStarted()`, `OnHackCompleted()`를 호출한다.
+- `HackCompletedLogicEvent`와 `PresentationEvent.Hack()`을 추가한다.
+
+### PlayerHackInputController
+
+`PlayerHackInputController`는 임시 해킹 입력 담당 컴포넌트다.
+
+현재 책임:
+
+- H 키로 해킹 행동 선택 요청.
+- 마우스 화면 좌표를 `GridManager.WorldToGrid()` 기준 목표 칸으로 변환.
+- 좌클릭한 칸의 `HackableObject`를 `HackableRegistry`에서 찾는다.
+- 찾은 대상은 `PlayerActionFlowController.TryExecuteHack()`으로 실행 요청한다.
+- 우클릭 또는 Escape로 해킹 선택을 취소한다.
+
+### HackPresenter
+
+`HackPresenter`는 `PresentationEventType.Hack` 이벤트를 받아 임시 해킹 연출을 처리한다.
+
+현재 책임:
+
+- 담당 `HackableObject`의 해킹 이벤트만 처리한다.
+- `HackableData.HackDuration`만큼 대기한 뒤 `PresentationEventHandle.Complete()`를 호출한다.
+- 로그에는 대상 칸 `EventPosition`과 나중에 검이 도착할 `ExecutionPosition`을 출력한다.
+
+후속 아트 작업에서는 이 Presenter를 확장해 검 현재 위치에서 `ExecutionPosition`까지 비행, 해킹 이펙트, 복귀/유지 연출을 연결한다.
+
+
+
+## 2026-06-24 현재 기준 보정
+
+오늘 기준으로 해킹 1차 통로와 플레이어 입력 구조는 다음 기준을 우선한다.
+
+### 해킹 현재 상태
+
+- 해킹 가능 거리는 플레이어와 대상 칸 사이의 맨해튼 거리로 판정한다.
+- 해킹 거리와 AP 비용은 `PlayerTurnData.HackRange`, `PlayerTurnData.HackActionPointCost`에서 읽는다.
+- `HackableObject`는 `IHackable` 구현체이며, `HackableData`, `GridActor`, 해킹 완료 상태를 가진다.
+- `HackableRegistry`는 씬의 해킹 가능 대상 목록과 칸 기준 조회를 담당한다.
+- `HackableRegistry`를 `EnemyRegistry`로 합치는 안은 보류한다. 해킹 대상은 적뿐 아니라 장치, 문, 기믹으로 확장될 수 있기 때문이다.
+- `PlayerHackAction`은 턴/AP/거리/대상 검증 뒤 대상 주변 8칸 중 진입 가능한 칸을 해킹 실행 위치로 고른다.
+- 해킹 실행 위치는 나중에 검이 날아가 도착할 칸 후보이며, 현재는 `PresentationEvent.ExecutionPosition`에 통로만 남긴다.
+- `HackPresenter`는 `PresentationEventType.Hack`을 받아 `HackableData.HackDuration`만큼 기다린 뒤 큐 완료 신호를 보낸다.
+
+### 입력 현재 상태
+
+- `PlayerInputController` 통합 입력 구조와 `PlayerActionSelection`은 제거했다.
+- 입력 원천은 `PlayerInputReader`가 담당한다.
+- `PlayerInputReader`는 현재 임시 키 매핑과 포인터 그리드 좌표 변환만 담당한다.
+- 나중에 Unity Input Action Map을 붙일 때는 `PlayerInputReader` 내부 매핑을 교체한다.
+- `PlayerMoveInputController`는 이동 행동 전용 입력 컨트롤러다.
+- `PlayerHackInputController`는 해킹 행동 전용 입력 컨트롤러다.
+- 두 입력 컨트롤러는 직접 `PlayerInputReader` 인스펙터 참조를 갖지 않고 `PlayerContext.InputReader`에서 꺼내 쓴다.
+- 새 행동이 추가되면 `PlayerInputReader`에는 입력값만 추가하고, 행동별 입력 컨트롤러를 별도 스크립트로 만든다.
+
+### PlayerContext 현재 참조
+
+`PlayerContext`는 플레이어 참조 주머니 역할만 유지한다. 현재 해킹/입력 기준으로 다음 참조가 포함된다.
+
+- `PlayerTurnData TurnData`
+- `GridActor GridActor`
+- `ActionPoint ActionPoint`
+- `PlayerGridMoveAction GridMoveAction`
+- `PlayerHackAction HackAction`
+- `GridMoveRiskEvaluator GridMoveRiskEvaluator`
+- `GridMoveRangeHighlighter GridMoveRangeHighlighter`
+- `PlayerInputReader InputReader`
+
+### 현재 테스트 기준
+
+`Tset` 씬 기준으로 다음 연결을 확인한 상태다.
+
+- `PlayerInputReader`, `PlayerMoveInputController`, `PlayerHackInputController`, `PlayerHackAction`은 플레이어 논리 오브젝트에 있다.
+- `PlayerContext.InputReader`는 `PlayerInputReader`에 연결되어 있다.
+- `PlayerContext.HackAction`은 `PlayerHackAction`에 연결되어 있다.
+- `PlayerMoveInputController`, `PlayerHackInputController`에는 직접 `PlayerInputReader` 직렬화 참조가 남아 있지 않다.
+- 씬의 Missing Script 패턴은 확인되지 않았다.
+
+### 다음 작업
+
+1. Unity 플레이 모드에서 M 이동 선택, H 해킹 선택, 좌클릭 확정, 우클릭/Escape 취소 입력을 확인한다.
+2. 해킹 실행 시 AP 소비, 맨해튼 거리 판정, 대상 주변 8칸 실행 위치 계산, `HackPresenter` 큐 완료 로그를 확인한다.
+3. 입력 확인 뒤 해킹 대상별 실제 효과와 검 비행 연출 통로를 단계적으로 붙인다.
+
+

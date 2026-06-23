@@ -21,9 +21,17 @@ public class PlayerTurnData : ScriptableObject
     // 이동 거리 구간 1개가 소비하는 AP 비용이다. 기본값 1이면 1~3칸은 AP 1, 4~6칸은 AP 2를 쓴다.
     [SerializeField] private int moveActionPointCost = 1;
 
+    [Header("Hack")]
+    // 플레이어가 해킹 대상을 선택할 수 있는 최대 맨해튼 거리다.
+    [SerializeField] private int hackRange = 3;
+    // 해킹 행동 1회가 소비하는 AP 비용이다.
+    [SerializeField] private int hackActionPointCost = 1;
+
     public int MaxActionPoint => maxActionPoint;
     public int StartTurnActionPoint => startTurnActionPoint;
     public int MoveDistancePerActionPoint => moveDistancePerActionPoint;
     public int MoveRange => moveRange;
     public int MoveActionPointCost => moveActionPointCost;
+    public int HackRange => hackRange;
+    public int HackActionPointCost => hackActionPointCost;
 }

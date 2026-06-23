@@ -89,3 +89,29 @@ public sealed class StageClearedLogicEvent : IActionLogicEvent
         StageGoal = stageGoal;
     }
 }
+
+/// <summary>
+/// 해킹 대상 하나의 해킹 처리가 완료됐음을 알리는 논리 이벤트다.
+/// </summary>
+public sealed class HackCompletedLogicEvent : IActionLogicEvent
+{
+    public GridActor Actor { get; }
+    public HackableObject Hackable { get; }
+    public GridPosition TargetPosition { get; }
+    public GridPosition ExecutionPosition { get; }
+
+    /// <summary>
+    /// 지정한 대상의 해킹 완료 이벤트를 만든다.
+    /// </summary>
+    public HackCompletedLogicEvent(
+        GridActor actor,
+        HackableObject hackable,
+        GridPosition targetPosition,
+        GridPosition executionPosition)
+    {
+        Actor = actor;
+        Hackable = hackable;
+        TargetPosition = targetPosition;
+        ExecutionPosition = executionPosition;
+    }
+}

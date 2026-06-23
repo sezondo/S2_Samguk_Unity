@@ -778,3 +778,126 @@
 - 각 적의 `AlertDetectedPresenter.VisualController`에 해당 VisualRoot의 `ActorVisualController`를 연결한다.
 - 기존 `EnemyAlertVisual` 컴포넌트를 씬에서 제거한다.
 - Unity 플레이 모드에서 이동 연출 뒤 최초 감지 적과 전파 적의 점멸 순서를 확인한다.
+
+
+## 2026-06-23
+
+## 핵심
+- `Tset` 씬 YAML 기준으로 현재 인스펙터 연결 상태를 확인했다.
+- 적 2개 모두 `AlertDetectedPresenter`가 있고, 각 `VisualController`는 해당 VisualRoot의 `ActorVisualController`에 연결되어 있다.
+- 기존 `EnemyAlertVisual` 스크립트와 씬 컴포넌트 잔존 흔적은 확인되지 않았다.
+- `PlayerActionFlowController`, `PlayerMoveInputController`, `PlayerContext`, `EnemyContext`, `StageGoalManager`, `StageStateManager`의 핵심 참조가 씬에 연결되어 있음을 확인했다.
+- 기존 문서의 다음 작업 중 발각 Presenter 연결과 `EnemyAlertVisual` 제거 항목은 완료된 상태로 정리했다.
+
+## 검증
+- 씬/프리팹 YAML에서 Missing Script 패턴을 검색했으며 발견되지 않았다.
+- 이번 작업은 문서 갱신과 인스펙터 세팅 확인만 진행했으므로 빌드는 실행하지 않았다.
+
+## 다음
+- 다음 큰 작업은 검 투척/해킹/해킹 대상 오브젝트 루프 설계와 1차 구현이다.
+- 우선 `IHackable`, `HackableData`, 해킹 가능 오브젝트의 최소 런타임 컴포넌트를 현재 `ActionResolutionContext -> PresentationEvent -> Presenter` 흐름에 맞춰 설계한다.
+- 해킹 구현 전에는 공격/검 투척/검 회수와 해킹의 순서 의존성을 먼저 정한다.
+
+
+## 추가 핵심
+- 해킹 1차 통로를 코드로 추가했다.
+- `PlayerTurnData`에 `HackRange`, `HackActionPointCost`를 추가했다.
+- `HackableObject`를 추가해 `IHackable` 구현 대상과 해킹 완료 상태를 제공하게 했다.
+- `HackableRegistry`를 추가해 씬의 활성 해킹 가능 대상 목록과 칸 기준 조회를 담당하게 했다.
+- `PlayerHackAction`을 추가해 해킹 선택 상태, AP 소비, 해킹 거리 검사, 대상 주변 8칸 실행 위치 계산, `HackCompletedLogicEvent`, `PresentationEvent.Hack()` 발행을 담당하게 했다.
+- `PlayerHackInputController`를 추가해 H 키 해킹 선택, 마우스 칸 클릭, 우클릭/Escape 취소 입력 통로를 열었다.
+- `HackPresenter`를 추가해 `PresentationEventType.Hack` 이벤트를 받아 `HackableData.HackDuration`만큼 대기한 뒤 큐 완료 신호를 보내는 임시 연출 통로를 만들었다.
+- 실제 검 오브젝트 비행 연출은 아직 만들지 않고, 나중에 검이 도착할 대상 주변 칸을 `PresentationEvent.ExecutionPosition`에 담아두는 방식으로 통로만 열었다.
+
+## 추가 검증
+- `dotnet build Assembly-CSharp.csproj --no-restore` 통과.
+- 경고 0개, 오류 0개.
+
+## 다음
+- Unity 씬에 `HackableRegistry`, `PlayerHackAction`, `PlayerHackInputController`, 테스트용 `HackableObject`, `HackPresenter`를 연결한다.
+- `PlayerContext.HackAction`에 `PlayerHackAction`을 연결하고, 테스트 해킹 대상에는 `HackableData`, `GridActor`, 필요 시 `HackPresenter`를 연결한다.
+- 플레이 모드에서 H 키 선택, 해킹 대상 클릭, AP 소비, 해킹 로그, `HackPresenter` 큐 완료 흐름을 확인한다.
+
+## 추가 핵심
+- 이동/해킹 임시 키 입력을 한 곳으로 모을 `PlayerInputController`를 추가했다.
+- `PlayerInputController`는 M 이동 선택, H 해킹 선택, 좌클릭 확정, 우클릭/Escape 취소를 처리한다.
+- 이동 선택 중에는 기존 `PlayerGridMoveAction.RefreshPathPreview()`를 호출해 경로 미리보기를 유지한다.
+- 해킹 선택 중에는 클릭 칸의 `HackableObject`를 `HackableRegistry`에서 찾아 `PlayerActionFlowController.TryExecuteHack()`으로 전달한다.
+- 나중에 Action Map이나 UI 버튼이 붙을 때 `RequestSelectMoveAction()`, `RequestSelectHackAction()`, `RequestCancelSelection()`, `RequestConfirmCurrentPointer()` 같은 공개 요청 메서드에 연결할 수 있게 했다.
+- 기존 `PlayerMoveInputController`, `PlayerHackInputController`는 인스펙터 정리 전까지 유지했다.
+- `PlayerContext`에 선택적 `PlayerInputController` 참조를 추가했다.
+
+## 추가 검증
+- `dotnet build Assembly-CSharp.csproj --no-restore` 통과.
+- 경고 0개, 오류 0개.
+
+## 다음
+- Unity 씬 인스펙터 정리 단계에서 기존 개별 입력 컨트롤러 대신 `PlayerInputController`를 연결한다.
+- `PlayerContext.InputController`, `PlayerContext.HackAction`을 연결하고, 기존 이동/해킹 개별 입력 컴포넌트는 동작 중복을 피하기 위해 비활성화하거나 제거한다.
+
+## 추가 정리
+- `PlayerMoveInputController`, `PlayerHackInputController`를 제거했다.
+- 입력은 `PlayerInputController`로 통합하는 기준으로 정리했다.
+- `Tset` 씬의 기존 `PlayerMoveInputController` 컴포넌트 참조를 제거해 Missing Script가 남지 않게 했다.
+- `Assembly-CSharp.csproj`의 기존 개별 입력 컨트롤러 Compile 항목을 제거했다.
+
+## 추가 검증
+- `PlayerMoveInputController`, `PlayerHackInputController` 클래스명과 기존 GUID 참조가 남아 있지 않은 것을 검색으로 확인했다.
+- `Tset.unity`에서 Missing Script 패턴이 검색되지 않았다.
+- `dotnet build Assembly-CSharp.csproj --no-restore` 통과.
+- 경고 0개, 오류 0개.
+
+## 다음
+- Unity 씬 인스펙터 정리 단계에서 `PlayerInputController`를 플레이어 입력 담당 컴포넌트로 연결한다.
+- `PlayerContext.InputController`, `PlayerContext.HackAction`을 연결하고 H/M 입력 중복 없이 통합 입력 흐름을 확인한다.
+
+## 추가 정리
+- 입력 구조를 `PlayerInputReader`와 액션별 입력 컨트롤러로 다시 분리했다.
+- 기존 통합 `PlayerInputController`와 `PlayerActionSelection`을 제거했다.
+- `PlayerInputReader`는 M/H/좌클릭/우클릭/Escape 같은 임시 입력 매핑과 포인터 그리드 좌표 변환만 담당한다.
+- `PlayerMoveInputController`는 `PlayerInputReader`의 이동 선택/확정/취소 입력만 읽어 `PlayerGridMoveAction`과 `PlayerActionFlowController`에 요청한다.
+- `PlayerHackInputController`는 `PlayerInputReader`의 해킹 선택/확정/취소 입력만 읽어 `PlayerHackAction`과 `PlayerActionFlowController`에 요청한다.
+- `PlayerContext`의 입력 참조를 `PlayerInputController`에서 `PlayerInputReader`로 변경했다.
+
+## 추가 검증
+- `dotnet build Assembly-CSharp.csproj --no-restore` 통과.
+- 경고 0개, 오류 0개.
+
+## 다음
+- Unity 씬 인스펙터 정리 단계에서 `PlayerInputReader`, `PlayerMoveInputController`, `PlayerHackInputController`를 연결한다.
+- 이후 Action Map을 붙일 때는 `PlayerInputReader` 내부 입력 매핑만 교체한다.
+
+## 추가 정리
+- `PlayerMoveInputController`, `PlayerHackInputController`의 직접 `PlayerInputReader` 인스펙터 참조를 제거했다.
+- 두 입력 컨트롤러는 이제 `PlayerContext.InputReader`에서 입력 Reader를 꺼내 쓴다.
+- `PlayerContext.HasValidReference()`에서 `PlayerInputReader` 누락을 필수 참조 오류로 드러내게 했다.
+- `Tset` 씬의 이동/해킹 입력 컨트롤러에 남아 있던 구 `inputReader` 직렬화 줄을 제거했다.
+- `Tset` 씬 기준 `PlayerContext.InputReader`, `PlayerContext.HackAction`은 연결된 상태로 확인했다.
+
+## 추가 검증
+- 직접 `PlayerInputReader` 인스펙터 필드는 `PlayerContext`에만 남아 있음을 검색으로 확인했다.
+- `dotnet build Assembly-CSharp.csproj --no-restore` 통과.
+- 경고 0개, 오류 0개.
+## 2026-06-24
+
+## 핵심
+- 해킹 1차 통로와 입력 구조를 오늘 기준으로 정리했다.
+- `HackableRegistry`를 `EnemyRegistry`로 합칠지 검토했지만, 해킹 대상은 적뿐 아니라 장치/문/기믹까지 확장될 수 있으므로 일단 별도 등록소를 유지하기로 했다.
+- `PlayerInputController` 통합 구조는 파일이 커질 위험이 있어 제거하고, `PlayerInputReader`와 액션별 입력 컨트롤러 구조로 다시 정리했다.
+- `PlayerInputReader`는 PLC I/O처럼 입력값과 포인터 그리드 좌표 변환만 담당한다.
+- `PlayerMoveInputController`와 `PlayerHackInputController`는 각각 이동/해킹 입력 해석과 행동 요청만 담당한다.
+- 두 입력 컨트롤러의 직접 `PlayerInputReader` 인스펙터 참조를 제거하고, `PlayerContext.InputReader`에서 꺼내 쓰게 했다.
+- `PlayerContext`를 플레이어 참조 주머니로 유지하고 `InputReader`, `HackAction` 참조를 포함하게 했다.
+- `Tset` 씬 기준 `PlayerContext.InputReader`, `PlayerContext.HackAction` 연결과 Missing Script 없음 상태를 확인했다.
+
+## 검증
+- `dotnet build Assembly-CSharp.csproj --no-restore` 통과.
+- 경고 0개, 오류 0개.
+- `PlayerInputController`, `PlayerActionSelection` 잔존 참조가 없는 것을 검색으로 확인했다.
+- `PlayerMoveInputController`, `PlayerHackInputController`의 직접 `PlayerInputReader` 직렬화 참조가 제거된 것을 확인했다.
+
+## 다음
+- Unity 플레이 모드에서 M 이동 선택, H 해킹 선택, 좌클릭 확정, 우클릭/Escape 취소 입력을 실제로 확인한다.
+- 해킹 실행 시 AP 소비, 맨해튼 거리 판정, 대상 주변 8칸 실행 위치 계산, `HackPresenter` 큐 완료 로그를 확인한다.
+- 입력 확인 후 해킹 대상별 실제 효과와 검 비행 연출 통로를 단계적으로 붙인다.
+
