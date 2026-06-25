@@ -10,6 +10,8 @@ public enum PresentationEventType
     EnemyReactionMove,
     Attack,
     Hack,
+    SwordThrow,
+    SwordRecall,
     Interact,
     StageCleared,
     StageFailed,

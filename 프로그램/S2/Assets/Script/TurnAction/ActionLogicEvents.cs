@@ -115,3 +115,43 @@ public sealed class HackCompletedLogicEvent : IActionLogicEvent
         ExecutionPosition = executionPosition;
     }
 }
+
+/// <summary>
+/// 검 투척 행동으로 검의 기준 칸이 바뀌었음을 알리는 논리 이벤트다.
+/// </summary>
+public sealed class SwordThrownLogicEvent : IActionLogicEvent
+{
+    public GridActor Actor { get; }
+    public GridPosition FromPosition { get; }
+    public GridPosition ToPosition { get; }
+
+    /// <summary>
+    /// 지정한 검 투척 완료 이벤트를 만든다.
+    /// </summary>
+    public SwordThrownLogicEvent(GridActor actor, GridPosition fromPosition, GridPosition toPosition)
+    {
+        Actor = actor;
+        FromPosition = fromPosition;
+        ToPosition = toPosition;
+    }
+}
+
+/// <summary>
+/// 검 회수 행동으로 검이 플레이어 위치로 돌아왔음을 알리는 논리 이벤트다.
+/// </summary>
+public sealed class SwordRecalledLogicEvent : IActionLogicEvent
+{
+    public GridActor Actor { get; }
+    public GridPosition FromPosition { get; }
+    public GridPosition ToPosition { get; }
+
+    /// <summary>
+    /// 지정한 검 회수 완료 이벤트를 만든다.
+    /// </summary>
+    public SwordRecalledLogicEvent(GridActor actor, GridPosition fromPosition, GridPosition toPosition)
+    {
+        Actor = actor;
+        FromPosition = fromPosition;
+        ToPosition = toPosition;
+    }
+}

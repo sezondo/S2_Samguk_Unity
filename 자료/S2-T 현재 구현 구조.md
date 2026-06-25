@@ -1,4 +1,4 @@
-﻿# S2-T 현재 구현 구조
+# S2-T 현재 구현 구조
 
 최신 기준: 2026-06-24
 브랜치: `turn-based-stealth`
@@ -1255,4 +1255,111 @@ MoveActor 3 -> 4
 2. 해킹 실행 시 AP 소비, 맨해튼 거리 판정, 대상 주변 8칸 실행 위치 계산, `HackPresenter` 큐 완료 로그를 확인한다.
 3. 입력 확인 뒤 해킹 대상별 실제 효과와 검 비행 연출 통로를 단계적으로 붙인다.
 
+
+
+
+## Sword / 도깨비 환도 행동 1차 뼈대
+
+현재 검 투척/회수는 실제 물리 오브젝트 이동 없이 행동 판정과 연출 이벤트 통로만 만든 상태다.
+
+### PlayerSwordState
+
+PlayerSwordState는 도깨비 환도의 현재 기준 칸을 보관한다.
+검은 보드 점유 Actor가 아니므로 GridManager에 등록하지 않고 GridPosition 값만 관리한다.
+
+현재 기준:
+
+- 시작 시 검 기준 칸을 플레이어 현재 칸으로 초기화할 수 있다.
+- 검 투척/해킹 후에는 검 기준 칸이 대상 위치로 갱신된다.
+- 검 회수 후에는 검 기준 칸이 플레이어 현재 칸으로 돌아온다.
+- HackCompletedLogicEvent를 처리해 해킹의 ExecutionPosition을 새 검 기준 칸으로 사용한다.
+
+### PlayerSwordThrowAction
+
+PlayerSwordThrowAction은 검 현재 위치 기준으로 목표 칸에 검을 투척하는 행동이다.
+
+현재 규칙:
+
+- 검 투척은 AP를 소비한다.
+- 사거리는 플레이어 위치가 아니라 PlayerSwordState.CurrentPosition 기준 맨해튼 거리로 판정한다.
+- 목표 칸은 GridManager.IsInside()로 보드 안인지 확인한다.
+- 검은 이동 말이 아니므로 GridManager.CanEnter()로 목표 칸을 막지 않는다.
+- 실행 시 SwordThrownLogicEvent와 PresentationEvent.SwordThrow를 추가한다.
+
+### PlayerSwordRecallAction
+
+PlayerSwordRecallAction은 거리 제한 없이 검을 플레이어 현재 칸으로 회수하는 행동이다.
+
+현재 규칙:
+
+- 검 회수는 AP를 소비한다.
+- 회수에는 거리 제한이 없다.
+- 실행 시 SwordRecalledLogicEvent와 PresentationEvent.SwordRecall을 추가한다.
+
+### 입력
+
+임시 입력 기준:
+
+- PlayerInputReader가 T 키 검 투척 선택과 R 키 검 회수 실행 입력을 읽는다.
+- PlayerSwordThrowInputController는 T 선택 후 좌클릭한 칸으로 검 투척 실행을 요청한다.
+- PlayerSwordRecallInputController는 R 입력 시 검 회수 실행을 요청한다.
+
+### SwordActionPresenter
+
+SwordActionPresenter는 PresentationEventType.SwordThrow, PresentationEventType.SwordRecall을 받아 임시 대기/로그 연출을 처리한다.
+실제 직선 이펙트와 검 위치 표시는 후속 아트 작업에서 이 Presenter를 확장해 연결한다.
+
+
+
+## 2026-06-25 입력 / 검 상태 보정
+
+오늘 기준 입력 컨트롤러와 검 상태 규칙은 다음 기준을 우선한다.
+
+### 입력 컨트롤러 실행 기준
+
+- PlayerInputReader는 원시 입력과 포인터 그리드 좌표 변환만 담당한다.
+- 행동별 입력 컨트롤러는 PlayerContext에서 자기 행동 컴포넌트와 PlayerInputReader를 꺼내 쓴다.
+- 행동별 입력 컨트롤러는 PlayerActionFlowController 인스펙터 참조를 직접 갖지 않는다.
+- 행동 실행 요청 시점에 PlayerActionFlowController.Instance를 조회한다.
+- PlayerActionFlowController.Instance가 없으면 한국어 오류 로그를 남기고 실행을 중단한다.
+- 이 기준은 이동, 해킹, 검 투척, 검 회수 입력 컨트롤러에 동일하게 적용한다.
+
+현재 입력 컨트롤러:
+
+- PlayerMoveInputController: M 선택, 좌클릭 이동 실행 요청.
+- PlayerHackInputController: H 선택, 좌클릭 해킹 대상 실행 요청.
+- PlayerSwordThrowInputController: T 선택, 좌클릭 검 투척 실행 요청.
+- PlayerSwordRecallInputController: R 입력 시 검 회수 실행 요청.
+
+### 검 회수 상태와 위치 기준
+
+- 검이 회수된 상태라면 PlayerSwordState.IsRecalled는 true다.
+- 회수 상태에서는 검 독립 위치가 의미 없으며, PlayerSwordState.CurrentPosition은 항상 플레이어 현재 칸을 반환한다.
+- 따라서 검을 소유한 채 플레이어가 이동하면 다음 검 투척 사거리 기준도 플레이어 현재 칸을 따라간다.
+- 검이 투척되거나 해킹 ExecutionPosition으로 이동하면 IsRecalled는 false가 되고, 이후 사거리 기준은 검이 나가 있는 칸이 된다.
+- 이미 검을 소유 중인 상태에서는 PlayerSwordRecallAction이 회수 행동을 막는다.
+
+### 현재 씬 정리 기준
+
+- 입력 컨트롤러에 남아 있던 구 actionFlowController 직렬화 줄은 제거 대상이다.
+- Tset.unity 기준으로 기존 이동/해킹 입력 컨트롤러의 구 actionFlowController 직렬화 줄은 제거했다.
+- 새 검 행동 컴포넌트 연결은 아직 인스펙터 작업으로 남아 있다.
+
+
+
+## 다음 작업 메모 - 2026-06-25
+
+- 해킹 사거리는 현재 플레이어 기준이지만, 다음 작업에서 PlayerSwordState.CurrentPosition 기준으로 바꾼다.
+- 검 투척을 이용한 공격 행동 뼈대를 추가한다.
+- 근접 공격 행동 뼈대를 추가한다.
+- 공격 행동도 현재 이동/해킹/검 행동과 동일하게 ActionResolutionContext -> PresentationEvent -> Presenter 흐름으로 만든다.
+
+
+
+## 인터페이스 파일 규칙
+
+- 새 인터페이스는 다른 클래스 파일 안에 함께 두지 않는다.
+- 인터페이스명과 같은 독립 .cs 파일로 만든다.
+- 예: IActionLogicEvent, IActionLogicEventHandler, IHackable, IDamageable.
+- ActionLogicEventBus는 논리 이벤트 전달자 역할만 맡고, IActionLogicEvent, IActionLogicEventHandler는 별도 파일에서 관리한다.
 

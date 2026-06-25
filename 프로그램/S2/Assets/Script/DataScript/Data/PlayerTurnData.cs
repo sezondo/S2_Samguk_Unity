@@ -27,6 +27,14 @@ public class PlayerTurnData : ScriptableObject
     // 해킹 행동 1회가 소비하는 AP 비용이다.
     [SerializeField] private int hackActionPointCost = 1;
 
+    [Header("Sword")]
+    // 검 현재 위치 기준으로 검을 다시 던질 수 있는 최대 맨해튼 거리다.
+    [SerializeField] private int swordThrowRange = 3;
+    // 검 투척 행동 1회가 소비하는 AP 비용이다.
+    [SerializeField] private int swordThrowActionPointCost = 1;
+    // 검 회수 행동 1회가 소비하는 AP 비용이다. 회수에는 거리 제한이 없다.
+    [SerializeField] private int swordRecallActionPointCost = 1;
+
     public int MaxActionPoint => maxActionPoint;
     public int StartTurnActionPoint => startTurnActionPoint;
     public int MoveDistancePerActionPoint => moveDistancePerActionPoint;
@@ -34,4 +42,7 @@ public class PlayerTurnData : ScriptableObject
     public int MoveActionPointCost => moveActionPointCost;
     public int HackRange => hackRange;
     public int HackActionPointCost => hackActionPointCost;
+    public int SwordThrowRange => swordThrowRange;
+    public int SwordThrowActionPointCost => swordThrowActionPointCost;
+    public int SwordRecallActionPointCost => swordRecallActionPointCost;
 }

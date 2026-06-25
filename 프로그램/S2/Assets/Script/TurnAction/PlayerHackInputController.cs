@@ -9,8 +9,6 @@ public class PlayerHackInputController : MonoBehaviour
     [Header("Reference")]
     // 해킹 행동과 플레이어 참조를 제공하는 Context다.
     [SerializeField] private PlayerContext playerContext;
-    // 행동 실행 흐름을 조정하는 필수 컨트롤러다.
-    [SerializeField] private PlayerActionFlowController actionFlowController;
 
     // 입력 요청을 받을 해킹 행동 컴포넌트다.
     private PlayerHackAction hackAction;
@@ -69,6 +67,13 @@ public class PlayerHackInputController : MonoBehaviour
             return;
         }
 
+        PlayerActionFlowController actionFlowController = PlayerActionFlowController.Instance;
+        if (actionFlowController == null)
+        {
+            Debug.LogError($"{nameof(PlayerHackInputController)} on {name}에는 해킹 행동 실행을 조정할 {nameof(PlayerActionFlowController)} 인스턴스가 필요합니다.", this);
+            return;
+        }
+
         actionFlowController.TryExecuteHack(target);
     }
 
@@ -97,12 +102,6 @@ public class PlayerHackInputController : MonoBehaviour
         if (playerContext.HackAction == null)
         {
             Debug.LogError($"{nameof(PlayerHackInputController)} on {name}에는 {nameof(PlayerContext)}에 연결된 {nameof(PlayerHackAction)} 참조가 필요합니다.", this);
-            return false;
-        }
-
-        if (actionFlowController == null)
-        {
-            Debug.LogError($"{nameof(PlayerHackInputController)} on {name}에는 해킹 행동 실행을 조정할 {nameof(PlayerActionFlowController)} 참조가 필요합니다.", this);
             return false;
         }
 

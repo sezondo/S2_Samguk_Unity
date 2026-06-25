@@ -18,6 +18,10 @@ public class PlayerInputReader : MonoBehaviour
     [SerializeField] private Key debugSelectMoveKey = Key.M;
     // 디버그 해킹 행동 선택에 사용할 키다.
     [SerializeField] private Key debugSelectHackKey = Key.H;
+    // 디버그 검 투척 행동 선택에 사용할 키다.
+    [SerializeField] private Key debugSelectSwordThrowKey = Key.T;
+    // 디버그 검 회수 행동 실행에 사용할 키다.
+    [SerializeField] private Key debugRecallSwordKey = Key.R;
 
     [Header("Pointer")]
     // true면 마우스 좌클릭으로 현재 선택된 행동을 확정한다.
@@ -29,6 +33,8 @@ public class PlayerInputReader : MonoBehaviour
 
     public bool SelectMovePressedThisFrame { get; private set; }
     public bool SelectHackPressedThisFrame { get; private set; }
+    public bool SelectSwordThrowPressedThisFrame { get; private set; }
+    public bool RecallSwordPressedThisFrame { get; private set; }
     public bool ConfirmPressedThisFrame { get; private set; }
     public bool CancelPressedThisFrame { get; private set; }
 
@@ -46,6 +52,16 @@ public class PlayerInputReader : MonoBehaviour
             debugSelectHackKey != Key.None &&
             Keyboard.current != null &&
             Keyboard.current[debugSelectHackKey].wasPressedThisFrame;
+
+        SelectSwordThrowPressedThisFrame = allowDebugKeyboardSelect &&
+            debugSelectSwordThrowKey != Key.None &&
+            Keyboard.current != null &&
+            Keyboard.current[debugSelectSwordThrowKey].wasPressedThisFrame;
+
+        RecallSwordPressedThisFrame = allowDebugKeyboardSelect &&
+            debugRecallSwordKey != Key.None &&
+            Keyboard.current != null &&
+            Keyboard.current[debugRecallSwordKey].wasPressedThisFrame;
 
         ConfirmPressedThisFrame = confirmByLeftClick &&
             Mouse.current != null &&

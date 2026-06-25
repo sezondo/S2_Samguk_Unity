@@ -9,8 +9,6 @@ public class PlayerMoveInputController : MonoBehaviour
     [Header("Reference")]
     // 이동 행동과 플레이어 참조를 제공하는 Context다.
     [SerializeField] private PlayerContext playerContext;
-    // 행동 실행 흐름을 조정하는 필수 컨트롤러다.
-    [SerializeField] private PlayerActionFlowController actionFlowController;
 
     // 입력 요청을 받을 이동 행동 컴포넌트다.
     private PlayerGridMoveAction moveAction;
@@ -62,6 +60,13 @@ public class PlayerMoveInputController : MonoBehaviour
         moveAction.RefreshPathPreview(targetPosition);
         if (inputReader.ConfirmPressedThisFrame)
         {
+            PlayerActionFlowController actionFlowController = PlayerActionFlowController.Instance;
+            if (actionFlowController == null)
+            {
+                Debug.LogError($"{nameof(PlayerMoveInputController)} on {name}에는 이동 행동 실행을 조정할 {nameof(PlayerActionFlowController)} 인스턴스가 필요합니다.", this);
+                return;
+            }
+
             actionFlowController.TryExecuteMove(targetPosition);
         }
     }
@@ -91,12 +96,6 @@ public class PlayerMoveInputController : MonoBehaviour
         if (playerContext.GridMoveAction == null)
         {
             Debug.LogError($"{nameof(PlayerMoveInputController)} on {name}에는 {nameof(PlayerContext)}에 연결된 {nameof(PlayerGridMoveAction)} 참조가 필요합니다.", this);
-            return false;
-        }
-
-        if (actionFlowController == null)
-        {
-            Debug.LogError($"{nameof(PlayerMoveInputController)} on {name}에는 이동 행동 실행을 조정할 {nameof(PlayerActionFlowController)} 참조가 필요합니다.", this);
             return false;
         }
 

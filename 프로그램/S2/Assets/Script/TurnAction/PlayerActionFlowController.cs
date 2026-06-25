@@ -99,6 +99,60 @@ public class PlayerActionFlowController : MonoBehaviour
     }
 
     /// <summary>
+    /// 플레이어 검 투척 행동을 실행하고 논리 처리가 끝나면 연출 큐를 재생한다.
+    /// </summary>
+    public bool TryExecuteSwordThrow(GridPosition targetPosition)
+    {
+        if (!CanStartAction())
+        {
+            return false;
+        }
+
+        if (playerContext.SwordThrowAction == null)
+        {
+            Debug.LogError($"{nameof(PlayerActionFlowController)} on {name}에는 {nameof(PlayerContext)}에 연결된 {nameof(PlayerSwordThrowAction)} 참조가 필요합니다.", this);
+            return false;
+        }
+
+        ActionResolutionContext resolutionContext = new(presentationQueue);
+        if (!playerContext.SwordThrowAction.TryExecuteSwordThrow(targetPosition, resolutionContext))
+        {
+            return false;
+        }
+
+        resolutionContext.Resolve();
+        presentationQueue.PlayQueuedEvents();
+        return true;
+    }
+
+    /// <summary>
+    /// 플레이어 검 회수 행동을 실행하고 논리 처리가 끝나면 연출 큐를 재생한다.
+    /// </summary>
+    public bool TryExecuteSwordRecall()
+    {
+        if (!CanStartAction())
+        {
+            return false;
+        }
+
+        if (playerContext.SwordRecallAction == null)
+        {
+            Debug.LogError($"{nameof(PlayerActionFlowController)} on {name}에는 {nameof(PlayerContext)}에 연결된 {nameof(PlayerSwordRecallAction)} 참조가 필요합니다.", this);
+            return false;
+        }
+
+        ActionResolutionContext resolutionContext = new(presentationQueue);
+        if (!playerContext.SwordRecallAction.TryExecuteSwordRecall(resolutionContext))
+        {
+            return false;
+        }
+
+        resolutionContext.Resolve();
+        presentationQueue.PlayQueuedEvents();
+        return true;
+    }
+
+    /// <summary>
     /// 현재 플레이어 행동을 시작할 수 있는지 확인한다.
     /// </summary>
     private bool CanStartAction()

@@ -25,6 +25,12 @@ public class PlayerContext : MonoBehaviour
     [SerializeField] private GridMoveRangeHighlighter gridMoveRangeHighlighter;
     // 플레이어의 해킹 행동 판정과 실행을 담당하는 컴포넌트다. 해킹 기능을 쓰는 씬에서 연결한다.
     [SerializeField] private PlayerHackAction hackAction;
+    // 도깨비 환도의 현재 기준 칸과 회수 상태를 보관하는 선택 컴포넌트다. 검 행동을 쓰는 씬에서 연결한다.
+    [SerializeField] private PlayerSwordState swordState;
+    // 도깨비 환도 투척 행동 판정과 실행을 담당하는 선택 컴포넌트다. 검 투척 기능을 쓰는 씬에서 연결한다.
+    [SerializeField] private PlayerSwordThrowAction swordThrowAction;
+    // 도깨비 환도 회수 행동 판정과 실행을 담당하는 선택 컴포넌트다. 검 회수 기능을 쓰는 씬에서 연결한다.
+    [SerializeField] private PlayerSwordRecallAction swordRecallAction;
 
     public PlayerTurnData TurnData => turnData;
     public PlayerInputReader InputReader => inputReader;
@@ -34,6 +40,9 @@ public class PlayerContext : MonoBehaviour
     public GridMoveRiskEvaluator GridMoveRiskEvaluator => gridMoveRiskEvaluator;
     public GridMoveRangeHighlighter GridMoveRangeHighlighter => gridMoveRangeHighlighter;
     public PlayerHackAction HackAction => hackAction;
+    public PlayerSwordState SwordState => swordState;
+    public PlayerSwordThrowAction SwordThrowAction => swordThrowAction;
+    public PlayerSwordRecallAction SwordRecallAction => swordRecallAction;
 
     /// <summary>
     /// 플레이어 Context에 필수 참조가 모두 연결되어 있는지 확인한다.

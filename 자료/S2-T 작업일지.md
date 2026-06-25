@@ -1,4 +1,4 @@
-﻿# S2-T 작업일지 요약
+# S2-T 작업일지 요약
 
 이 문서는 S2의 턴제 전투 게임 분기인 S2-T 작업 전 빠르게 읽기 위한 날짜별 요약이다.
 각 날짜는 `핵심`, `검증`, `다음` 정도만 남기고, 상세 구현 설명은 `S2-T 현재 구현 구조.md`에 반영한다.
@@ -900,4 +900,65 @@
 - Unity 플레이 모드에서 M 이동 선택, H 해킹 선택, 좌클릭 확정, 우클릭/Escape 취소 입력을 실제로 확인한다.
 - 해킹 실행 시 AP 소비, 맨해튼 거리 판정, 대상 주변 8칸 실행 위치 계산, `HackPresenter` 큐 완료 로그를 확인한다.
 - 입력 확인 후 해킹 대상별 실제 효과와 검 비행 연출 통로를 단계적으로 붙인다.
+
+
+## 2026-06-25
+
+## 핵심
+- 검 투척/회수 행동의 1차 뼈대를 추가했다.
+- 검은 GridActor로 점유 등록하지 않고 PlayerSwordState가 현재 기준 칸만 관리한다.
+- 검 투척은 플레이어 위치가 아니라 PlayerSwordState.CurrentPosition 기준 사거리로 판정한다.
+- 검 투척 목표는 GridManager.CanEnter()로 막지 않고 보드 안 칸 여부와 사거리만 검사한다.
+- 검 투척과 회수는 각각 AP를 소비하고 SwordThrow/SwordRecall 연출 이벤트를 큐에 추가한다.
+- 해킹 완료 시 PlayerSwordState가 HackCompletedLogicEvent를 받아 ExecutionPosition으로 검 기준 칸을 갱신한다.
+- 임시 입력은 T 키 검 투척 선택, R 키 검 회수 실행으로 추가했다.
+
+## 검증
+- dotnet build Assembly-CSharp.csproj --no-restore 통과.
+- 경고 0개, 오류 0개.
+
+## 다음
+- Tset 씬에 PlayerSwordState, PlayerSwordThrowAction, PlayerSwordRecallAction, 입력 컨트롤러, SwordActionPresenter를 연결한다.
+- 플레이 모드에서 T 검 투척, R 검 회수, 해킹 후 검 기준 위치 갱신 흐름을 확인한다.
+- 이후 검 직선 이펙트와 실제 공격/해킹 연출을 Presenter 기준으로 확장한다.
+
+
+## 2026-06-25 추가 정리
+
+## 핵심
+- 입력 컨트롤러의 PlayerActionFlowController 인스펙터 참조를 제거했다.
+- PlayerMoveInputController, PlayerHackInputController, PlayerSwordThrowInputController, PlayerSwordRecallInputController는 실행 시점에 PlayerActionFlowController.Instance를 조회해 행동 실행을 요청한다.
+- 씬 YAML에 남아 있던 구 actionFlowController 직렬화 줄을 제거했다.
+- 회수 상태의 검 위치 기준을 보정했다. PlayerSwordState.CurrentPosition은 검이 회수된 상태라면 항상 플레이어 현재 칸을 반환한다.
+- 검을 이미 소유 중인 상태에서는 PlayerSwordRecallAction이 회수 행동을 막는다.
+
+## 검증
+- dotnet build Assembly-CSharp.csproj --no-restore 통과.
+- 경고 0개, 오류 0개.
+- actionFlowController 구 직렬화 필드가 씬/프리팹에 남아 있지 않은 것을 검색으로 확인했다.
+- Tset.unity에서 Missing Script 패턴이 검색되지 않았다.
+
+## 다음
+- Tset 씬에 새 검 행동 컴포넌트를 연결하고 PlayerContext의 SwordState, SwordThrowAction, SwordRecallAction 참조를 연결한다.
+- 플레이 모드에서 T 검 투척, R 검 회수, 회수 상태 이동 후 투척 기준 칸, 이미 소유 중 회수 차단, 해킹 후 검 기준 위치 갱신을 확인한다.
+
+
+## 2026-06-25 내일 작업 메모
+
+## 다음 작업 후보
+- 해킹 사거리를 플레이어 기준이 아니라 검 위치 기준으로 판정하도록 바꾼다.
+- 검 투척을 이용한 공격 행동 뼈대를 만든다.
+- 근접 공격 행동 뼈대를 만든다.
+
+
+## 2026-06-25 인터페이스 정리
+
+## 핵심
+- ActionLogicEventBus.cs 안에 함께 있던 IActionLogicEvent, IActionLogicEventHandler를 각각 별도 파일로 분리했다.
+- 앞으로 새 인터페이스를 만들 때는 다른 클래스 파일 안에 숨기지 않고 인터페이스명과 같은 독립 .cs 파일로 만든다.
+
+## 검증
+- dotnet build Assembly-CSharp.csproj --no-restore 통과.
+- 경고 0개, 오류 0개.
+- public interface 검색 기준 모든 인터페이스가 독립 파일에 있음을 확인했다.
 
