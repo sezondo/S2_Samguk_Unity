@@ -1363,3 +1363,64 @@ SwordActionPresenter는 PresentationEventType.SwordThrow, PresentationEventType.
 - 예: IActionLogicEvent, IActionLogicEventHandler, IHackable, IDamageable.
 - ActionLogicEventBus는 논리 이벤트 전달자 역할만 맡고, IActionLogicEvent, IActionLogicEventHandler는 별도 파일에서 관리한다.
 
+
+## 2026-06-28 공격 / 피해 1차 통로
+
+### 해킹 사거리 기준 변경
+
+해킹 가능 거리는 이제 플레이어 위치가 아니라 `PlayerSwordState.CurrentPosition`과 해킹 대상 칸 사이의 맨해튼 거리로 판정한다.
+검이 회수된 상태라면 `CurrentPosition`이 플레이어 현재 칸을 반환하므로 기존 플레이어 기준과 동일하게 동작하고, 검이 나가 있으면 나가 있는 검 위치가 해킹 기준점이 된다.
+
+### ActorHealth
+
+`ActorHealth`는 `IDamageable`을 구현하는 기본 HP 컴포넌트다.
+현재는 임시 테스트 전용이 아니라 후속 확장 가능한 기본 컴포넌트로 둔다.
+
+현재 값:
+
+- `MaxHitPoint`: 최대 HP.
+- `CurrentHitPoint`: 현재 HP.
+- `IsDead`: 현재 HP가 0 이하인지 여부.
+
+현재 책임:
+
+- `TakeDamage(int damage)`로 피해를 적용한다.
+- HP가 0 이하가 되면 전투불능 로그를 남긴다.
+- 실제 사망 제거, 애니메이션, 보상, AI 상태 전환은 아직 처리하지 않는다.
+
+### 검 투척 피해
+
+`PlayerSwordThrowAction`은 기존 검 투척 행동을 유지하되, 목표 칸에 `GridActor`가 있고 해당 오브젝트가 `IDamageable`을 구현하면 피해를 적용한다.
+목표 칸에 `IDamageable`이 없으면 공격 실패가 아니라 기존처럼 검만 해당 칸으로 이동한다.
+
+현재 규칙:
+
+- 검 투척 사거리는 기존 `PlayerTurnData.SwordThrowRange`를 공유한다.
+- 검 투척 AP 비용은 `PlayerTurnData.SwordThrowActionPointCost`를 사용한다.
+- 검 투척 피해량은 `PlayerTurnData.SwordThrowDamage`를 사용한다.
+- 피해 적용 시도 후 `DamageAppliedLogicEvent`를 발행한다.
+- 검은 투척 목표 칸에 남는다.
+
+### 근접 공격
+
+`PlayerMeleeAttackAction`은 플레이어 현재 칸 기준 8방향 1칸 대상에게 근접 공격을 실행한다.
+근접 공격 입력은 `PlayerMeleeAttackInputController`가 담당하고, 임시 키는 F다.
+
+현재 규칙:
+
+- 근접 공격은 AP 1을 소비한다. 실제 비용은 `PlayerTurnData.MeleeAttackActionPointCost`에서 읽는다.
+- 검을 소유 중이면 `PlayerTurnData.MeleeDamageWithSword` 피해를 적용한다.
+- 검을 소유하지 않으면 `PlayerTurnData.MeleeDamageWithoutSword` 피해를 적용한다.
+- 대상 칸에 `IDamageable`이 없으면 공격을 실행하지 않는다.
+- 검 위치는 근접 공격으로 바뀌지 않는다.
+- 피해 적용 시도 후 `DamageAppliedLogicEvent`를 발행한다.
+
+### 근접 공격 연출 이벤트 분리
+
+근접 공격은 검 소유 여부에 따라 서로 다른 연출 이벤트를 큐에 넣는다.
+
+- `PresentationEventType.MeleeAttackWithSword`: 검 보유 근접 공격 연출.
+- `PresentationEventType.MeleeAttackUnarmed`: 검 없음 근접 공격 연출.
+
+현재 `SwordActionPresenter`가 두 이벤트를 임시 대기/로그 방식으로 처리한다.
+후속 작업에서 검 보유 근접 공격과 검 없음 근접 공격의 실제 애니메이션, 이펙트, 타격 타이밍을 분리해 확장한다.

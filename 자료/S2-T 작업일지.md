@@ -962,3 +962,26 @@
 - 경고 0개, 오류 0개.
 - public interface 검색 기준 모든 인터페이스가 독립 파일에 있음을 확인했다.
 
+
+## 2026-06-28
+
+## 핵심
+- 해킹 사거리 기준을 플레이어 위치에서 `PlayerSwordState.CurrentPosition` 기준으로 변경했다.
+- 기존 검 투척 행동에 목표 칸 `IDamageable` 피해 적용을 추가했다.
+- 목표 칸에 피해 가능 대상이 없으면 기존처럼 검만 이동한다.
+- `DamageAppliedLogicEvent`를 추가해 피해 적용 시도 결과를 논리 이벤트로 남기게 했다.
+- `ActorHealth`를 추가해 `IDamageable` 기반 HP 감소와 전투불능 로그를 담당하게 했다.
+- 근접 공격 1차 행동 `PlayerMeleeAttackAction`과 입력 컨트롤러를 추가했다.
+- 근접 공격은 플레이어 주변 8방향 1칸 대상만 공격한다.
+- 근접 공격은 검 보유 중 피해량과 검 없음 피해량을 `PlayerTurnData`에서 분리해 읽는다.
+- 근접 공격 연출 이벤트를 `MeleeAttackWithSword`, `MeleeAttackUnarmed`로 분리했다.
+- 임시 입력 기준 근접 공격 선택 키는 F다.
+
+## 검증
+- `dotnet build Assembly-CSharp.csproj --no-restore` 통과.
+- 경고 0개, 오류 0개.
+
+## 다음
+- Tset 씬에 `ActorHealth`, `PlayerMeleeAttackAction`, `PlayerMeleeAttackInputController` 참조를 연결한다.
+- 플레이 모드에서 T 검 투척 피해, F 근접 공격, 검 보유/미보유 근접 피해량과 연출 이벤트 분기를 확인한다.
+- 이후 실제 피격 연출과 사망/제거 처리를 `ActorHealth`와 Presenter 기준으로 확장한다.

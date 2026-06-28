@@ -2,8 +2,8 @@ using System.Collections;
 using UnityEngine;
 
 /// <summary>
-/// 검 투척과 회수 연출 이벤트를 받아 임시 대기/로그 연출을 처리하는 Presenter다.
-/// 실제 직선 이펙트와 검 위치 표시는 후속 아트 작업에서 이 컴포넌트를 확장해 연결한다.
+/// 검 투척, 회수, 근접 공격 연출 이벤트를 받아 임시 대기/로그 연출을 처리하는 Presenter다.
+/// 실제 직선 이펙트, 검 위치 표시, 근접 공격 애니메이션은 후속 아트 작업에서 이 컴포넌트를 확장해 연결한다.
 /// </summary>
 public class SwordActionPresenter : MonoBehaviour
 {
@@ -16,6 +16,10 @@ public class SwordActionPresenter : MonoBehaviour
     [SerializeField] private float throwDuration = 0.15f;
     // 임시 검 회수 연출 대기 시간이다.
     [SerializeField] private float recallDuration = 0.15f;
+    // 임시 검 보유 근접 공격 연출 대기 시간이다.
+    [SerializeField] private float meleeWithSwordDuration = 0.15f;
+    // 임시 검 없음 근접 공격 연출 대기 시간이다.
+    [SerializeField] private float meleeUnarmedDuration = 0.1f;
 
     [Header("Debug")]
     // true면 검 연출 시작과 종료 흐름을 Unity 콘솔에 출력한다.
@@ -98,7 +102,9 @@ public class SwordActionPresenter : MonoBehaviour
     private bool HandlePresentationEventStarted(PresentationEvent presentationEvent, PresentationEventHandle handle)
     {
         bool isSwordEvent = presentationEvent.Type == PresentationEventType.SwordThrow ||
-            presentationEvent.Type == PresentationEventType.SwordRecall;
+            presentationEvent.Type == PresentationEventType.SwordRecall ||
+            presentationEvent.Type == PresentationEventType.MeleeAttackWithSword ||
+            presentationEvent.Type == PresentationEventType.MeleeAttackUnarmed;
         if (!isSwordEvent || presentationEvent.Actor != ownerActor)
         {
             return false;
@@ -133,7 +139,7 @@ public class SwordActionPresenter : MonoBehaviour
             Debug.Log($"{nameof(SwordActionPresenter)}: {presentationEvent.Type} 연출을 시작합니다. 시작 칸: {presentationEvent.FromPosition}, 목표 칸: {presentationEvent.ToPosition}", this);
         }
 
-        float duration = presentationEvent.Type == PresentationEventType.SwordThrow ? throwDuration : recallDuration;
+        float duration = GetDuration(presentationEvent.Type);
         if (duration > 0f)
         {
             yield return new WaitForSeconds(duration);
@@ -155,6 +161,21 @@ public class SwordActionPresenter : MonoBehaviour
         swordCoroutine = null;
         activeHandle = null;
         handle.Complete();
+    }
+
+    /// <summary>
+    /// 연출 이벤트 타입에 맞는 임시 대기 시간을 반환한다.
+    /// </summary>
+    private float GetDuration(PresentationEventType eventType)
+    {
+        return eventType switch
+        {
+            PresentationEventType.SwordThrow => throwDuration,
+            PresentationEventType.SwordRecall => recallDuration,
+            PresentationEventType.MeleeAttackWithSword => meleeWithSwordDuration,
+            PresentationEventType.MeleeAttackUnarmed => meleeUnarmedDuration,
+            _ => 0f,
+        };
     }
 
     /// <summary>

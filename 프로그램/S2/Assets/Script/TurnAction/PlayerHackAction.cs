@@ -264,7 +264,8 @@ public class PlayerHackAction : MonoBehaviour
         }
 
         targetPosition = target.GridPosition;
-        int distance = playerContext.GridActor.GridPosition.ManhattanDistanceTo(targetPosition);
+        GridPosition hackOriginPosition = playerContext.SwordState.CurrentPosition;
+        int distance = hackOriginPosition.ManhattanDistanceTo(targetPosition);
         if (distance > HackRange)
         {
             LogBlockedTarget(target, $"해킹 가능 거리 밖입니다. 거리: {distance}, 최대 거리: {HackRange}");
@@ -344,6 +345,12 @@ public class PlayerHackAction : MonoBehaviour
         if (playerContext.ActionPoint == null)
         {
             Debug.LogError($"{nameof(PlayerHackAction)} on {name}에는 {nameof(PlayerContext)}에 연결된 {nameof(ActionPoint)} 참조가 필요합니다.", this);
+            return false;
+        }
+
+        if (playerContext.SwordState == null)
+        {
+            Debug.LogError($"{nameof(PlayerHackAction)} on {name}에는 {nameof(PlayerContext)}에 연결된 {nameof(PlayerSwordState)} 참조가 필요합니다.", this);
             return false;
         }
 

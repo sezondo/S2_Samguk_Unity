@@ -122,6 +122,7 @@ public class PlayerSwordThrowAction : MonoBehaviour
         }
 
         playerContext.SwordState.SetDeployedPosition(targetPosition);
+        TryApplyDamageAtTarget(targetPosition, resolutionContext);
         isSwordThrowSelected = false;
         SwordThrowCanceled?.Invoke();
 
@@ -134,6 +135,37 @@ public class PlayerSwordThrowAction : MonoBehaviour
         }
 
         return true;
+    }
+
+    /// <summary>
+    /// 검 투척 목표 칸에 피해 가능 대상이 있으면 피해를 적용하고 논리 이벤트를 발행한다.
+    /// </summary>
+    private void TryApplyDamageAtTarget(GridPosition targetPosition, ActionResolutionContext resolutionContext)
+    {
+        if (!GridManager.Instance.TryGetActorAt(targetPosition, out GridActor targetActor) || targetActor == playerContext.GridActor)
+        {
+            return;
+        }
+
+        IDamageable damageable = targetActor.GetComponent<IDamageable>();
+        if (damageable == null)
+        {
+            if (logActionState)
+            {
+                Debug.Log($"{nameof(PlayerSwordThrowAction)}: {targetPosition} 칸의 {targetActor.name} 대상에는 {nameof(IDamageable)}이 없어 검만 이동합니다.", this);
+            }
+
+            return;
+        }
+
+        int damage = playerContext.TurnData.SwordThrowDamage;
+        bool applied = damageable.TakeDamage(damage);
+        resolutionContext.Publish(new DamageAppliedLogicEvent(playerContext.GridActor, targetActor, targetPosition, damage, applied));
+
+        if (logActionState)
+        {
+            Debug.Log($"{nameof(PlayerSwordThrowAction)}: 검 투척으로 {targetActor.name} 대상에게 {damage} 피해 적용을 시도했습니다. 적용 여부: {applied}", this);
+        }
     }
 
     /// <summary>
@@ -290,6 +322,12 @@ public class PlayerSwordThrowAction : MonoBehaviour
         if (turnData.SwordThrowActionPointCost <= 0)
         {
             Debug.LogError($"{nameof(PlayerSwordThrowAction)} on {name}의 {nameof(PlayerTurnData)} 검 투척 AP 비용은 0보다 커야 합니다.", this);
+            return false;
+        }
+
+        if (turnData.SwordThrowDamage <= 0)
+        {
+            Debug.LogError($"{nameof(PlayerSwordThrowAction)} on {name}의 {nameof(PlayerTurnData)} 검 투척 피해량은 0보다 커야 합니다.", this);
             return false;
         }
 

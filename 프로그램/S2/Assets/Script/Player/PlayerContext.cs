@@ -31,6 +31,8 @@ public class PlayerContext : MonoBehaviour
     [SerializeField] private PlayerSwordThrowAction swordThrowAction;
     // 도깨비 환도 회수 행동 판정과 실행을 담당하는 선택 컴포넌트다. 검 회수 기능을 쓰는 씬에서 연결한다.
     [SerializeField] private PlayerSwordRecallAction swordRecallAction;
+    // 플레이어 근접 공격 행동 판정과 실행을 담당하는 선택 컴포넌트다. 근접 공격 기능을 쓰는 씬에서 연결한다.
+    [SerializeField] private PlayerMeleeAttackAction meleeAttackAction;
 
     public PlayerTurnData TurnData => turnData;
     public PlayerInputReader InputReader => inputReader;
@@ -43,6 +45,7 @@ public class PlayerContext : MonoBehaviour
     public PlayerSwordState SwordState => swordState;
     public PlayerSwordThrowAction SwordThrowAction => swordThrowAction;
     public PlayerSwordRecallAction SwordRecallAction => swordRecallAction;
+    public PlayerMeleeAttackAction MeleeAttackAction => meleeAttackAction;
 
     /// <summary>
     /// 플레이어 Context에 필수 참조가 모두 연결되어 있는지 확인한다.

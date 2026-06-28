@@ -98,6 +98,16 @@ public readonly struct PresentationEvent
     }
 
     /// <summary>
+    /// 근접 공격 연출 이벤트를 만든다.
+    /// hasSword가 true면 검 보유 근접 공격, false면 검 없음 근접 공격 이벤트를 만든다.
+    /// </summary>
+    public static PresentationEvent MeleeAttack(GridActor actor, GridPosition fromPosition, GridPosition targetPosition, bool hasSword, string message = null)
+    {
+        PresentationEventType type = hasSword ? PresentationEventType.MeleeAttackWithSword : PresentationEventType.MeleeAttackUnarmed;
+        return new PresentationEvent(type, actor, null, null, fromPosition, targetPosition, targetPosition, targetPosition, message);
+    }
+
+    /// <summary>
     /// 스테이지 클리어 연출 이벤트를 만든다.
     /// </summary>
     public static PresentationEvent StageCleared(string message = null)

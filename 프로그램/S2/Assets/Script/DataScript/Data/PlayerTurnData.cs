@@ -32,8 +32,18 @@ public class PlayerTurnData : ScriptableObject
     [SerializeField] private int swordThrowRange = 3;
     // 검 투척 행동 1회가 소비하는 AP 비용이다.
     [SerializeField] private int swordThrowActionPointCost = 1;
+    // 검 투척 목표 칸에 피해 가능 대상이 있을 때 적용할 피해량이다.
+    [SerializeField] private int swordThrowDamage = 2;
     // 검 회수 행동 1회가 소비하는 AP 비용이다. 회수에는 거리 제한이 없다.
     [SerializeField] private int swordRecallActionPointCost = 1;
+
+    [Header("Melee")]
+    // 근접 공격 행동 1회가 소비하는 AP 비용이다.
+    [SerializeField] private int meleeAttackActionPointCost = 1;
+    // 검을 소유 중일 때 근접 공격으로 적용할 피해량이다.
+    [SerializeField] private int meleeDamageWithSword = 3;
+    // 검을 소유하지 않을 때 근접 공격으로 적용할 피해량이다.
+    [SerializeField] private int meleeDamageWithoutSword = 1;
 
     public int MaxActionPoint => maxActionPoint;
     public int StartTurnActionPoint => startTurnActionPoint;
@@ -44,5 +54,9 @@ public class PlayerTurnData : ScriptableObject
     public int HackActionPointCost => hackActionPointCost;
     public int SwordThrowRange => swordThrowRange;
     public int SwordThrowActionPointCost => swordThrowActionPointCost;
+    public int SwordThrowDamage => swordThrowDamage;
     public int SwordRecallActionPointCost => swordRecallActionPointCost;
+    public int MeleeAttackActionPointCost => meleeAttackActionPointCost;
+    public int MeleeDamageWithSword => meleeDamageWithSword;
+    public int MeleeDamageWithoutSword => meleeDamageWithoutSword;
 }

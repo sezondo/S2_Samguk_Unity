@@ -155,3 +155,27 @@ public sealed class SwordRecalledLogicEvent : IActionLogicEvent
         ToPosition = toPosition;
     }
 }
+
+/// <summary>
+/// 피해 가능 대상에게 피해 적용을 시도했음을 알리는 논리 이벤트다.
+/// </summary>
+public sealed class DamageAppliedLogicEvent : IActionLogicEvent
+{
+    public GridActor Attacker { get; }
+    public GridActor Target { get; }
+    public GridPosition TargetPosition { get; }
+    public int Damage { get; }
+    public bool Applied { get; }
+
+    /// <summary>
+    /// 지정한 공격자와 대상 사이의 피해 적용 이벤트를 만든다.
+    /// </summary>
+    public DamageAppliedLogicEvent(GridActor attacker, GridActor target, GridPosition targetPosition, int damage, bool applied)
+    {
+        Attacker = attacker;
+        Target = target;
+        TargetPosition = targetPosition;
+        Damage = damage;
+        Applied = applied;
+    }
+}
