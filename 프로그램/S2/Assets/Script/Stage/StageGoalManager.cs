@@ -90,7 +90,10 @@ public class StageGoalManager : MonoBehaviour, IActionLogicEventHandler
     /// </summary>
     public bool CanHandle(IActionLogicEvent logicEvent)
     {
-        return logicEvent is MoveCompletedLogicEvent;
+        GridActor playerActor = playerContext != null ? playerContext.GridActor : null;
+        return playerActor != null &&
+            logicEvent is MoveCompletedLogicEvent moveCompleted &&
+            moveCompleted.Actor == playerActor;
     }
 
     /// <summary>

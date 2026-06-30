@@ -62,16 +62,36 @@ public sealed class EnemyAlertedLogicEvent : IActionLogicEvent
     public EnemyContext Enemy { get; }
     public EnemyContext SourceEnemy { get; }
     public GridPosition DetectedPosition { get; }
+    public GridPosition KnownPlayerPosition { get; }
+    public EnemyAlertReason Reason { get; }
 
     /// <summary>
     /// 지정한 적의 발각 상태 전환 이벤트를 만든다.
     /// </summary>
-    public EnemyAlertedLogicEvent(EnemyContext enemy, EnemyContext sourceEnemy, GridPosition detectedPosition)
+    public EnemyAlertedLogicEvent(
+        EnemyContext enemy,
+        EnemyContext sourceEnemy,
+        GridPosition detectedPosition,
+        GridPosition knownPlayerPosition,
+        EnemyAlertReason reason)
     {
         Enemy = enemy;
         SourceEnemy = sourceEnemy;
         DetectedPosition = detectedPosition;
+        KnownPlayerPosition = knownPlayerPosition;
+        Reason = reason;
     }
+}
+
+/// <summary>
+/// 적이 경계 상태로 전환된 원인이다.
+/// </summary>
+public enum EnemyAlertReason
+{
+    SightDetected,
+    Damaged,
+    Spread,
+    Scripted,
 }
 
 /// <summary>

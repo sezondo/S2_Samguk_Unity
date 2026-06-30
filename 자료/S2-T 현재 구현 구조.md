@@ -1,4 +1,4 @@
-# S2-T 현재 구현 구조
+﻿# S2-T 현재 구현 구조
 
 최신 기준: 2026-06-24
 브랜치: `turn-based-stealth`
@@ -972,16 +972,33 @@ S2-T의 행동 처리는 최초 명령에서 파생되는 논리 사건을 `Acti
 현재 연결:
 
 - `PlayerGridMoveAction`은 이동 경로를 계산하고 AP를 소비한 뒤, 각 칸 이동마다 `MoveActor` 연출 이벤트와 `MoveStepEnteredLogicEvent`를 추가한다.
-- `GridMoveRiskEvaluator`는 `MoveStepEnteredLogicEvent`를 처리해 위험 칸 진입을 확인하고 `AlertTriggeredLogicEvent`를 추가한다.
-- `EnemyAlertCoordinator`는 `AlertTriggeredLogicEvent`를 처리해 애드 전파와 `EnemyAlertState.RequestAlert()`를 수행하고, 실제 상태가 바뀐 적마다 `AlertDetected` 연출 이벤트를 추가한다.
-- `StageGoalManager`는 `MoveCompletedLogicEvent`를 처리해 목표 도착을 확인하고, 클리어 시 `StageClearedLogicEvent`와 `StageCleared` 연출 이벤트를 추가한다.
+- `GridMoveRiskEvaluator`는 플레이어 `GridActor`의 `MoveStepEnteredLogicEvent`를 처리해 위험 칸 진입을 확인하고 `AlertTriggeredLogicEvent`를 추가한다.
+- `EnemyAlertCoordinator`는 `AlertTriggeredLogicEvent`와 `DamageAppliedLogicEvent`를 처리해 경계 상태 전환, 애드 전파, `EnemyAlertedLogicEvent` 발행을 담당한다.
+- `EnemyAlertReactionCoordinator`는 자기 `EnemyContext`의 `EnemyAlertedLogicEvent`를 처리해 경계 반응 엄폐 이동과 `EnemyReactionMove` 연출 이벤트를 추가한다.
+- `StageGoalManager`는 플레이어 `GridActor`의 `MoveCompletedLogicEvent`를 처리해 목표 도착을 확인하고, 클리어 시 `StageClearedLogicEvent`와 `StageCleared` 연출 이벤트를 추가한다.
 - `StageStateManager`는 `StageClearedLogicEvent`를 처리해 스테이지 상태를 `Cleared`로 바꾼다.
+
+### CanHandle 필터링 기준
+
+`ActionLogicEventBus`는 `CanHandle()`이 true인 모든 핸들러에 이벤트를 전달한다.
+따라서 개별 대상이 정해진 핸들러는 `CanHandle()`에서 이벤트 타입뿐 아니라 대상 참조까지 확인한다.
+
+현재 기준:
+
+- `EnemyAlertReactionCoordinator`: `EnemyAlertedLogicEvent.Enemy`가 자기 `EnemyContext`일 때만 처리한다.
+- `GridMoveRiskEvaluator`: 플레이어 `GridActor`의 `MoveStepEnteredLogicEvent`, `MoveCompletedLogicEvent`만 처리한다.
+- `StageGoalManager`: 플레이어 `GridActor`의 `MoveCompletedLogicEvent`만 처리한다.
+- `PlayerSwordState`: 플레이어 `GridActor`의 `HackCompletedLogicEvent`만 처리한다.
+- `EnemyAlertCoordinator`: 씬 단위 애드 전파 담당이므로 `AlertTriggeredLogicEvent`, `DamageAppliedLogicEvent` 타입 기준으로 처리한다.
+- `StageStateManager`: 스테이지 전체 상태 담당이므로 `StageClearedLogicEvent` 타입 기준으로 처리한다.
+
+`Handle()` 내부의 대상 검사는 직접 호출이나 추후 이벤트 버스 구조 변경에 대한 2차 방어로 유지한다.
 
 현재 한계:
 
 - 이동 입력은 `PlayerMoveInputController`로 분리했다. `PlayerGridMoveAction`은 입력을 직접 처리하지 않고, 이동 선택 상태와 이동 판정/실행 책임만 가진다.
-- 적 AI 반응 논리와 연출 이벤트 삽입은 아직 연결하지 않았다.
-- `EnemyAlertedLogicEvent`는 후속 적 반응/시각 연출 확장용으로 발행되지만, 현재 별도 핸들러는 없다.
+- 경계 반응은 Alerted 진입 시 수동 엄폐 이동까지만 처리한다.
+- 적 턴의 능동 AI 판단과 공격 위치 선정은 아직 구현하지 않았다.
 
 ## ActorPresentationSynchronizer
 
@@ -1424,3 +1441,131 @@ SwordActionPresenter는 PresentationEventType.SwordThrow, PresentationEventType.
 
 현재 `SwordActionPresenter`가 두 이벤트를 임시 대기/로그 방식으로 처리한다.
 후속 작업에서 검 보유 근접 공격과 검 없음 근접 공격의 실제 애니메이션, 이펙트, 타격 타이밍을 분리해 확장한다.
+
+### 2026-06-28 테스트 확인
+
+Unity 플레이 모드에서 공격 / 피해 1차 통로를 확인했다.
+
+확인한 항목:
+
+- T 검 투척으로 목표 칸에 `IDamageable` 대상이 있으면 피해가 적용된다.
+- 목표 칸에 `IDamageable` 대상이 없으면 검만 이동한다.
+- F 근접 공격은 플레이어 주변 8방향 1칸 대상에게 실행된다.
+- 검 보유 중 근접 공격과 검 미보유 중 근접 공격은 서로 다른 피해량을 적용한다.
+- 검 보유 여부에 따라 `MeleeAttackWithSword`, `MeleeAttackUnarmed` 연출 이벤트가 분리되어 큐에 등록된다.
+- `ActorHealth`는 HP 감소와 전투불능 로그를 정상 출력한다.
+- 해킹 사거리는 `PlayerSwordState.CurrentPosition` 기준으로 동작한다.
+
+현재 후속 작업:
+
+- 실제 피격 연출과 사망/제거 처리를 `ActorHealth`와 Presenter 기준으로 확장한다.
+- 검 투척/근접 공격의 임시 로그 연출을 실제 검 표시, 타격 이펙트, 애니메이션 타이밍으로 교체한다.
+- 공격 시 적 경계 상태 전환과 애드 규칙을 정한다.
+
+## 2026-06-28 경계 반응 / 엄폐 이동 1차 통로
+
+### 경계 상태 전환과 경계 반응 분리
+
+경계 상태 전환은 적의 상태가 `Alerted`로 바뀌는 논리 처리다.
+경계 반응 행동은 `Alerted`가 된 적이 실제로 무엇을 할지 결정하는 후속 논리 처리다.
+
+현재 기준:
+
+- `EnemyAlertCoordinator`: 시야 발각 또는 피해 적용을 받아 경계 상태 전환과 애드 전파를 담당한다.
+- `EnemyAlertState`: 적 하나의 `Normal` / `Alerted` 상태를 보관한다.
+- `EnemyAlertedLogicEvent`: 적이 새로 `Alerted`가 됐음을 알리는 논리 이벤트다.
+- `EnemyAlertReactionCoordinator`: `EnemyAlertedLogicEvent`를 받아 경계 반응 이동을 계산한다.
+
+### EnemyAlertReason
+
+`EnemyAlertedLogicEvent`에는 경계 상태 전환 원인을 나타내는 `EnemyAlertReason`이 포함된다.
+
+현재 값:
+
+- `SightDetected`: 적 시야에 플레이어가 들어와 직접 발각된 경우.
+- `Damaged`: 피해를 받아 경계 상태가 된 경우.
+- `Spread`: 주변 적의 경계 전파로 경계 상태가 된 경우.
+- `Scripted`: 이후 스크립트 이벤트용 후보.
+
+### 피해 기반 경계 전환
+
+`EnemyAlertCoordinator`는 `DamageAppliedLogicEvent`도 처리한다.
+피해가 실제 적용됐고 대상 `GridActor`가 `EnemyContext`에 속하면, 피해를 받은 적을 기준으로 경계 상태 전환과 애드 전파를 실행한다.
+
+현재 기준:
+
+- 피해를 받은 적은 `Damaged` 원인으로 경계 상태가 된다.
+- 전파로 경계 상태가 된 적은 `Spread` 원인으로 처리된다.
+- 모든 새 경계 적은 `EnemyAlertedLogicEvent`를 발행한다.
+- 모든 새 경계 적은 기존 `AlertDetected` 연출 이벤트도 받는다.
+
+### EnemyData 경계 반응 값
+
+`EnemyData`에 `AlertReactionMoveRange`를 추가했다.
+이 값은 적이 경계 상태로 전환됐을 때 엄폐 반응으로 이동할 수 있는 최대 BFS 거리다.
+0이면 경계 상태만 되고 엄폐 이동은 하지 않는다.
+
+### EnemyAlertReactionCoordinator
+
+`EnemyAlertReactionCoordinator`는 적 오브젝트별로 붙는 경계 반응 컴포넌트다.
+경계 상태로 전환된 자기 `EnemyContext`의 `EnemyAlertedLogicEvent`만 처리한다.
+현재는 이동 가능 범위 안의 벽 인접 칸으로 이동하는 엄폐 반응만 처리한다.
+
+현재 참조:
+
+- `EnemyContext EnemyContext`: 이 컴포넌트가 반응 이동을 처리할 적 Context.
+- `EnemyTacticalPositionScoreSettings ScoreSettings`: 엄폐 후보 점수 가중치.
+
+처리 흐름:
+
+1. `EnemyAlertedLogicEvent`를 받는다.
+2. 이벤트의 `Enemy`가 자기 `EnemyContext`가 아니면 무시한다.
+3. 이미 현재 Alerted 진입에 대해 반응했다면 추가 이동을 하지 않는다.
+4. 적의 `EnemyData.AlertReactionMoveRange` 기준으로 `EnemyTacticalMovePlanner`에 경로 계산을 요청한다.
+5. 계산된 경로를 따라 적 논리 위치를 1칸씩 이동시킨다.
+6. 각 1칸 이동마다 `PresentationEvent.EnemyReactionMove`를 큐에 추가한다.
+
+경계 반응 이동은 상태 변화에 따른 수동 반응이다.
+적 턴에 공격 위치를 찾아 이동하는 능동 AI 이동과 분리해서 관리한다.
+
+### EnemyTacticalPositionScorer
+
+`EnemyTacticalPositionScorer`는 적 전술 위치 후보의 점수를 계산하는 재사용 가능한 평가 도구다.
+현재 경계 반응 엄폐 이동에서 사용하며, 이후 적 턴 AI의 공격 위치 선정에도 재사용할 수 있다.
+
+현재 점수 항목:
+
+- 정면 노출 패널티: 플레이어와 같은 직선축에 있고 사이에 벽이 없으면 감점한다.
+- 플레이어 접근 감점: 현재 위치보다 플레이어에게 가까워지면 거리 차이만큼 감점한다.
+- 실제 차단 엄폐 보너스: 후보 주변 벽이 후보보다 플레이어에 더 가까우면 차단 벽으로 점수를 준다.
+- 인접 벽 수 보너스: 후보 주변 4방향의 벽 개수에 따라 기본 엄폐 점수를 준다.
+- 엄폐 품질 개선 보너스: 후보 엄폐 품질이 현재 위치보다 좋으면 추가 점수를 준다.
+- 이동 거리 패널티: 이동 거리가 길수록 감점한다.
+
+후보별 점수 결과는 `EnemyTacticalPositionScoreResult`로 반환하며, 디버그 로그에서 점수 산정 근거를 확인할 수 있다.
+
+### EnemyTacticalMovePlanner
+
+`EnemyTacticalMovePlanner`는 적이 이동 가능한 전술 후보 칸을 찾고 목표 칸까지의 경로를 계산한다.
+현재는 `TryFindBestCoverReactionPath()`로 경계 반응 엄폐 이동 경로를 계산한다.
+
+역할:
+
+- `GridPathfinder.FindReachablePositionDistances()`로 이동 가능 후보와 이동 거리를 계산한다.
+- `EnemyTacticalPositionScorer`로 후보 점수를 계산한다.
+- 최고 점수 후보를 목표 칸으로 선택한다.
+- `GridPathfinder.TryFindPath()`로 목표까지의 실제 1칸 단위 경로를 만든다.
+
+현재 연출은 기존 `GridActorMovePresenter`가 `EnemyReactionMove`를 처리하는 흐름을 재사용한다.
+
+### 현재 한계
+
+- 엄폐 후보 점수식은 1차 기준이며, 실제 XCOM식 엄폐 품질/각도/명중률은 아직 없다.
+- 현재 Alerted 진입에 대한 경계 반응은 적별 1회만 처리한다.
+- 벽 인접 칸이 없으면 경계 상태만 유지하고 이동하지 않는다.
+- 적 유형별로 이동하지 않는 적, 자리 고수형 적, 즉시 공격형 적을 구분하는 정책은 아직 없다.
+- 엄폐 이동은 경계 상태로 새로 전환된 순간에만 실행된다.
+
+
+
+

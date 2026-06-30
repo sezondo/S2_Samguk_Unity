@@ -194,7 +194,10 @@ public class GridMoveRiskEvaluator : MonoBehaviour, IActionLogicEventHandler
     /// </summary>
     public bool CanHandle(IActionLogicEvent logicEvent)
     {
-        return logicEvent is MoveStepEnteredLogicEvent or MoveCompletedLogicEvent;
+        GridActor playerActor = playerContext != null ? playerContext.GridActor : null;
+        return playerActor != null &&
+            (logicEvent is MoveStepEnteredLogicEvent moveStepEntered && moveStepEntered.Actor == playerActor ||
+             logicEvent is MoveCompletedLogicEvent moveCompleted && moveCompleted.Actor == playerActor);
     }
 
     /// <summary>

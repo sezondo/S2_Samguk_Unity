@@ -985,3 +985,85 @@
 - Tset 씬에 `ActorHealth`, `PlayerMeleeAttackAction`, `PlayerMeleeAttackInputController` 참조를 연결한다.
 - 플레이 모드에서 T 검 투척 피해, F 근접 공격, 검 보유/미보유 근접 피해량과 연출 이벤트 분기를 확인한다.
 - 이후 실제 피격 연출과 사망/제거 처리를 `ActorHealth`와 Presenter 기준으로 확장한다.
+
+## 2026-06-28 테스트 확인
+
+## 핵심
+- Unity 플레이 모드에서 공격 / 피해 1차 통로를 확인했다.
+- T 검 투척 시 목표 칸에 `IDamageable` 대상이 있으면 피해가 적용되고, 없으면 검만 이동하는 흐름을 확인했다.
+- F 근접 공격 입력과 8방향 인접 대상 공격 흐름을 확인했다.
+- 검 보유 중 근접 공격과 검 미보유 중 근접 공격의 피해량 분기와 연출 이벤트 분기를 확인했다.
+- `ActorHealth` 기반 HP 감소와 전투불능 로그 흐름을 확인했다.
+- 해킹 사거리가 `PlayerSwordState.CurrentPosition` 기준으로 동작하는 흐름을 확인했다.
+
+## 검증
+- Unity 플레이 모드 테스트 완료.
+
+## 다음
+- 실제 피격 연출과 사망/제거 처리를 `ActorHealth`와 Presenter 기준으로 확장한다.
+- 검 투척/근접 공격의 임시 로그 연출을 실제 검 표시, 타격 이펙트, 애니메이션 타이밍으로 교체한다.
+- 공격으로 적 경계 상태가 바뀌는 규칙을 정한다.
+
+## 2026-06-28 경계 반응 엄폐 이동
+
+## 핵심
+- 경계 상태 전환과 경계 반응 행동을 분리하는 기준으로 정리했다.
+- `EnemyAlertCoordinator`가 시야 발각뿐 아니라 `DamageAppliedLogicEvent`도 처리하게 했다.
+- 피해가 실제 적용된 적은 경계 상태로 전환되고, 해당 적 기준 `AlertSpreadRange` 안의 적에게 애드가 전파된다.
+- `EnemyAlertedLogicEvent`에 경계 원인 `EnemyAlertReason`과 `KnownPlayerPosition`을 추가했다.
+- `EnemyData`에 `AlertReactionMoveRange`를 추가해 경계 반응 이동 가능 거리를 데이터로 조절하게 했다.
+- `EnemyAlertReactionCoordinator`를 추가했다.
+- `EnemyAlertReactionCoordinator`는 `EnemyAlertedLogicEvent`를 받아 이동 가능 범위 안의 벽 인접 칸을 점수식으로 고른다.
+- 점수식은 플레이어 방향 쪽 벽 여부, 플레이어와의 거리, 이동 거리를 기준으로 계산한다.
+- 엄폐 후보가 있으면 적 논리 위치를 경로대로 이동시키고, 각 1칸 이동을 `PresentationEvent.EnemyReactionMove`로 큐에 추가한다.
+- 기존 `GridActorMovePresenter`의 `EnemyReactionMove` 처리 기능을 재사용한다.
+
+## 검증
+- `dotnet build Assembly-CSharp.csproj --no-restore` 통과.
+- 경고 0개, 오류 0개.
+
+## 다음
+- Tset 씬에 `EnemyAlertReactionCoordinator`를 배치하고 경계 반응 이동을 플레이 모드에서 확인한다.
+- 각 적 `EnemyData.AlertReactionMoveRange` 값을 테스트 기준에 맞게 조정한다.
+- 벽 인접 엄폐 후보 점수식을 실제 맵 배치 기준으로 다듬는다.
+
+## 2026-06-30 경계 반응 이동 구조 정리
+
+## 핵심
+- 경계 반응 엄폐 이동을 현재 코드 기준으로 플레이 모드 테스트 완료했다.
+- `EnemyReactionMove` 연출 이벤트는 각 적의 `GridActorMovePresenter`가 처리해야 하며, 적 ActorPresentation에 이동 Presenter 연결이 필요하다는 점을 확인했다.
+- 엄폐 후보 선택은 단순 우선순위 방식보다 점수제 유지가 더 적합하다고 판단했다.
+- 점수 항목을 정면 노출 패널티, 플레이어 접근 감점, 실제 차단 엄폐 보너스, 인접 벽 수 보너스, 현재 위치 대비 엄폐 품질 개선 보너스, 이동 거리 패널티 기준으로 정리했다.
+- 전술 위치 평가와 경로 선택 책임을 `EnemyAlertReactionCoordinator`에서 분리했다.
+- `EnemyTacticalPositionScorer`를 추가해 엄폐 품질과 후보 점수 산정을 담당하게 했다.
+- `EnemyTacticalMovePlanner`를 추가해 도달 가능한 후보 탐색, 최고 점수 후보 선택, 목표까지 경로 계산을 담당하게 했다.
+- `EnemyAlertReactionCoordinator`는 적 오브젝트별 컴포넌트로 유지한다.
+- `EnemyAlertReactionCoordinator`는 자기 `EnemyContext`에 해당하는 `EnemyAlertedLogicEvent`만 처리한다.
+- `EnemyAlertReactionCoordinator`는 `hasReactedToAlert`로 현재 Alerted 진입에 대한 수동 반응 이동을 1회만 처리한다.
+- 경계 반응 이동은 상태 변화에 따른 수동 반응이며, 적 턴 AI가 공격 위치를 잡는 능동 이동과 분리해서 본다.
+
+## 검증
+- 현재 코드로 Unity 플레이 모드 테스트 완료.
+- `dotnet build Assembly-CSharp.csproj --no-restore` 통과.
+- 경고 0개, 오류 0개.
+
+## 다음
+- 각 적의 `EnemyAlertReactionCoordinator.EnemyContext` 인스펙터 참조를 자기 `EnemyContext`로 연결해 둔다.
+- 후보별 점수 로그를 보며 점수 가중치를 실제 맵 배치 기준으로 조정한다.
+- 이후 적 턴 AI에서 `EnemyTacticalMovePlanner`와 `EnemyTacticalPositionScorer`를 재사용해 공격 가능하면서 엄폐가 좋은 위치를 고르는 흐름으로 확장한다.
+
+## 2026-06-30 논리 이벤트 CanHandle 필터 정리
+
+## 핵심
+- `ActionLogicEventBus`는 `CanHandle()`이 true인 모든 `IActionLogicEventHandler`에 이벤트를 전달한다.
+- 개별 대상이 정해진 핸들러는 `CanHandle()` 단계에서 이벤트 타입뿐 아니라 대상 참조까지 검사하도록 정리했다.
+- `EnemyAlertReactionCoordinator`는 `EnemyAlertedLogicEvent` 중 이벤트의 `Enemy`가 자기 `EnemyContext`인 경우에만 처리 가능하다고 응답한다.
+- `GridMoveRiskEvaluator`는 플레이어 `GridActor`의 `MoveStepEnteredLogicEvent`, `MoveCompletedLogicEvent`만 처리 가능하다고 응답한다.
+- `StageGoalManager`는 플레이어 `GridActor`의 `MoveCompletedLogicEvent`만 처리 가능하다고 응답한다.
+- `PlayerSwordState`는 플레이어 `GridActor`의 `HackCompletedLogicEvent`만 처리 가능하다고 응답한다.
+- `Handle()` 내부의 대상 검사는 직접 호출이나 추후 구조 변경에 대한 2차 방어로 유지한다.
+- `EnemyAlertCoordinator`와 `StageStateManager`는 씬/스테이지 단위 핸들러라 이벤트 타입 기준 `CanHandle()`을 유지한다.
+
+## 검증
+- `dotnet build Assembly-CSharp.csproj --no-restore` 통과.
+- 경고 0개, 오류 0개.

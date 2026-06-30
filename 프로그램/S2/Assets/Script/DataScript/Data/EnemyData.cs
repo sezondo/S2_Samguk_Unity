@@ -18,9 +18,12 @@ public class EnemyData : ScriptableObject
     [Header("Alert")]
     // 이 적이 플레이어를 발견했을 때 주변 적에게 애드를 전파하는 맨해튼 거리다.
     [SerializeField] private int alertSpreadRange = 5;
+    // 경계 상태로 전환됐을 때 벽 인접 엄폐 칸으로 이동할 수 있는 최대 거리다.
+    [SerializeField] private int alertReactionMoveRange = 3;
 
     public int SightRange => sightRange;
     public bool UseAdjacentDetection => useAdjacentDetection;
     public int AdjacentDetectionRange => adjacentDetectionRange;
     public int AlertSpreadRange => alertSpreadRange;
+    public int AlertReactionMoveRange => alertReactionMoveRange;
 }

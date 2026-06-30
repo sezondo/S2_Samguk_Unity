@@ -2,7 +2,7 @@ using System.Collections.Generic;
 using UnityEngine;
 
 /// <summary>
-/// 플레이어 발각 이벤트를 받아 최초 감지 적 기준으로 주변 적에게 애드를 전파하는 조정자다.
+/// 플레이어 발각이나 피해 이벤트를 받아 기준 적 주변으로 애드를 전파하는 조정자다.
 /// 현재 단계에서는 전파 대상 계산과 적 상태 전환 요청을 담당한다.
 /// </summary>
 public class EnemyAlertCoordinator : MonoBehaviour, IActionLogicEventHandler
@@ -72,13 +72,45 @@ public class EnemyAlertCoordinator : MonoBehaviour, IActionLogicEventHandler
             return;
         }
 
-        if (!HasValidData(detectingEnemy))
+        SpreadAlertFromSource(detectingEnemy, logicEvent.DetectedPosition, logicEvent.DetectedPosition, EnemyAlertReason.SightDetected, context);
+    }
+
+    /// <summary>
+    /// 피해 적용 이벤트를 받아 피해 대상 적 기준 전파 대상 적을 계산한다.
+    /// </summary>
+    private void HandleDamageApplied(DamageAppliedLogicEvent logicEvent, ActionResolutionContext context)
+    {
+        if (!logicEvent.Applied || logicEvent.Target == null)
         {
             return;
         }
 
-        int spreadRange = detectingEnemy.EnemyData.AlertSpreadRange;
-        GridPosition spreadOrigin = detectingEnemy.GridActor.GridPosition;
+        if (!TryFindEnemyContext(logicEvent.Target, out EnemyContext damagedEnemy))
+        {
+            return;
+        }
+
+        GridPosition knownPlayerPosition = logicEvent.Attacker != null ? logicEvent.Attacker.GridPosition : logicEvent.TargetPosition;
+        SpreadAlertFromSource(damagedEnemy, logicEvent.TargetPosition, knownPlayerPosition, EnemyAlertReason.Damaged, context);
+    }
+
+    /// <summary>
+    /// 기준 적의 애드 전파 범위 안 적들을 경계 상태로 전환하고 후속 논리 이벤트를 발행한다.
+    /// </summary>
+    private void SpreadAlertFromSource(
+        EnemyContext sourceEnemy,
+        GridPosition detectedPosition,
+        GridPosition knownPlayerPosition,
+        EnemyAlertReason sourceReason,
+        ActionResolutionContext context)
+    {
+        if (!HasValidData(sourceEnemy))
+        {
+            return;
+        }
+
+        int spreadRange = sourceEnemy.EnemyData.AlertSpreadRange;
+        GridPosition spreadOrigin = sourceEnemy.GridActor.GridPosition;
         IReadOnlyList<EnemyContext> enemies = EnemyRegistry.Instance.Enemies;
 
         for (int i = 0; i < enemies.Count; i++)
@@ -95,20 +127,23 @@ public class EnemyAlertCoordinator : MonoBehaviour, IActionLogicEventHandler
                 continue;
             }
 
-            bool changed = enemy.AlertState.RequestAlert(logicEvent.DetectedPosition, detectingEnemy);
-            if (logAlertSpread && changed)
+            bool changed = enemy.AlertState.RequestAlert(detectedPosition, sourceEnemy);
+            if (!changed)
             {
-                Debug.Log($"{nameof(EnemyAlertCoordinator)}: {logicEvent.DetectedPosition} 칸 발각을 {detectingEnemy.name} 기준 {distance}칸 거리의 {enemy.name} 적에게 전파했습니다.", this);
+                continue;
             }
 
-            if (changed)
+            EnemyAlertReason reason = enemy == sourceEnemy ? sourceReason : EnemyAlertReason.Spread;
+            if (logAlertSpread)
             {
-                context.EnqueuePresentation(PresentationEvent.AlertDetected(
-                    logicEvent.DetectedPosition,
-                    enemy,
-                    "적 발각 상태 전환 연출"));
-                context.Publish(new EnemyAlertedLogicEvent(enemy, detectingEnemy, logicEvent.DetectedPosition));
+                Debug.Log($"{nameof(EnemyAlertCoordinator)}: {detectedPosition} 칸 사건을 {sourceEnemy.name} 기준 {distance}칸 거리의 {enemy.name} 적에게 전파했습니다. 원인: {reason}", this);
             }
+
+            context.EnqueuePresentation(PresentationEvent.AlertDetected(
+                detectedPosition,
+                enemy,
+                "적 경계 상태 전환 연출"));
+            context.Publish(new EnemyAlertedLogicEvent(enemy, sourceEnemy, detectedPosition, knownPlayerPosition, reason));
         }
     }
 
@@ -117,7 +152,7 @@ public class EnemyAlertCoordinator : MonoBehaviour, IActionLogicEventHandler
     /// </summary>
     public bool CanHandle(IActionLogicEvent logicEvent)
     {
-        return logicEvent is AlertTriggeredLogicEvent;
+        return logicEvent is AlertTriggeredLogicEvent || logicEvent is DamageAppliedLogicEvent;
     }
 
     /// <summary>
@@ -128,6 +163,12 @@ public class EnemyAlertCoordinator : MonoBehaviour, IActionLogicEventHandler
         if (logicEvent is AlertTriggeredLogicEvent alertTriggered)
         {
             HandleAlertTriggered(alertTriggered, context);
+            return;
+        }
+
+        if (logicEvent is DamageAppliedLogicEvent damageApplied)
+        {
+            HandleDamageApplied(damageApplied, context);
         }
     }
 
@@ -143,6 +184,29 @@ public class EnemyAlertCoordinator : MonoBehaviour, IActionLogicEventHandler
             {
                 EnemyContext enemy = enemies[i];
                 if (enemy != null && enemy.GridSight == gridSight)
+                {
+                    enemyContext = enemy;
+                    return true;
+                }
+            }
+        }
+
+        enemyContext = null;
+        return false;
+    }
+
+    /// <summary>
+    /// 지정한 GridActor를 가진 EnemyContext를 현재 등록소에서 찾는다.
+    /// </summary>
+    private bool TryFindEnemyContext(GridActor gridActor, out EnemyContext enemyContext)
+    {
+        if (gridActor != null && EnemyRegistry.Instance != null)
+        {
+            IReadOnlyList<EnemyContext> enemies = EnemyRegistry.Instance.Enemies;
+            for (int i = 0; i < enemies.Count; i++)
+            {
+                EnemyContext enemy = enemies[i];
+                if (enemy != null && enemy.GridActor == gridActor)
                 {
                     enemyContext = enemy;
                     return true;

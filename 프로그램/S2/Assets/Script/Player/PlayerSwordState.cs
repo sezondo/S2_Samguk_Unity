@@ -64,7 +64,10 @@ public class PlayerSwordState : MonoBehaviour, IActionLogicEventHandler
     /// </summary>
     public bool CanHandle(IActionLogicEvent logicEvent)
     {
-        return logicEvent is HackCompletedLogicEvent;
+        GridActor playerActor = playerContext != null ? playerContext.GridActor : null;
+        return playerActor != null &&
+            logicEvent is HackCompletedLogicEvent hackCompleted &&
+            hackCompleted.Actor == playerActor;
     }
 
     /// <summary>
