@@ -30,38 +30,42 @@ public class ActorHealth : MonoBehaviour, IDamageable
     }
 
     /// <summary>
-    /// 지정한 피해량만큼 현재 HP를 줄인다.
+    /// 지정한 피해량만큼 현재 HP를 줄이고 피해 전후 HP 스냅샷을 반환한다.
     /// </summary>
-    public bool TakeDamage(int damage)
+    public DamageResult TakeDamage(int damage)
     {
+        int hitPointBefore = currentHitPoint;
+        bool wasDeadBefore = IsDead;
+
         if (damage <= 0)
         {
             Debug.LogError($"{nameof(ActorHealth)} on {name}에는 0보다 큰 피해량만 적용할 수 있습니다. 입력 피해량: {damage}", this);
-            return false;
+            return new DamageResult(false, damage, hitPointBefore, currentHitPoint, wasDeadBefore, IsDead);
         }
 
-        if (IsDead)
+        if (wasDeadBefore)
         {
             if (logDamage)
             {
                 Debug.Log($"{nameof(ActorHealth)}: {name} 대상은 이미 전투불능이라 피해를 무시합니다.", this);
             }
 
-            return false;
+            return new DamageResult(false, damage, hitPointBefore, currentHitPoint, wasDeadBefore, IsDead);
         }
 
         currentHitPoint = Mathf.Max(0, currentHitPoint - damage);
+        DamageResult result = new(true, damage, hitPointBefore, currentHitPoint, wasDeadBefore, IsDead);
 
         if (logDamage)
         {
-            Debug.Log($"{nameof(ActorHealth)}: {name} 대상이 {damage} 피해를 받았습니다. 현재 HP: {currentHitPoint}/{maxHitPoint}", this);
+            Debug.Log($"{nameof(ActorHealth)}: {name} 대상이 {damage} 피해를 받았습니다. HP: {result.HitPointBefore} -> {result.HitPointAfter}/{maxHitPoint}", this);
         }
 
-        if (IsDead && logDamage)
+        if (result.KilledByThisDamage && logDamage)
         {
             Debug.Log($"{nameof(ActorHealth)}: {name} 대상이 전투불능 상태가 됐습니다.", this);
         }
 
-        return true;
+        return result;
     }
 }

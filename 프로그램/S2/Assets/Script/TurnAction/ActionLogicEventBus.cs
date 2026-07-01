@@ -12,6 +12,14 @@ public static class ActionLogicEventBus
     private static readonly List<IActionLogicEventHandler> handlers = new();
 
     /// <summary>
+    /// 씬 배치가 필요 없는 기본 논리 이벤트 처리자를 등록한다.
+    /// </summary>
+    static ActionLogicEventBus()
+    {
+        Register(DamageResolutionCoordinator.Instance);
+    }
+
+    /// <summary>
     /// 논리 이벤트 핸들러를 등록한다.
     /// </summary>
     public static void Register(IActionLogicEventHandler handler)

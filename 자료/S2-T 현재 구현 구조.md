@@ -1401,9 +1401,32 @@ SwordActionPresenter는 PresentationEventType.SwordThrow, PresentationEventType.
 
 현재 책임:
 
-- `TakeDamage(int damage)`로 피해를 적용한다.
+- `TakeDamage(int damage)`로 피해를 적용하고 `DamageResult`를 반환한다.
+- 실제 HP는 논리 처리 시점에 즉시 변경한다.
+- 피해 전 HP, 피해 후 HP, 사망 전후 상태는 `DamageResult`에 스냅샷으로 담는다.
 - HP가 0 이하가 되면 전투불능 로그를 남긴다.
 - 실제 사망 제거, 애니메이션, 보상, AI 상태 전환은 아직 처리하지 않는다.
+
+### DamageResult
+
+`DamageResult`는 피해 적용 전후의 HP 스냅샷을 담는 값 타입이다.
+논리 HP는 즉시 확정하지만, 연출은 이 스냅샷을 기준으로 HP바 감소와 사망 연출을 재생한다.
+
+현재 값:
+
+- `Applied`: 피해가 실제 적용됐는지 여부.
+- `Damage`: 시도한 피해량.
+- `HitPointBefore`: 피해 적용 전 HP.
+- `HitPointAfter`: 피해 적용 후 HP.
+- `WasDeadBefore`: 피해 전 이미 전투불능이었는지 여부.
+- `IsDeadAfter`: 피해 후 전투불능인지 여부.
+- `KilledByThisDamage`: 이번 피해로 새로 전투불능이 됐는지 여부.
+
+현재 기준:
+
+- 연출 Presenter는 피해 연출을 만들 때 `ActorHealth.CurrentHitPoint`를 다시 읽지 않고 `DamageResult`의 전후 HP를 사용한다.
+- `DamageAppliedLogicEvent`는 `DamageResult`를 포함한다.
+- 기존 피해 기반 경계 전환은 `DamageAppliedLogicEvent.Applied` 편의 속성으로 동일하게 동작한다.
 
 ### 검 투척 피해
 
@@ -1565,6 +1588,101 @@ Unity 플레이 모드에서 공격 / 피해 1차 통로를 확인했다.
 - 벽 인접 칸이 없으면 경계 상태만 유지하고 이동하지 않는다.
 - 적 유형별로 이동하지 않는 적, 자리 고수형 적, 즉시 공격형 적을 구분하는 정책은 아직 없다.
 - 엄폐 이동은 경계 상태로 새로 전환된 순간에만 실행된다.
+
+## Debug
+
+### S2TDebugOverlay
+
+`S2TDebugOverlay`는 턴제 테스트 중 주요 수치를 화면에 출력하는 디버그 전용 컴포넌트다.
+정식 UI나 연출이 아니라 수치 확인용이며, 게임 상태를 변경하지 않는다.
+
+현재 표시 항목:
+
+- 현재 턴.
+- 스테이지 상태.
+- 연출 큐 실행 여부와 대기 이벤트 수.
+- 플레이어 그리드 위치.
+- 플레이어 AP.
+- 플레이어 HP.
+- 검 회수/투척 상태와 현재 검 기준 칸.
+- 이동, 해킹, 검 투척, 근접 공격 선택 상태.
+- 활성 적 수와 경계 상태 적 수.
+- 마지막 피해 이벤트의 공격자, 대상, 대상 칸, 피해량, 적용 여부, HP 전후 값, 이번 피해 사망 여부.
+
+현재 기준:
+
+- `PlayerContext`, 플레이어 `ActorHealth`, `StageStateManager`는 인스펙터에서 연결한다.
+- `TurnManager`, `ActionPresentationQueue`, `EnemyRegistry`는 씬 단위 인스턴스를 읽는다.
+- 마지막 피해 수치는 `DamageAppliedLogicEvent.Result`의 `DamageResult` 스냅샷을 사용한다.
+- 연결되지 않은 항목은 `None`으로 표시한다.
+
+## 피해 요청 / 통합 전투 연출
+
+### ApplyDamageLogicEvent
+
+`ApplyDamageLogicEvent`는 공격 행동이 표준 피해 적용을 요청할 때 발행하는 논리 이벤트다.
+공격 행동은 피해 결과를 직접 해석하지 않고, 누가 누구에게 어떤 공격 종류로 몇 피해를 요청했는지만 전달한다.
+
+전달 값:
+
+- `Attacker`: 공격자 `GridActor`.
+- `Target`: 피해 대상 `GridActor`.
+- `FromPosition`: 공격 또는 투사체 시작 칸.
+- `TargetPosition`: 피해 대상 칸.
+- `Damage`: 적용할 피해량.
+- `PresentationKind`: 통합 전투 연출에서 사용할 공격 표현 종류.
+- `Message`: 연출 로그용 설명.
+
+### DamageResolutionCoordinator
+
+`DamageResolutionCoordinator`는 `ApplyDamageLogicEvent`를 처리하는 기본 논리 이벤트 처리자다.
+씬 배치 없이 `ActionLogicEventBus`에 기본 등록된다.
+
+처리 흐름:
+
+1. `ApplyDamageLogicEvent`를 받는다.
+2. 대상의 `IDamageable`을 찾는다.
+3. `TakeDamage()`를 호출해 `DamageResult`를 얻는다.
+4. `DamageAppliedLogicEvent`를 발행한다.
+5. `DamageResult.KilledByThisDamage`가 true면 `ActorDiedLogicEvent`를 발행한다.
+6. 공격/피격/사망 여부를 함께 담은 `PresentationEvent.CombatAction()`을 연출 큐에 추가한다.
+
+현재 기준:
+
+- `ActorHealth`는 `ActionResolutionContext`나 연출 큐를 알지 않는다.
+- 공격 행동도 피해 전후 HP나 사망 여부를 직접 해석하지 않는다.
+- 피해 대상이 없는 검 투척은 기존 `SwordThrow` 연출만 사용한다.
+
+### ActorDiedLogicEvent
+
+`ActorDiedLogicEvent`는 이번 피해로 액터가 새로 전투불능이 됐음을 알리는 논리 이벤트다.
+현재는 오브젝트 제거/비활성화는 하지 않고 후속 규칙과 디버그 확인용 통로만 둔다.
+
+전달 값:
+
+- `Attacker`: 사망을 유발한 공격자.
+- `DeadActor`: 전투불능이 된 액터.
+- `DeadPosition`: 사망이 발생한 칸.
+- `Result`: 사망을 만든 `DamageResult`.
+
+### CombatAction PresentationEvent
+
+`PresentationEventType.CombatAction`은 공격, 피격, 사망 여부를 한 이벤트로 묶는 통합 전투 연출 이벤트다.
+연출 큐는 순차 실행 구조이므로, 동시에 맞물려야 하는 공격/피격/사망 타이밍은 이 이벤트를 처리하는 Presenter 내부에서 맞춘다.
+
+현재 포함 값:
+
+- 공격자 `Actor`.
+- 피격자 `TargetActor`.
+- 공격 시작 칸 `FromPosition`.
+- 대상 칸 `ToPosition` / `EventPosition`.
+- 공격 표현 종류 `AttackKind`.
+- 피해 결과 `DamageResult`.
+- 피해 결과 포함 여부 `HasDamageResult`.
+
+현재 `SwordActionPresenter`가 `CombatAction`을 임시 로그/대기 방식으로 처리한다.
+후속 작업에서 실제 공격 애니메이션, 피격 반응, 사망 애니메이션을 이 이벤트 안에서 연결한다.
+현재 피격측 처리는 로그 확인용이다. 아트/애니메이션이 준비되면 `TargetActor`로 피격 주체를 찾고 `DamageResult`의 HP 전후 값과 `KilledByThisDamage`를 기준으로 피격 애니메이션 또는 사망 애니메이션을 재생한다.
 
 
 

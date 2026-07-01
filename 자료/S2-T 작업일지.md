@@ -48,6 +48,67 @@
 ## 검증
 - `dotnet build Assembly-CSharp.csproj --no-restore` 통과.
 - 경고 0개, 오류 0개.
+
+## 2026-07-01 피해 요청 / 통합 전투 연출 이벤트 구조
+
+## 핵심
+- 공격과 피격/사망 연출은 동시에 맞물려야 하므로 피해가 있는 공격은 하나의 통합 전투 연출 이벤트로 묶는 기준으로 정리했다.
+- `ApplyDamageLogicEvent`를 추가했다. 공격 행동은 직접 `TakeDamage()`와 `DamageAppliedLogicEvent`를 처리하지 않고 피해 적용 요청만 발행한다.
+- `DamageResolutionCoordinator`를 추가했다. 이 기본 논리 이벤트 처리자는 씬 배치 없이 `ActionLogicEventBus`에 등록된다.
+- `DamageResolutionCoordinator`는 `ApplyDamageLogicEvent`를 받아 대상의 `IDamageable.TakeDamage()`를 호출하고 `DamageAppliedLogicEvent`를 발행한다.
+- 이번 피해로 새로 전투불능이 되면 `ActorDiedLogicEvent`도 발행한다.
+- 피해 결과가 있는 공격 연출은 `PresentationEventType.CombatAction`으로 묶고, 공격자/피격자/공격 종류/피해 전후 HP/사망 여부를 함께 전달한다.
+- `PlayerMeleeAttackAction`, `PlayerSwordThrowAction`은 더 이상 직접 `TakeDamage()`를 호출하지 않는다.
+- 피해 대상이 없는 검 투척은 기존 `SwordThrow` 연출 이벤트를 유지한다.
+- `SwordActionPresenter`는 `CombatAction`을 받아 임시 로그/대기 연출을 처리하며, 추후 공격/피격/사망 애니메이션 타이밍을 이 이벤트 안에서 맞춘다.
+- 현재 `SwordActionPresenter`의 피격측 처리는 로그 확인용이다. 아트/애니메이션이 준비되면 `TargetActor`와 `DamageResult`를 기준으로 피격자 애니메이션과 사망 애니메이션을 연결한다.
+- `S2TDebugOverlay`는 `ActorDiedLogicEvent`도 받아 마지막 사망 정보를 표시한다.
+
+## 검증
+- `dotnet build Assembly-CSharp.csproj --no-restore` 통과.
+- 경고 0개, 오류 0개.
+- Unity 플레이 모드에서 현재 코드 흐름 테스트 완료.
+
+## 다음
+- `CombatAction` 기반으로 실제 공격 애니메이션, 피격 반응, 사망 애니메이션 타이밍을 `SwordActionPresenter` 또는 전용 Presenter에서 확장한다.
+- 피격측 연출은 `PresentationEvent.TargetActor`를 추적하고, HP 전후 값과 사망 여부는 `DamageResult` 스냅샷을 사용한다.
+
+## 2026-07-01 S2-T 디버그 오버레이
+
+## 핵심
+- 전체 턴제 테스트 수치를 화면에서 보기 위한 `S2TDebugOverlay`를 추가했다.
+- 새 폴더 `Assets/Script/Debug`를 만들고 디버그 전용 스크립트를 분리했다.
+- `OnGUI`와 `GUIStyle` 기반으로 턴, 스테이지 상태, 연출 큐 상태, 플레이어 위치/AP/HP/검 상태/행동 선택 상태를 표시한다.
+- `EnemyRegistry` 기준 활성 적 수와 경계 상태 적 수를 표시한다.
+- `DamageAppliedLogicEvent`를 구독해 마지막 피해의 공격자, 대상, 대상 칸, 피해량, 적용 여부, HP 전후 값, 이번 피해 사망 여부를 표시한다.
+- 오버레이는 게임 상태를 바꾸지 않고 연결된 참조와 이벤트 스냅샷만 읽는다.
+
+## 검증
+- `dotnet build Assembly-CSharp.csproj --no-restore` 통과.
+- 경고 0개, 오류 0개.
+
+## 다음
+- Tset 씬에 `S2TDebugOverlay`를 배치하고 `PlayerContext`, 플레이어 `ActorHealth`, `StageStateManager` 참조를 연결한다.
+- 플레이 모드에서 검 투척/근접 공격 시 Last Damage 수치가 `DamageResult`와 맞게 표시되는지 확인한다.
+
+## 2026-07-01 HP 스냅샷 기반 피해 결과
+
+## 핵심
+- 실제 HP와 연출용 HP가 어긋나는 문제를 피하기 위해 피해 결과 스냅샷 구조를 추가했다.
+- `DamageResult`를 추가해 피해 적용 여부, 피해량, 피해 전 HP, 피해 후 HP, 피해 전 사망 여부, 피해 후 사망 여부를 한 값으로 전달하게 했다.
+- `IDamageable.TakeDamage()` 반환값을 `bool`에서 `DamageResult`로 변경했다.
+- `ActorHealth`는 실제 HP를 즉시 변경하되, 연출이 사용할 수 있는 전후 HP 스냅샷을 `DamageResult`로 반환한다.
+- `DamageAppliedLogicEvent`는 기존 `Damage`, `Applied` 값 대신 `DamageResult`를 보관하고, 기존 접근 편의를 위해 `Damage`, `Applied` 속성은 유지했다.
+- `PlayerSwordThrowAction`, `PlayerMeleeAttackAction`은 `TakeDamage()` 결과를 받아 `DamageAppliedLogicEvent`에 전달하게 했다.
+- 아직 HP바, 사망 연출, 적 제거, 플레이어 패배 처리는 추가하지 않았다.
+
+## 검증
+- `dotnet build Assembly-CSharp.csproj --no-restore` 통과.
+- 경고 0개, 오류 0개.
+
+## 다음
+- `DamageResult.HitPointBefore`, `HitPointAfter`, `KilledByThisDamage`를 사용하는 피해/HP바 Presenter를 추가한다.
+- 사망 처리는 논리 상태 확정과 연출 완료 후 제거/비활성화 시점을 분리해서 설계한다.
 - 변수 주석과 규칙 문서 반영 후 `dotnet build Assembly-CSharp.csproj --no-restore` 재검증 통과.
 - 함수 주석과 규칙 문서 반영 후 `dotnet build Assembly-CSharp.csproj --no-restore` 재검증 통과.
 - 로그 한글화와 규칙 문서 반영 후 `dotnet build Assembly-CSharp.csproj --no-restore` 재검증 통과.

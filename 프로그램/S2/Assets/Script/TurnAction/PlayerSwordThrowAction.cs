@@ -122,12 +122,15 @@ public class PlayerSwordThrowAction : MonoBehaviour
         }
 
         playerContext.SwordState.SetDeployedPosition(targetPosition);
-        TryApplyDamageAtTarget(targetPosition, resolutionContext);
+        bool requestedDamage = TryRequestDamageAtTarget(fromPosition, targetPosition, resolutionContext);
         isSwordThrowSelected = false;
         SwordThrowCanceled?.Invoke();
 
         resolutionContext.Publish(new SwordThrownLogicEvent(playerContext.GridActor, fromPosition, targetPosition));
-        resolutionContext.EnqueuePresentation(PresentationEvent.SwordThrow(playerContext.GridActor, fromPosition, targetPosition, "검 투척 연출"));
+        if (!requestedDamage)
+        {
+            resolutionContext.EnqueuePresentation(PresentationEvent.SwordThrow(playerContext.GridActor, fromPosition, targetPosition, "검 투척 연출"));
+        }
 
         if (logActionState)
         {
@@ -138,34 +141,41 @@ public class PlayerSwordThrowAction : MonoBehaviour
     }
 
     /// <summary>
-    /// 검 투척 목표 칸에 피해 가능 대상이 있으면 피해를 적용하고 논리 이벤트를 발행한다.
+    /// 검 투척 목표 칸에 피해 가능 대상이 있으면 표준 피해 적용을 요청한다.
     /// </summary>
-    private void TryApplyDamageAtTarget(GridPosition targetPosition, ActionResolutionContext resolutionContext)
+    private bool TryRequestDamageAtTarget(GridPosition fromPosition, GridPosition targetPosition, ActionResolutionContext resolutionContext)
     {
         if (!GridManager.Instance.TryGetActorAt(targetPosition, out GridActor targetActor) || targetActor == playerContext.GridActor)
         {
-            return;
+            return false;
         }
 
-        IDamageable damageable = targetActor.GetComponent<IDamageable>();
-        if (damageable == null)
+        if (targetActor.GetComponent<IDamageable>() == null)
         {
             if (logActionState)
             {
                 Debug.Log($"{nameof(PlayerSwordThrowAction)}: {targetPosition} 칸의 {targetActor.name} 대상에는 {nameof(IDamageable)}이 없어 검만 이동합니다.", this);
             }
 
-            return;
+            return false;
         }
 
         int damage = playerContext.TurnData.SwordThrowDamage;
-        bool applied = damageable.TakeDamage(damage);
-        resolutionContext.Publish(new DamageAppliedLogicEvent(playerContext.GridActor, targetActor, targetPosition, damage, applied));
+        resolutionContext.Publish(new ApplyDamageLogicEvent(
+            playerContext.GridActor,
+            targetActor,
+            fromPosition,
+            targetPosition,
+            damage,
+            AttackPresentationKind.SwordThrow,
+            "검 투척 연출"));
 
         if (logActionState)
         {
-            Debug.Log($"{nameof(PlayerSwordThrowAction)}: 검 투척으로 {targetActor.name} 대상에게 {damage} 피해 적용을 시도했습니다. 적용 여부: {applied}", this);
+            Debug.Log($"{nameof(PlayerSwordThrowAction)}: 검 투척으로 {targetActor.name} 대상에게 {damage} 피해 적용을 요청했습니다.", this);
         }
+
+        return true;
     }
 
     /// <summary>

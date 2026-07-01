@@ -177,6 +177,42 @@ public sealed class SwordRecalledLogicEvent : IActionLogicEvent
 }
 
 /// <summary>
+/// 피해 적용과 그 결과 연출 생성을 요청하는 논리 이벤트다.
+/// 공격 행동은 피해 결과를 직접 해석하지 않고 이 이벤트로 표준 피해 처리를 요청한다.
+/// </summary>
+public sealed class ApplyDamageLogicEvent : IActionLogicEvent
+{
+    public GridActor Attacker { get; }
+    public GridActor Target { get; }
+    public GridPosition FromPosition { get; }
+    public GridPosition TargetPosition { get; }
+    public int Damage { get; }
+    public AttackPresentationKind PresentationKind { get; }
+    public string Message { get; }
+
+    /// <summary>
+    /// 지정한 공격과 피해 적용 요청 이벤트를 만든다.
+    /// </summary>
+    public ApplyDamageLogicEvent(
+        GridActor attacker,
+        GridActor target,
+        GridPosition fromPosition,
+        GridPosition targetPosition,
+        int damage,
+        AttackPresentationKind presentationKind,
+        string message)
+    {
+        Attacker = attacker;
+        Target = target;
+        FromPosition = fromPosition;
+        TargetPosition = targetPosition;
+        Damage = damage;
+        PresentationKind = presentationKind;
+        Message = message;
+    }
+}
+
+/// <summary>
 /// 피해 가능 대상에게 피해 적용을 시도했음을 알리는 논리 이벤트다.
 /// </summary>
 public sealed class DamageAppliedLogicEvent : IActionLogicEvent
@@ -184,18 +220,51 @@ public sealed class DamageAppliedLogicEvent : IActionLogicEvent
     public GridActor Attacker { get; }
     public GridActor Target { get; }
     public GridPosition TargetPosition { get; }
-    public int Damage { get; }
-    public bool Applied { get; }
+    public DamageResult Result { get; }
+    public int Damage => Result.Damage;
+    public bool Applied => Result.Applied;
 
     /// <summary>
     /// 지정한 공격자와 대상 사이의 피해 적용 이벤트를 만든다.
     /// </summary>
-    public DamageAppliedLogicEvent(GridActor attacker, GridActor target, GridPosition targetPosition, int damage, bool applied)
+    public DamageAppliedLogicEvent(GridActor attacker, GridActor target, GridPosition targetPosition, DamageResult result)
     {
         Attacker = attacker;
         Target = target;
         TargetPosition = targetPosition;
-        Damage = damage;
-        Applied = applied;
+        Result = result;
     }
+}
+
+/// <summary>
+/// 액터가 이번 피해 결과로 새로 전투불능이 됐음을 알리는 논리 이벤트다.
+/// </summary>
+public sealed class ActorDiedLogicEvent : IActionLogicEvent
+{
+    public GridActor Attacker { get; }
+    public GridActor DeadActor { get; }
+    public GridPosition DeadPosition { get; }
+    public DamageResult Result { get; }
+
+    /// <summary>
+    /// 지정한 액터의 전투불능 이벤트를 만든다.
+    /// </summary>
+    public ActorDiedLogicEvent(GridActor attacker, GridActor deadActor, GridPosition deadPosition, DamageResult result)
+    {
+        Attacker = attacker;
+        DeadActor = deadActor;
+        DeadPosition = deadPosition;
+        Result = result;
+    }
+}
+
+/// <summary>
+/// 공격과 피격을 하나의 연출 이벤트로 묶을 때 사용하는 공격 표현 종류다.
+/// </summary>
+public enum AttackPresentationKind
+{
+    None,
+    SwordThrow,
+    MeleeWithSword,
+    MeleeUnarmed,
 }

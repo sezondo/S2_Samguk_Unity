@@ -5,7 +5,7 @@
 public interface IDamageable
 {
     /// <summary>
-    /// 데미지 적용에 성공하면 true, 무적/사망 등으로 무시되면 false를 반환한다.
+    /// 데미지 적용 전후 HP 스냅샷과 적용 여부를 반환한다.
     /// </summary>
-    bool TakeDamage(int damage);
+    DamageResult TakeDamage(int damage);
 }

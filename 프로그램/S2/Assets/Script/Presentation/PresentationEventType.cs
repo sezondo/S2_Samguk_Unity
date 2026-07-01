@@ -14,6 +14,7 @@ public enum PresentationEventType
     SwordRecall,
     MeleeAttackWithSword,
     MeleeAttackUnarmed,
+    CombatAction,
     Interact,
     StageCleared,
     StageFailed,

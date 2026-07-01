@@ -2,8 +2,8 @@ using System.Collections;
 using UnityEngine;
 
 /// <summary>
-/// 검 투척, 회수, 근접 공격 연출 이벤트를 받아 임시 대기/로그 연출을 처리하는 Presenter다.
-/// 실제 직선 이펙트, 검 위치 표시, 근접 공격 애니메이션은 후속 아트 작업에서 이 컴포넌트를 확장해 연결한다.
+/// 검 투척, 회수, 근접 공격, 통합 전투 연출 이벤트를 받아 임시 대기/로그 연출을 처리하는 Presenter다.
+/// 실제 직선 이펙트, 검 위치 표시, 근접 공격 애니메이션, 피격/사망 애니메이션은 후속 아트 작업에서 이 컴포넌트를 확장해 연결한다.
 /// </summary>
 public class SwordActionPresenter : MonoBehaviour
 {
@@ -104,7 +104,8 @@ public class SwordActionPresenter : MonoBehaviour
         bool isSwordEvent = presentationEvent.Type == PresentationEventType.SwordThrow ||
             presentationEvent.Type == PresentationEventType.SwordRecall ||
             presentationEvent.Type == PresentationEventType.MeleeAttackWithSword ||
-            presentationEvent.Type == PresentationEventType.MeleeAttackUnarmed;
+            presentationEvent.Type == PresentationEventType.MeleeAttackUnarmed ||
+            presentationEvent.Type == PresentationEventType.CombatAction;
         if (!isSwordEvent || presentationEvent.Actor != ownerActor)
         {
             return false;
@@ -137,9 +138,10 @@ public class SwordActionPresenter : MonoBehaviour
         if (logSwordFlow)
         {
             Debug.Log($"{nameof(SwordActionPresenter)}: {presentationEvent.Type} 연출을 시작합니다. 시작 칸: {presentationEvent.FromPosition}, 목표 칸: {presentationEvent.ToPosition}", this);
+            LogCombatResult(presentationEvent);
         }
 
-        float duration = GetDuration(presentationEvent.Type);
+        float duration = GetDuration(presentationEvent);
         if (duration > 0f)
         {
             yield return new WaitForSeconds(duration);
@@ -166,9 +168,14 @@ public class SwordActionPresenter : MonoBehaviour
     /// <summary>
     /// 연출 이벤트 타입에 맞는 임시 대기 시간을 반환한다.
     /// </summary>
-    private float GetDuration(PresentationEventType eventType)
+    private float GetDuration(PresentationEvent presentationEvent)
     {
-        return eventType switch
+        if (presentationEvent.Type == PresentationEventType.CombatAction)
+        {
+            return GetCombatActionDuration(presentationEvent.AttackKind);
+        }
+
+        return presentationEvent.Type switch
         {
             PresentationEventType.SwordThrow => throwDuration,
             PresentationEventType.SwordRecall => recallDuration,
@@ -176,6 +183,35 @@ public class SwordActionPresenter : MonoBehaviour
             PresentationEventType.MeleeAttackUnarmed => meleeUnarmedDuration,
             _ => 0f,
         };
+    }
+
+    /// <summary>
+    /// 통합 전투 연출의 공격 종류에 맞는 임시 대기 시간을 반환한다.
+    /// </summary>
+    private float GetCombatActionDuration(AttackPresentationKind attackKind)
+    {
+        return attackKind switch
+        {
+            AttackPresentationKind.SwordThrow => throwDuration,
+            AttackPresentationKind.MeleeWithSword => meleeWithSwordDuration,
+            AttackPresentationKind.MeleeUnarmed => meleeUnarmedDuration,
+            _ => 0f,
+        };
+    }
+
+    /// <summary>
+    /// 통합 전투 연출 이벤트에 포함된 피격/사망 결과를 로그로 출력한다.
+    /// </summary>
+    private void LogCombatResult(PresentationEvent presentationEvent)
+    {
+        if (presentationEvent.Type != PresentationEventType.CombatAction || !presentationEvent.HasDamageResult)
+        {
+            return;
+        }
+
+        string targetName = presentationEvent.TargetActor != null ? presentationEvent.TargetActor.name : "없음";
+        DamageResult result = presentationEvent.DamageResult;
+        Debug.Log($"{nameof(SwordActionPresenter)}: 통합 전투 연출 결과. 공격 종류: {presentationEvent.AttackKind}, 대상: {targetName}, 피해량: {result.Damage}, HP: {result.HitPointBefore} -> {result.HitPointAfter}, 사망 여부: {result.KilledByThisDamage}", this);
     }
 
     /// <summary>

@@ -107,7 +107,7 @@ public class PlayerMeleeAttackAction : MonoBehaviour
             return false;
         }
 
-        if (!TryValidateTarget(targetPosition, out GridActor targetActor, out IDamageable damageable))
+        if (!TryValidateTarget(targetPosition, out GridActor targetActor))
         {
             return false;
         }
@@ -122,19 +122,25 @@ public class PlayerMeleeAttackAction : MonoBehaviour
 
         bool hasSword = playerContext.SwordState.IsRecalled;
         int damage = hasSword ? playerContext.TurnData.MeleeDamageWithSword : playerContext.TurnData.MeleeDamageWithoutSword;
-        bool applied = damageable.TakeDamage(damage);
 
         isMeleeAttackSelected = false;
         MeleeAttackCanceled?.Invoke();
 
         GridPosition attackerPosition = playerContext.GridActor.GridPosition;
-        resolutionContext.Publish(new DamageAppliedLogicEvent(playerContext.GridActor, targetActor, targetPosition, damage, applied));
-        resolutionContext.EnqueuePresentation(PresentationEvent.MeleeAttack(playerContext.GridActor, attackerPosition, targetPosition, hasSword, "근접 공격 연출"));
+        AttackPresentationKind attackKind = hasSword ? AttackPresentationKind.MeleeWithSword : AttackPresentationKind.MeleeUnarmed;
+        resolutionContext.Publish(new ApplyDamageLogicEvent(
+            playerContext.GridActor,
+            targetActor,
+            attackerPosition,
+            targetPosition,
+            damage,
+            attackKind,
+            "근접 공격 연출"));
 
         if (logActionState)
         {
             string swordStateText = hasSword ? "검 보유" : "검 없음";
-            Debug.Log($"{nameof(PlayerMeleeAttackAction)}: {targetActor.name} 대상에게 근접 공격을 실행했습니다. 상태: {swordStateText}, 피해량: {damage}, 적용 여부: {applied}", this);
+            Debug.Log($"{nameof(PlayerMeleeAttackAction)}: {targetActor.name} 대상에게 근접 공격 피해 적용을 요청했습니다. 상태: {swordStateText}, 피해량: {damage}", this);
         }
 
         return true;
@@ -210,10 +216,9 @@ public class PlayerMeleeAttackAction : MonoBehaviour
     /// <summary>
     /// 목표 칸이 플레이어 8방향 근접 칸이고 피해 가능 대상이 있는지 검사한다.
     /// </summary>
-    private bool TryValidateTarget(GridPosition targetPosition, out GridActor targetActor, out IDamageable damageable)
+    private bool TryValidateTarget(GridPosition targetPosition, out GridActor targetActor)
     {
         targetActor = null;
-        damageable = null;
 
         GridPosition attackerPosition = playerContext.GridActor.GridPosition;
         int deltaX = Mathf.Abs(targetPosition.x - attackerPosition.x);
@@ -231,8 +236,7 @@ public class PlayerMeleeAttackAction : MonoBehaviour
             return false;
         }
 
-        damageable = targetActor.GetComponent<IDamageable>();
-        if (damageable == null)
+        if (targetActor.GetComponent<IDamageable>() == null)
         {
             LogBlockedTarget(targetPosition, $"{targetActor.name} 대상에는 {nameof(IDamageable)}이 없습니다");
             return false;
