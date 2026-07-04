@@ -21,9 +21,23 @@ public class EnemyData : ScriptableObject
     // 경계 상태로 전환됐을 때 벽 인접 엄폐 칸으로 이동할 수 있는 최대 거리다.
     [SerializeField] private int alertReactionMoveRange = 3;
 
+    [Header("Turn AI")]
+    // 적 턴마다 이 적이 사용할 수 있는 행동 AP다.
+    [SerializeField] private int turnActionPoint = 2;
+    // 적 턴 이동 행동 1회로 이동할 수 있는 최대 칸 수다.
+    [SerializeField] private int turnMoveRange = 3;
+    // 적 원거리 공격이 닿는 최대 맨해튼 거리다.
+    [SerializeField] private int rangedAttackRange = 4;
+    // 적 원거리 공격이 적용할 피해량이다.
+    [SerializeField] private int rangedAttackDamage = 1;
+
     public int SightRange => sightRange;
     public bool UseAdjacentDetection => useAdjacentDetection;
     public int AdjacentDetectionRange => adjacentDetectionRange;
     public int AlertSpreadRange => alertSpreadRange;
     public int AlertReactionMoveRange => alertReactionMoveRange;
+    public int TurnActionPoint => turnActionPoint;
+    public int TurnMoveRange => turnMoveRange;
+    public int RangedAttackRange => rangedAttackRange;
+    public int RangedAttackDamage => rangedAttackDamage;
 }

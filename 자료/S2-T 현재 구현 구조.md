@@ -1,6 +1,6 @@
 ﻿# S2-T 현재 구현 구조
 
-최신 기준: 2026-06-24
+최신 기준: 2026-07-04
 브랜치: `turn-based-stealth`
 프로젝트 명칭: `S2-T`
 
@@ -10,7 +10,7 @@
 ## 최신 기준 요약
 
 - S2-T는 사이버 조선 세계관을 유지한 현재 메인 개발 방향의 보드게임식 턴제 잠입 퍼즐/전술 게임이다.
-- 플레이어는 한 명이며, AP를 사용해 격자 보드에서 이동한다.
+- 플레이어는 한 명이며, AP를 사용해 격자 보드에서 이동/해킹/검 행동/공격을 실행한다.
 - 이동은 목표 칸을 선택하면 BFS 경로를 따라 한 칸씩 처리하는 구조다.
 - 이동 가능 범위는 현재 AP와 AP당 이동 거리 기준으로 계산한다.
 - 적 시야는 `EnemyGridSight`가 그리드 칸 단위로 계산한다.
@@ -20,11 +20,13 @@
 - 현재 애드 구조는 단일 단계 전파 기준이며, 연쇄 전파는 맵 크기와 적 밀도 기준이 잡힌 뒤 확장한다.
 - 실제로 새로 발각된 적마다 `AlertDetectedPresenter`가 큐 순서에 맞춰 경고색 점멸을 재생한다.
 - Presenter의 색상 요청은 VisualRoot의 `ActorVisualController`가 실제 스프라이트에 적용한다.
+- 적 턴에는 경계 상태이고 전투불능이 아닌 적이 `EnemyActionPoint`의 AP를 사용해 원거리 공격과 엄폐 이동을 순서대로 수행한다.
+- 적 턴 AI는 `EnemyTacticalMovePlanner`와 `EnemyTacticalPositionScorer`를 재사용해 공격 가능한 엄폐 위치 또는 최고 엄폐 위치를 고른다.
 
 ## 현재 목표
 
-S2-T의 현재 구현 목표는 `이동 -> 위험 경고 -> 발각 이벤트 -> 애드 전파 -> 적 상태 전환`까지의 최소 루프를 만드는 것이다.
-현재 실제 피해, 적 AI 반응, 카메라 연출, UI 경고, 이동 일시 정지는 아직 구현하지 않는다.
+S2-T의 현재 구현 목표는 `이동 -> 위험 경고 -> 발각 이벤트 -> 애드 전파 -> 적 상태 전환 -> 적 턴 공격/엄폐 이동`까지의 최소 전술 루프를 안정화하는 것이다.
+현재 실제 피해와 전투 연출 이벤트 통로, 적 경계 반응, 적 턴 AI 1차 통로는 열려 있다. 카메라 연출, UI 경고, 이동 일시 정지, 실제 투사체/피격/사망 애니메이션은 아직 구현하지 않는다.
 
 ## 씬 구성 기준
 
@@ -35,9 +37,10 @@ S2-T의 현재 구현 목표는 `이동 -> 위험 경고 -> 발각 이벤트 -> 
 - `GridManager`: 보드 크기, 좌표 변환, 칸 상태, 점유 상태를 관리한다.
 - `TurnManager`: 플레이어/적 턴 전환 이벤트를 관리한다.
 - 플레이어 토큰: `PlayerContext`, `GridActor`, `ActionPoint`, `PlayerGridMoveAction`, `GridMoveRiskEvaluator`, `GridMoveRangeHighlighter`를 가진다.
-- 적 토큰: `EnemyContext`, `GridActor`, `EnemyGridSight`, `EnemyAlertState`를 가진다.
+- 적 토큰: `EnemyContext`, `GridActor`, `EnemyGridSight`, `EnemyAlertState`, `EnemyActionPoint`, `EnemyTurnAgent`, `EnemyAttackAction`을 가진다.
 - `EnemyRegistry`: 현재 씬의 활성 `EnemyContext` 목록을 관리한다.
-- `EnemyAlertCoordinator`: 플레이어 발각 이벤트를 구독하고 애드 전파를 처리한다.
+- `EnemyAlertCoordinator`: 플레이어 발각 이벤트와 피해 이벤트를 받아 애드 전파를 처리한다.
+- `EnemyTurnCoordinator`: 적 턴 시작 시 활성 적을 순서대로 실행하고 연출 큐 완료 후 다음 적을 처리한다.
 - Dialogue/VFX 관련 오브젝트는 필요한 테스트에서만 배치한다.
 
 ## 코드 폴더 구조
@@ -48,7 +51,7 @@ S2-T의 현재 구현 목표는 `이동 -> 위험 경고 -> 발각 이벤트 -> 
 - `Assets/Script/Turn`: 턴 진행과 AP 관리.
 - `Assets/Script/TurnAction`: 플레이어 이동 행동, 이동 범위 표시, 이동 경로 위험 평가.
 - `Assets/Script/Player`: 플레이어 핵심 참조를 모으는 `PlayerContext`.
-- `Assets/Script/Enemy`: 적 핵심 참조, 시야, 등록소, 애드 전파, 발각 상태.
+- `Assets/Script/Enemy`: 적 핵심 참조, 시야, 등록소, 애드 전파, 발각 상태, 적 턴 AI, 적 AP, 적 원거리 공격.
 - `Assets/Script/DataScript/Data`: 플레이어/적/대사/해킹 데이터 에셋.
 - `Assets/Script/Dialogue`: 말풍선 대사 시스템.
 - `Assets/Script/Common`: 공용 VFX 풀.
@@ -1686,4 +1689,78 @@ Unity 플레이 모드에서 공격 / 피해 1차 통로를 확인했다.
 
 
 
+
+
+## 적 턴 AI 1차
+
+### EnemyTurnCoordinator
+
+`EnemyTurnCoordinator`는 적 턴 시작 시 현재 씬의 활성 적들을 순서대로 실행하는 씬 단위 조정자다.
+
+책임:
+
+- `TurnManager.TurnStarted`를 구독해 적 턴 시작을 감지한다.
+- `EnemyRegistry.Enemies`의 적을 순서대로 확인한다.
+- 각 적의 `EnemyContext.TurnAgent`가 있으면 해당 적 턴 행동을 실행한다.
+- 적 하나의 논리 처리를 `ActionResolutionContext`로 확정한 뒤 `ActionPresentationQueue`를 재생한다.
+- 연출 큐가 비면 다음 적을 실행한다.
+- 모든 적 처리가 끝나면 적 턴을 종료하고 플레이어 턴으로 넘긴다.
+
+### EnemyTurnAgent
+
+`EnemyTurnAgent`는 적 하나의 2AP 행동 판단을 담당한다.
+
+현재 1차 규칙:
+
+- `EnemyAlertState.IsAlerted`인 적만 행동한다.
+- `ActorHealth.IsDead`가 true인 적은 행동하지 않는다.
+- 현재 위치에서 플레이어가 원거리 공격 사거리 안이면 공격 후 남은 AP로 최고 엄폐 위치를 찾는다.
+- 현재 위치가 최고 엄폐 위치면 이동하지 않는다.
+- 현재 위치에서 공격 사거리 밖이면 공격 가능한 엄폐 위치 중 점수가 가장 높은 칸으로 이동한 뒤 공격한다.
+- 공격 가능한 엄폐 위치가 없으면 공격하지 않고 이동 가능 범위 안의 최고 엄폐 위치로 이동 후 대기한다.
+- 이동은 1AP, 공격은 1AP를 소비한다.
+
+### EnemyAttackAction
+
+`EnemyAttackAction`은 적 원거리 공격 판정과 피해 적용 요청을 담당한다.
+
+책임:
+
+- 현재 적 위치 또는 후보 위치 기준 공격 사거리 판정.
+- 대상 `IDamageable` 확인.
+- 대상이 이미 `ActorHealth.IsDead`이면 공격하지 않음.
+- 공격 성공 시 `ApplyDamageLogicEvent`를 발행해 기존 `DamageResolutionCoordinator` 피해 흐름을 사용한다.
+- 적 원거리 공격 표현은 `AttackPresentationKind.EnemyRanged`를 사용한다.
+
+### EnemyAttackPresenter
+
+`EnemyAttackPresenter`는 적 원거리 공격 `CombatAction`을 임시 로그/대기 연출로 처리한다.
+실제 투사체, 피격 반응, 사망 애니메이션은 후속 아트 작업에서 확장한다.
+
+### EnemyTacticalMovePlanner 적 턴 확장
+
+`EnemyTacticalMovePlanner`는 기존 경계 반응 엄폐 이동 외에 적 턴 AI에서도 재사용된다.
+
+추가된 기준:
+
+- 현재 위치를 후보에 포함할 수 있다.
+- 후보 필터를 받아 공격 가능한 엄폐 위치만 고를 수 있다.
+- 현재 위치가 최고 후보면 빈 경로를 반환해 이동하지 않는 판단을 지원한다.
+
+### EnemyActionPoint
+
+`EnemyActionPoint`는 적 하나가 적 턴 행동에 사용할 AP를 관리한다.
+
+책임:
+
+- `EnemyData.TurnActionPoint` 기준 현재 AP와 최대 AP 제공.
+- `CanSpend()`, `TrySpend()`로 AP 소비 가능 여부와 실제 소비 처리.
+- `RefillForTurn()`으로 적 하나의 턴 행동 시작 시 AP를 보충.
+- AP 변경 이벤트 발행.
+
+현재 적 AP 보충은 `EnemyActionPoint`가 턴 이벤트를 직접 구독하지 않고, `EnemyTurnCoordinator`가 각 적 행동 실행 직전에 호출한다.
+이는 적들이 하나의 Enemy 턴 안에서 순서대로 행동하는 구조이기 때문이다.
+
+`EnemyTurnAgent`는 지역 AP 값을 만들지 않고 `EnemyContext.ActionPoint`를 통해 이동/공격 AP를 확인하고 소비한다.
+현재 이동 1회와 원거리 공격 1회는 각각 AP 1을 소비한다.
 

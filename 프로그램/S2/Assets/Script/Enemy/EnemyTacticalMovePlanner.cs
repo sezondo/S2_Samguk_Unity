@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 
 /// <summary>
@@ -21,24 +22,63 @@ public sealed class EnemyTacticalMovePlanner
         List<EnemyTacticalPositionScoreResult> scoreResults,
         out GridPosition targetPosition)
     {
+        return TryFindBestCoverPath(
+            gridManager,
+            startPosition,
+            knownPlayerPosition,
+            moveRange,
+            scoreSettings,
+            path,
+            scoreResults,
+            out targetPosition,
+            null,
+            false);
+    }
+
+    /// <summary>
+    /// 이동 가능 범위 안에서 조건을 만족하는 최적 엄폐 위치와 경로를 찾는다.
+    /// 현재 위치를 후보에 포함하면 최선 위치가 현재 위치일 때 빈 경로를 반환한다.
+    /// </summary>
+    public bool TryFindBestCoverPath(
+        GridManager gridManager,
+        GridPosition startPosition,
+        GridPosition knownPlayerPosition,
+        int moveRange,
+        EnemyTacticalPositionScoreSettings scoreSettings,
+        List<GridPosition> path,
+        List<EnemyTacticalPositionScoreResult> scoreResults,
+        out GridPosition targetPosition,
+        Func<GridPosition, bool> candidateFilter = null,
+        bool includeStartPosition = true)
+    {
         path.Clear();
         scoreResults?.Clear();
         targetPosition = GridPosition.Zero;
 
-        if (gridManager == null || moveRange <= 0)
+        if (gridManager == null || moveRange < 0)
         {
             return false;
         }
 
         reachableDistances.Clear();
-        GridPathfinder.FindReachablePositionDistances(gridManager, startPosition, moveRange, reachableDistances);
+        if (moveRange > 0)
+        {
+            GridPathfinder.FindReachablePositionDistances(gridManager, startPosition, moveRange, reachableDistances);
+        }
+
+        if (includeStartPosition && gridManager.IsInside(startPosition))
+        {
+            reachableDistances[startPosition] = 0;
+        }
 
         EnemyTacticalPositionScoreResult bestResult = default;
         bool found = false;
         foreach (KeyValuePair<GridPosition, int> pair in reachableDistances)
         {
             GridPosition candidate = pair.Key;
-            if (candidate == startPosition || !EnemyTacticalPositionScorer.IsCoverCandidate(gridManager, candidate, knownPlayerPosition))
+            if ((!includeStartPosition && candidate == startPosition) ||
+                !EnemyTacticalPositionScorer.IsCoverCandidate(gridManager, candidate, knownPlayerPosition) ||
+                (candidateFilter != null && !candidateFilter(candidate)))
             {
                 continue;
             }
@@ -60,7 +100,18 @@ public sealed class EnemyTacticalMovePlanner
             }
         }
 
-        return found && GridPathfinder.TryFindPath(gridManager, startPosition, targetPosition, moveRange, path);
+        if (!found)
+        {
+            return false;
+        }
+
+        if (targetPosition == startPosition)
+        {
+            path.Clear();
+            return true;
+        }
+
+        return GridPathfinder.TryFindPath(gridManager, startPosition, targetPosition, moveRange, path);
     }
 
     /// <summary>

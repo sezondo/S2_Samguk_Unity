@@ -17,6 +17,12 @@ public class EnemyContext : MonoBehaviour
     [SerializeField] private EnemyGridSight gridSight;
     // 적의 현재 경계 상태를 보관하고 전환 요청을 처리하는 컴포넌트다.
     [SerializeField] private EnemyAlertState alertState;
+    // 적 턴 행동에서 소비하는 AP 컴포넌트다. 적 턴 AI를 쓰는 씬에서 연결한다.
+    [SerializeField] private EnemyActionPoint actionPoint;
+    // 적 턴에 자기 행동을 결정하고 실행하는 선택 컴포넌트다. 적 턴 AI를 쓰는 씬에서 연결한다.
+    [SerializeField] private EnemyTurnAgent turnAgent;
+    // 적 원거리 공격 판정과 피해 요청을 담당하는 선택 컴포넌트다. 적 턴 AI를 쓰는 씬에서 연결한다.
+    [SerializeField] private EnemyAttackAction attackAction;
     // 현재 EnemyRegistry에 등록되어 있는지 나타낸다.
     private bool registeredToRegistry;
 
@@ -24,6 +30,9 @@ public class EnemyContext : MonoBehaviour
     public GridActor GridActor => gridActor;
     public EnemyGridSight GridSight => gridSight;
     public EnemyAlertState AlertState => alertState;
+    public EnemyActionPoint ActionPoint => actionPoint;
+    public EnemyTurnAgent TurnAgent => turnAgent;
+    public EnemyAttackAction AttackAction => attackAction;
 
     /// <summary>
     /// 적 Context에 필요한 참조를 확인한다.

@@ -1128,3 +1128,67 @@
 ## 검증
 - `dotnet build Assembly-CSharp.csproj --no-restore` 통과.
 - 경고 0개, 오류 0개.
+
+## 2026-07-02 적 턴 AI 1차
+
+## 핵심
+- 적 턴에 경계 상태 적이 2AP 안에서 원거리 공격과 엄폐 이동을 수행하는 1차 AI 구조를 추가했다.
+- `EnemyTurnCoordinator`를 추가해 적 턴 시작 시 `EnemyRegistry`의 적을 순서대로 실행하고, 각 적 연출 큐가 끝난 뒤 다음 적으로 넘어가게 했다.
+- `EnemyTurnAgent`를 추가해 적 하나의 행동 우선순위를 처리하게 했다.
+- 적은 살아 있고 경계 상태일 때만 행동한다. `ActorHealth.IsDead`가 true인 적은 적 턴 행동을 생략한다.
+- 현재 위치에서 공격 사거리 안이면 공격 후 남은 AP로 최고 엄폐 위치를 찾고, 현재 위치가 최고면 움직이지 않는다.
+- 공격 사거리 밖이면 공격 가능한 엄폐 위치 중 점수가 가장 높은 곳으로 이동한 뒤 공격한다.
+- 공격 가능한 엄폐 위치가 없으면 공격하지 않고 이동 가능 범위 안의 최고 엄폐 위치로 이동 후 대기한다.
+- `EnemyAttackAction`을 추가해 적 원거리 공격을 기존 `ApplyDamageLogicEvent -> DamageResolutionCoordinator -> CombatAction` 피해 처리 흐름에 연결했다.
+- `EnemyTacticalMovePlanner`를 확장해 현재 위치 포함 여부와 후보 필터를 받아 적 턴 AI에서도 기존 엄폐 점수 계산을 재사용하게 했다.
+- `EnemyData`에 적 턴 AP, 턴 이동 거리, 원거리 공격 사거리, 원거리 공격 피해량을 추가했다.
+- `EnemyContext`에 `EnemyTurnAgent`, `EnemyAttackAction` 참조를 추가했다.
+- `EnemyAttackPresenter`를 추가해 적 원거리 공격 `CombatAction`을 임시 로그/대기 연출로 처리할 수 있게 했다.
+
+## 검증
+- `dotnet build Assembly-CSharp.csproj --no-restore` 통과.
+- 경고 0개, 오류 0개.
+
+## 다음
+- Tset 씬에 `EnemyTurnCoordinator`를 배치하고 `PlayerContext`, `TurnManager`, `ActionPresentationQueue`를 연결한다.
+- 각 적 `EnemyContext`에 `EnemyTurnAgent`, `EnemyAttackAction`을 연결한다.
+- 각 적에 `EnemyAttackPresenter`를 연결하거나 임시로 큐 자동 완료 로그를 확인한다.
+- 플레이 모드에서 경계 상태 적의 공격 가능 시 공격 후 재배치, 공격 불가 시 공격 가능한 엄폐 위치 이동 후 공격, 공격 가능한 엄폐 위치 없음 시 최고 엄폐 위치 이동 후 대기 흐름을 확인한다.
+
+## 2026-07-04 적 AP 컴포넌트 분리
+
+## 핵심
+- 적 턴 AI에서 지역 변수로 관리하던 AP를 `EnemyActionPoint` 전용 컴포넌트로 분리했다.
+- `EnemyActionPoint`는 `EnemyData.TurnActionPoint`를 기준으로 `Current`, `Max`, `CanSpend()`, `TrySpend()`, `RefillForTurn()`을 제공한다.
+- `EnemyContext`에 `EnemyActionPoint ActionPoint` 참조를 추가했다.
+- `EnemyTurnCoordinator`는 각 적 행동 실행 직전에 `EnemyContext.ActionPoint.RefillForTurn()`을 호출한다.
+- `EnemyTurnAgent`는 이동/공격 전 `CanSpend(1)`을 확인하고, 행동 성공 후 `TrySpend(1)`로 AP를 소비한다.
+- 적 이동 1회와 원거리 공격 1회는 각각 AP 1을 소비한다.
+
+## 검증
+- `dotnet build Assembly-CSharp.csproj --no-restore` 통과.
+- 경고 0개, 오류 0개.
+
+## 다음
+- Tset 씬의 각 적에 `EnemyActionPoint`를 추가하고 `EnemyContext.ActionPoint`에 연결한다.
+- 기존 `EnemyTurnAgent`, `EnemyAttackAction` 참조도 함께 연결해 적 턴 AI를 플레이 모드에서 확인한다.
+
+## 2026-07-04 적 턴 AI 플레이 모드 테스트 확인
+
+## 핵심
+- 현재 코드 기준으로 적 턴 AI와 `EnemyActionPoint` 분리 구조를 플레이 모드에서 테스트 완료했다.
+- `EnemyTurnCoordinator`가 적 턴 시작 시 활성 적을 순서대로 실행하는 흐름을 확인했다.
+- 각 적의 `EnemyActionPoint`가 턴 행동 시작 시 보충되고, 이동/공격 성공 시 AP 1씩 소비되는 흐름을 확인했다.
+- 경계 상태이고 전투불능이 아닌 적만 행동하는 기준을 확인했다.
+- 공격 사거리 안에서는 원거리 공격 후 엄폐 위치 재평가를 수행하는 흐름을 확인했다.
+- 공격 사거리 밖에서는 공격 가능한 엄폐 위치로 이동한 뒤 공격하는 흐름을 확인했다.
+- 공격 가능한 엄폐 위치가 없을 때는 공격하지 않고 최고 엄폐 위치로 이동 후 대기하는 기준을 확인했다.
+
+## 검증
+- Unity 플레이 모드 테스트 완료.
+- `EnemyDataTest.asset`, `Tset.unity` 기준 인스펙터 연결과 수치 조정이 반영된 상태다.
+
+## 다음
+- 적 원거리 공격의 임시 로그 연출을 실제 투사체/피격 연출로 교체한다.
+- `ActorDiedLogicEvent` 이후 사망 제거/비활성화/점유 해제 타이밍을 정한다.
+- 적 유형별 자리 고수, 엄폐 우선, 즉시 공격 같은 정책 분기를 `EnemyData` 또는 별도 정책 컴포넌트로 확장할지 검토한다.
