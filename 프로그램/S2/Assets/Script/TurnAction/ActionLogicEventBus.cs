@@ -17,6 +17,7 @@ public static class ActionLogicEventBus
     static ActionLogicEventBus()
     {
         Register(DamageResolutionCoordinator.Instance);
+        Register(ActorDeathCoordinator.Instance);
     }
 
     /// <summary>

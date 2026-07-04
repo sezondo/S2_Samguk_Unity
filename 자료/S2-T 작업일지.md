@@ -1192,3 +1192,22 @@
 - 적 원거리 공격의 임시 로그 연출을 실제 투사체/피격 연출로 교체한다.
 - `ActorDiedLogicEvent` 이후 사망 제거/비활성화/점유 해제 타이밍을 정한다.
 - 적 유형별 자리 고수, 엄폐 우선, 즉시 공격 같은 정책 분기를 `EnemyData` 또는 별도 정책 컴포넌트로 확장할지 검토한다.
+
+## 2026-07-04 논리 사망 처리 1차
+
+## 핵심
+- `ActorDiedLogicEvent`를 처리하는 기본 논리 핸들러 `ActorDeathCoordinator`를 추가했다.
+- 사망한 액터는 GameObject를 제거하거나 비활성화하지 않고, `GridActor.ReleaseCellOccupation()`으로 현재 칸 점유만 해제한다.
+- `GridActor.ReleaseCellOccupation()`은 런타임 점유 등록을 해제하고 이후 해당 액터가 칸 진입을 막지 않도록 `occupyCell`을 false로 바꾼다.
+- 죽은 적은 `EnemyGridSight.CanDetect()`에서 감지자로 동작하지 않게 했다.
+- 죽은 적은 `EnemyAlertCoordinator`의 애드 전파 수신 대상에서 제외했다.
+- 사망 애니메이션, 시체 정렬, 플레이어와 시체가 같은 칸에 있을 때의 표시 우선순위는 아트/연출 작업 때 처리하기로 메모만 남긴다.
+
+## 검증
+- `dotnet build Assembly-CSharp.csproj --no-restore` 통과.
+- 경고 0개, 오류 0개.
+
+## 다음
+- Unity 플레이 모드에서 적 사망 후 해당 칸으로 플레이어가 진입 가능한지 확인한다.
+- 죽은 적이 이후 이동 위험 평가에서 더 이상 감지자로 잡히지 않는지 확인한다.
+- 사망 연출 아트가 준비되면 `CombatAction`의 `DamageResult.KilledByThisDamage` 기준으로 사망 애니메이션과 시체 정렬을 연결한다.

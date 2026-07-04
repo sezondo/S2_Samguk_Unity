@@ -1764,3 +1764,29 @@ Unity 플레이 모드에서 공격 / 피해 1차 통로를 확인했다.
 `EnemyTurnAgent`는 지역 AP 값을 만들지 않고 `EnemyContext.ActionPoint`를 통해 이동/공격 AP를 확인하고 소비한다.
 현재 이동 1회와 원거리 공격 1회는 각각 AP 1을 소비한다.
 
+
+## 논리 사망 처리
+
+### ActorDeathCoordinator
+
+`ActorDeathCoordinator`는 `ActorDiedLogicEvent`를 처리하는 기본 논리 이벤트 처리자다.
+씬 배치 없이 `ActionLogicEventBus`에 기본 등록된다.
+
+현재 기준:
+
+- 사망한 액터의 GameObject는 삭제하거나 비활성화하지 않는다.
+- 사망 상태는 `ActorHealth.IsDead`를 기준으로 판단한다.
+- 사망 시 `GridActor.ReleaseCellOccupation()`을 호출해 현재 칸 점유만 해제한다.
+- 점유가 해제된 시체는 같은 칸으로 다른 액터가 들어오는 것을 막지 않는다.
+- 사망 애니메이션, 시체 스프라이트 정렬, 플레이어와 시체가 같은 칸에 있을 때의 표시 우선순위는 Presenter/Visual 작업에서 처리한다.
+
+### GridActor 사망 점유 해제
+
+`GridActor.ReleaseCellOccupation()`은 오브젝트의 논리 위치는 유지하면서 GridManager 점유 테이블에서만 액터를 제거한다.
+호출 후 `occupyCell`은 false가 되어 해당 액터가 다시 활성화되더라도 전술 점유자로 재등록되지 않는다.
+
+### 죽은 적 제외 기준
+
+- `EnemyGridSight.CanDetect()`는 자기 `ActorHealth.IsDead`가 true면 감지하지 않는다.
+- `EnemyAlertCoordinator`는 죽은 적을 애드 전파 수신 대상에서 제외한다.
+- `EnemyTurnAgent`는 기존처럼 죽은 적의 적 턴 행동을 생략한다.

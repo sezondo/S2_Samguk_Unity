@@ -223,7 +223,13 @@ public class EnemyAlertCoordinator : MonoBehaviour, IActionLogicEventHandler
     /// </summary>
     private static bool CanReceiveAlert(EnemyContext enemy)
     {
-        return enemy != null && enemy.enabled && enemy.HasValidReference() && enemy.AlertState != null && enemy.AlertState.enabled;
+        if (enemy == null || !enemy.enabled || !enemy.HasValidReference() || enemy.AlertState == null || !enemy.AlertState.enabled)
+        {
+            return false;
+        }
+
+        ActorHealth health = enemy.GridActor != null ? enemy.GridActor.GetComponent<ActorHealth>() : null;
+        return health == null || !health.IsDead;
     }
 
     /// <summary>

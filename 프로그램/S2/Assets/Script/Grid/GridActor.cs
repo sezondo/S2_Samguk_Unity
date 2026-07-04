@@ -106,6 +106,26 @@ public class GridActor : MonoBehaviour
     }
 
     /// <summary>
+    /// 현재 칸 점유를 해제하고 이후 이 말이 다른 말의 진입을 막지 않게 한다.
+    /// 사망한 액터처럼 오브젝트는 남기되 전술 점유만 제거할 때 사용한다.
+    /// </summary>
+    public void ReleaseCellOccupation()
+    {
+        if (!occupyCell)
+        {
+            return;
+        }
+
+        if (EnsureGridManager() && registeredOnGrid)
+        {
+            gridManager.UnregisterActor(this, gridPosition);
+        }
+
+        registeredOnGrid = false;
+        occupyCell = false;
+    }
+
+    /// <summary>
     /// GridManager 참조 확보, 점유 등록, 위치 스냅을 순서대로 시도한다.
     /// </summary>
     private bool TryInitializeOnGrid()
