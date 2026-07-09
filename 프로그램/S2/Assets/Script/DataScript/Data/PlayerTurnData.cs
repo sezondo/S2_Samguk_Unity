@@ -45,6 +45,16 @@ public class PlayerTurnData : ScriptableObject
     // 검을 소유하지 않을 때 근접 공격으로 적용할 피해량이다.
     [SerializeField] private int meleeDamageWithoutSword = 1;
 
+    [Header("Gun")]
+    // 총 공격 행동 1회가 소비하는 AP 비용이다.
+    [SerializeField] private int gunAttackActionPointCost = 1;
+    // 플레이어 현재 위치 기준으로 총 공격 대상을 선택할 수 있는 최대 맨해튼 거리다.
+    [SerializeField] private int gunAttackRange = 5;
+    // 총 공격으로 적용할 피해량이다.
+    [SerializeField] private int gunAttackDamage = 2;
+    // 플레이어가 보유할 수 있는 총알 수다. 현재 총알은 PlayerGunAmmo가 런타임 상태로 보관한다.
+    [SerializeField] private int maxGunAmmo = 3;
+
     public int MaxActionPoint => maxActionPoint;
     public int StartTurnActionPoint => startTurnActionPoint;
     public int MoveDistancePerActionPoint => moveDistancePerActionPoint;
@@ -59,4 +69,8 @@ public class PlayerTurnData : ScriptableObject
     public int MeleeAttackActionPointCost => meleeAttackActionPointCost;
     public int MeleeDamageWithSword => meleeDamageWithSword;
     public int MeleeDamageWithoutSword => meleeDamageWithoutSword;
+    public int GunAttackActionPointCost => gunAttackActionPointCost;
+    public int GunAttackRange => gunAttackRange;
+    public int GunAttackDamage => gunAttackDamage;
+    public int MaxGunAmmo => maxGunAmmo;
 }

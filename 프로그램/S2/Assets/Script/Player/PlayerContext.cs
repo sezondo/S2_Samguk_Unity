@@ -33,6 +33,10 @@ public class PlayerContext : MonoBehaviour
     [SerializeField] private PlayerSwordRecallAction swordRecallAction;
     // 플레이어 근접 공격 행동 판정과 실행을 담당하는 선택 컴포넌트다. 근접 공격 기능을 쓰는 씬에서 연결한다.
     [SerializeField] private PlayerMeleeAttackAction meleeAttackAction;
+    // 플레이어 총 공격의 현재 총알 수를 보관하는 선택 컴포넌트다. 총 공격 기능을 쓰는 씬에서 연결한다.
+    [SerializeField] private PlayerGunAmmo gunAmmo;
+    // 플레이어 총 공격 행동 판정과 실행을 담당하는 선택 컴포넌트다. 총 공격 기능을 쓰는 씬에서 연결한다.
+    [SerializeField] private PlayerGunAttackAction gunAttackAction;
 
     public PlayerTurnData TurnData => turnData;
     public PlayerInputReader InputReader => inputReader;
@@ -46,6 +50,8 @@ public class PlayerContext : MonoBehaviour
     public PlayerSwordThrowAction SwordThrowAction => swordThrowAction;
     public PlayerSwordRecallAction SwordRecallAction => swordRecallAction;
     public PlayerMeleeAttackAction MeleeAttackAction => meleeAttackAction;
+    public PlayerGunAmmo GunAmmo => gunAmmo;
+    public PlayerGunAttackAction GunAttackAction => gunAttackAction;
 
     /// <summary>
     /// 플레이어 Context에 필수 참조가 모두 연결되어 있는지 확인한다.

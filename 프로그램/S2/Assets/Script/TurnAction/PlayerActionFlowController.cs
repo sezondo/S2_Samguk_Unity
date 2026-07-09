@@ -180,6 +180,33 @@ public class PlayerActionFlowController : MonoBehaviour
     }
 
     /// <summary>
+    /// 플레이어 총 공격 행동을 실행하고 논리 처리가 끝나면 연출 큐를 재생한다.
+    /// </summary>
+    public bool TryExecuteGunAttack(GridPosition targetPosition)
+    {
+        if (!CanStartAction())
+        {
+            return false;
+        }
+
+        if (playerContext.GunAttackAction == null)
+        {
+            Debug.LogError($"{nameof(PlayerActionFlowController)} on {name}에는 {nameof(PlayerContext)}에 연결된 {nameof(PlayerGunAttackAction)} 참조가 필요합니다.", this);
+            return false;
+        }
+
+        ActionResolutionContext resolutionContext = new(presentationQueue);
+        if (!playerContext.GunAttackAction.TryExecuteGunAttack(targetPosition, resolutionContext))
+        {
+            return false;
+        }
+
+        resolutionContext.Resolve();
+        presentationQueue.PlayQueuedEvents();
+        return true;
+    }
+
+    /// <summary>
     /// 현재 플레이어 행동을 시작할 수 있는지 확인한다.
     /// </summary>
     private bool CanStartAction()

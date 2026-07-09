@@ -1211,3 +1211,62 @@
 - Unity 플레이 모드에서 적 사망 후 해당 칸으로 플레이어가 진입 가능한지 확인한다.
 - 죽은 적이 이후 이동 위험 평가에서 더 이상 감지자로 잡히지 않는지 확인한다.
 - 사망 연출 아트가 준비되면 `CombatAction`의 `DamageResult.KilledByThisDamage` 기준으로 사망 애니메이션과 시체 정렬을 연결한다.
+
+## 2026-07-04 논리 사망 처리 플레이 모드 테스트 확인
+
+## 핵심
+- Unity 플레이 모드에서 논리 사망 처리 1차 구조를 테스트 완료했다.
+- 적 사망 시 GameObject는 유지되고, `GridActor.ReleaseCellOccupation()`으로 해당 칸 점유만 해제되는 흐름을 확인했다.
+- 사망한 적이 있던 칸으로 플레이어가 진입 가능한 것을 확인했다.
+- 죽은 적이 이후 시야 감지자로 동작하지 않는 기준을 확인했다.
+- 별도 디버그 표시 보강은 현재 필요하지 않다고 판단했다.
+- 사망 애니메이션, 시체 정렬, 플레이어와 시체가 같은 칸에 있을 때의 표시 우선순위는 아트가 준비된 뒤 연출 작업과 함께 처리하기로 했다.
+
+## 검증
+- Unity 플레이 모드 테스트 완료.
+
+## 다음
+- 사망 연출 아트가 준비되면 `CombatAction`의 `DamageResult.KilledByThisDamage` 기준으로 사망 애니메이션과 시체 정렬을 연결한다.
+- 그 전까지는 다음 게임플레이 작업 후보를 별도로 선정한다.
+
+## 2026-07-08 플레이어 총 공격 1차
+
+## 핵심
+- 플레이어 원거리 총 공격 행동 1차 통로를 추가했다.
+- 총 공격은 플레이어 현재 칸 기준 맨해튼 사거리 안의 `IDamageable` 대상을 공격한다.
+- 총 공격은 기존 피해 처리 흐름인 `ApplyDamageLogicEvent -> DamageResolutionCoordinator -> CombatAction`을 재사용한다.
+- 총 공격은 AP 비용과 총알 1발을 함께 요구하며, 실행 시 AP와 총알을 각각 소비한다.
+- `PlayerTurnData`에 총 공격 AP 비용, 사거리, 피해량, 최대 총알 수를 추가했다.
+- 현재 총알 수는 `PlayerTurnData`가 아니라 `PlayerGunAmmo` 런타임 컴포넌트가 보관하도록 분리했다.
+- `PlayerContext`, `PlayerInputReader`, `PlayerActionFlowController`에 총 공격 선택/실행 연결점을 추가했다.
+- 임시 디버그 입력 기준 총 공격 선택 키는 G다.
+- 디버그 오버레이에 총알 수와 총 공격 선택 상태를 표시하게 했다.
+
+## 검증
+- `dotnet build Assembly-CSharp.csproj --no-restore` 통과.
+- 경고 0개, 오류 0개.
+
+## 다음
+- Tset 씬의 플레이어에 `PlayerGunAmmo`, `PlayerGunAttackAction`, `PlayerGunAttackInputController`를 추가하고 `PlayerContext` 참조를 연결한다.
+- `PlayerTurnData` 에셋에서 총 공격 사거리, 피해량, 최대 총알 수를 테스트 기준으로 조정한다.
+- 플레이 모드에서 G 총 공격 선택, 좌클릭 공격, AP/총알 소비, 피해/사망/애드 전파 흐름을 확인한다.
+
+## 2026-07-09 플레이어 공격 Presenter 책임 분리
+
+## 핵심
+- 기존 `SwordActionPresenter`가 검 투척/회수뿐 아니라 근접 공격과 플레이어 총 공격까지 처리하던 책임을 기능별로 분리했다.
+- `SwordActionPresenter`는 검 투척, 검 회수, 검 투척 피해의 `CombatAction`만 처리한다.
+- `PlayerMeleeAttackPresenter`를 추가해 `MeleeWithSword`, `MeleeUnarmed` 근접 공격 연출을 처리하게 했다.
+- `PlayerGunAttackPresenter`를 추가해 `PlayerGun` 총 공격 연출을 처리하게 했다.
+- 각 Presenter가 `PresentationEventType`과 `AttackPresentationKind`, `ownerActor`를 함께 검사해 하나의 `CombatAction`을 중복 처리하지 않게 했다.
+- 현재 사용하지 않는 근접 공격 전용 `PresentationEventType`은 기존 호환성을 위해 `PlayerMeleeAttackPresenter`가 계속 처리한다.
+- 씬과 프리팹 인스펙터 연결은 변경하지 않았다.
+
+## 검증
+- `dotnet build Assembly-CSharp.csproj --no-restore` 통과.
+- 경고 0개, 오류 0개.
+
+## 다음
+- `Tset` 씬의 기존 `SwordActionPresenter`에는 `ownerActor` 연결을 유지한다.
+- 플레이어 연출 오브젝트에 `PlayerMeleeAttackPresenter`, `PlayerGunAttackPresenter`를 추가하고 각각 플레이어 `GridActor`를 `ownerActor`로 연결한다.
+- 플레이 모드에서 검 투척/회수, 검 보유/미보유 근접 공격, 총 공격이 각각 한 Presenter에서만 처리되는지 확인한다.

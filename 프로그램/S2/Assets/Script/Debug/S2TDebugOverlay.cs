@@ -218,6 +218,7 @@ public class S2TDebugOverlay : MonoBehaviour, IActionLogicEventHandler
         AppendPlayerActionPoint();
         AppendPlayerHealth();
         AppendSwordState();
+        AppendGunState();
         AppendActionSelectionState();
     }
 
@@ -278,6 +279,24 @@ public class S2TDebugOverlay : MonoBehaviour, IActionLogicEventHandler
     }
 
     /// <summary>
+    /// 총알 상태를 출력 버퍼에 추가한다.
+    /// </summary>
+    private void AppendGunState()
+    {
+        PlayerGunAmmo gunAmmo = playerContext.GunAmmo;
+        if (gunAmmo == null)
+        {
+            builder.AppendLine("Gun Ammo: None");
+            return;
+        }
+
+        builder.Append("Gun Ammo: ");
+        builder.Append(gunAmmo.CurrentAmmo);
+        builder.Append(" / ");
+        builder.AppendLine(gunAmmo.MaxAmmo.ToString());
+    }
+
+    /// <summary>
     /// 현재 행동 선택 상태를 출력 버퍼에 추가한다.
     /// </summary>
     private void AppendActionSelectionState()
@@ -290,6 +309,8 @@ public class S2TDebugOverlay : MonoBehaviour, IActionLogicEventHandler
         builder.AppendLine(playerContext.SwordThrowAction != null ? playerContext.SwordThrowAction.IsSwordThrowSelected.ToString() : "None");
         builder.Append("Melee Selected: ");
         builder.AppendLine(playerContext.MeleeAttackAction != null ? playerContext.MeleeAttackAction.IsMeleeAttackSelected.ToString() : "None");
+        builder.Append("Gun Selected: ");
+        builder.AppendLine(playerContext.GunAttackAction != null ? playerContext.GunAttackAction.IsGunAttackSelected.ToString() : "None");
     }
 
     /// <summary>

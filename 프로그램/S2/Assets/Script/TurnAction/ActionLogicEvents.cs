@@ -267,5 +267,6 @@ public enum AttackPresentationKind
     SwordThrow,
     MeleeWithSword,
     MeleeUnarmed,
+    PlayerGun,
     EnemyRanged,
 }

@@ -1326,8 +1326,8 @@ PlayerSwordRecallAction은 거리 제한 없이 검을 플레이어 현재 칸�
 
 ### SwordActionPresenter
 
-SwordActionPresenter는 PresentationEventType.SwordThrow, PresentationEventType.SwordRecall을 받아 임시 대기/로그 연출을 처리한다.
-실제 직선 이펙트와 검 위치 표시는 후속 아트 작업에서 이 Presenter를 확장해 연결한다.
+SwordActionPresenter는 `PresentationEventType.SwordThrow`, `PresentationEventType.SwordRecall`, `AttackPresentationKind.SwordThrow`인 `CombatAction`을 받아 임시 대기/로그 연출을 처리한다.
+실제 직선 이펙트, 검 위치 표시, 검 투척 피격/사망 연출은 후속 아트 작업에서 이 Presenter를 확장해 연결한다.
 
 
 
@@ -1465,7 +1465,7 @@ SwordActionPresenter는 PresentationEventType.SwordThrow, PresentationEventType.
 - `PresentationEventType.MeleeAttackWithSword`: 검 보유 근접 공격 연출.
 - `PresentationEventType.MeleeAttackUnarmed`: 검 없음 근접 공격 연출.
 
-현재 `SwordActionPresenter`가 두 이벤트를 임시 대기/로그 방식으로 처리한다.
+현재 `PlayerMeleeAttackPresenter`가 두 이벤트와 `MeleeWithSword`, `MeleeUnarmed` 종류의 `CombatAction`을 임시 대기/로그 방식으로 처리한다.
 후속 작업에서 검 보유 근접 공격과 검 없음 근접 공격의 실제 애니메이션, 이펙트, 타격 타이밍을 분리해 확장한다.
 
 ### 2026-06-28 테스트 확인
@@ -1683,8 +1683,14 @@ Unity 플레이 모드에서 공격 / 피해 1차 통로를 확인했다.
 - 피해 결과 `DamageResult`.
 - 피해 결과 포함 여부 `HasDamageResult`.
 
-현재 `SwordActionPresenter`가 `CombatAction`을 임시 로그/대기 방식으로 처리한다.
-후속 작업에서 실제 공격 애니메이션, 피격 반응, 사망 애니메이션을 이 이벤트 안에서 연결한다.
+플레이어 공격 `CombatAction`은 공격 종류별 Presenter가 임시 로그/대기 방식으로 처리한다.
+
+- `SwordActionPresenter`: `SwordThrow`
+- `PlayerMeleeAttackPresenter`: `MeleeWithSword`, `MeleeUnarmed`
+- `PlayerGunAttackPresenter`: `PlayerGun`
+
+각 Presenter는 `PresentationEventType`, `AttackPresentationKind`, `ownerActor`를 함께 검사해 자기 공격 이벤트만 처리한다.
+후속 작업에서 실제 공격 애니메이션, 피격 반응, 사망 애니메이션을 각 공격 Presenter에 연결한다.
 현재 피격측 처리는 로그 확인용이다. 아트/애니메이션이 준비되면 `TargetActor`로 피격 주체를 찾고 `DamageResult`의 HP 전후 값과 `KilledByThisDamage`를 기준으로 피격 애니메이션 또는 사망 애니메이션을 재생한다.
 
 

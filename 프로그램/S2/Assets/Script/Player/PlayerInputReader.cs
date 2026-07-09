@@ -24,6 +24,8 @@ public class PlayerInputReader : MonoBehaviour
     [SerializeField] private Key debugRecallSwordKey = Key.R;
     // 디버그 근접 공격 행동 선택에 사용할 키다.
     [SerializeField] private Key debugSelectMeleeAttackKey = Key.F;
+    // 디버그 총 공격 행동 선택에 사용할 키다.
+    [SerializeField] private Key debugSelectGunAttackKey = Key.G;
 
     [Header("Pointer")]
     // true면 마우스 좌클릭으로 현재 선택된 행동을 확정한다.
@@ -38,6 +40,7 @@ public class PlayerInputReader : MonoBehaviour
     public bool SelectSwordThrowPressedThisFrame { get; private set; }
     public bool RecallSwordPressedThisFrame { get; private set; }
     public bool SelectMeleeAttackPressedThisFrame { get; private set; }
+    public bool SelectGunAttackPressedThisFrame { get; private set; }
     public bool ConfirmPressedThisFrame { get; private set; }
     public bool CancelPressedThisFrame { get; private set; }
 
@@ -70,6 +73,11 @@ public class PlayerInputReader : MonoBehaviour
             debugSelectMeleeAttackKey != Key.None &&
             Keyboard.current != null &&
             Keyboard.current[debugSelectMeleeAttackKey].wasPressedThisFrame;
+
+        SelectGunAttackPressedThisFrame = allowDebugKeyboardSelect &&
+            debugSelectGunAttackKey != Key.None &&
+            Keyboard.current != null &&
+            Keyboard.current[debugSelectGunAttackKey].wasPressedThisFrame;
 
         ConfirmPressedThisFrame = confirmByLeftClick &&
             Mouse.current != null &&
