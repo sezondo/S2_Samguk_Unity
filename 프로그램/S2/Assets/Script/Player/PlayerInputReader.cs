@@ -7,6 +7,9 @@ using UnityEngine.InputSystem;
 /// </summary>
 public class PlayerInputReader : MonoBehaviour
 {
+    // 씬에서 원시 입력을 읽는 단일 Reader 인스턴스다.
+    public static PlayerInputReader Instance { get; private set; }
+
     [Header("Reference")]
     // 마우스 화면 좌표를 월드 좌표로 바꿀 카메라다. 비어 있으면 Camera.main을 사용한다.
     [SerializeField] private Camera worldCamera;
@@ -43,6 +46,32 @@ public class PlayerInputReader : MonoBehaviour
     public bool SelectGunAttackPressedThisFrame { get; private set; }
     public bool ConfirmPressedThisFrame { get; private set; }
     public bool CancelPressedThisFrame { get; private set; }
+
+    /// <summary>
+    /// 씬의 단일 입력 Reader 인스턴스를 등록한다.
+    /// </summary>
+    private void Awake()
+    {
+        if (Instance != null && Instance != this)
+        {
+            Debug.LogWarning($"{nameof(PlayerInputReader)}: 이미 인스턴스가 있습니다. 중복 오브젝트 {name}의 컴포넌트를 비활성화합니다.", this);
+            enabled = false;
+            return;
+        }
+
+        Instance = this;
+    }
+
+    /// <summary>
+    /// 현재 입력 Reader가 제거될 때 전역 참조를 정리한다.
+    /// </summary>
+    private void OnDestroy()
+    {
+        if (Instance == this)
+        {
+            Instance = null;
+        }
+    }
 
     /// <summary>
     /// 이번 프레임의 원시 입력 상태를 갱신한다.

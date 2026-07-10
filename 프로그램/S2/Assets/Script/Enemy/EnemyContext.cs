@@ -4,8 +4,12 @@ using UnityEngine;
 /// 적 루트에 붙은 핵심 컴포넌트와 데이터를 모아 제공하는 참조 주머니다.
 /// 정책 계산이나 상태 변경은 하지 않고, 다른 적 컴포넌트가 필요한 참조를 꺼내 쓰게 한다.
 /// </summary>
-public class EnemyContext : MonoBehaviour
+public class EnemyContext : MonoBehaviour, ITacticalUnit
 {
+    [Header("Unit")]
+    // 적 Context가 전술 유닛 등록소에 제공할 진영이다.
+    [SerializeField] private UnitFaction faction = UnitFaction.Enemy;
+
     [Header("Data")]
     // 적 시야와 행동에 사용하는 튜닝 데이터다.
     [SerializeField] private EnemyData enemyData;
@@ -13,6 +17,8 @@ public class EnemyContext : MonoBehaviour
     [Header("Core Components")]
     // 적이 보드에서 차지하는 칸과 실제 격자 이동을 관리하는 공용 말 컴포넌트다.
     [SerializeField] private GridActor gridActor;
+    // 적의 HP와 전투불능 상태를 관리하는 컴포넌트다.
+    [SerializeField] private ActorHealth health;
     // 적의 그리드 시야 칸 계산을 담당하는 컴포넌트다.
     [SerializeField] private EnemyGridSight gridSight;
     // 적의 현재 경계 상태를 보관하고 전환 요청을 처리하는 컴포넌트다.
@@ -25,9 +31,14 @@ public class EnemyContext : MonoBehaviour
     [SerializeField] private EnemyAttackAction attackAction;
     // 현재 EnemyRegistry에 등록되어 있는지 나타낸다.
     private bool registeredToRegistry;
+    // 현재 TacticalUnitRegistry에 등록되어 있는지 나타낸다.
+    private bool registeredToTacticalRegistry;
 
+    public UnitFaction Faction => faction;
     public EnemyData EnemyData => enemyData;
     public GridActor GridActor => gridActor;
+    public ActorHealth Health => health;
+    public bool IsAlive => health != null && !health.IsDead;
     public EnemyGridSight GridSight => gridSight;
     public EnemyAlertState AlertState => alertState;
     public EnemyActionPoint ActionPoint => actionPoint;
@@ -69,11 +80,19 @@ public class EnemyContext : MonoBehaviour
         if (!registeredToRegistry || EnemyRegistry.Instance == null)
         {
             registeredToRegistry = false;
-            return;
+        }
+        else
+        {
+            EnemyRegistry.Instance.UnregisterEnemy(this);
+            registeredToRegistry = false;
         }
 
-        EnemyRegistry.Instance.UnregisterEnemy(this);
-        registeredToRegistry = false;
+        if (registeredToTacticalRegistry && TacticalUnitRegistry.Instance != null)
+        {
+            TacticalUnitRegistry.Instance.Unregister(this);
+        }
+
+        registeredToTacticalRegistry = false;
     }
 
     /// <summary>
@@ -81,25 +100,43 @@ public class EnemyContext : MonoBehaviour
     /// </summary>
     private void TryRegisterToRegistry(bool logMissingRegistry)
     {
-        if (registeredToRegistry)
+        if (registeredToRegistry && registeredToTacticalRegistry)
         {
             return;
         }
 
-        EnemyRegistry registry = EnemyRegistry.Instance;
-        if (registry == null)
+        if (!registeredToRegistry)
+        {
+            EnemyRegistry registry = EnemyRegistry.Instance;
+            if (registry == null)
+            {
+                if (logMissingRegistry)
+                {
+                    Debug.LogError($"{nameof(EnemyContext)} on {name}에는 씬의 {nameof(EnemyRegistry)}가 필요합니다.", this);
+                    enabled = false;
+                }
+
+                return;
+            }
+
+            registry.RegisterEnemy(this);
+            registeredToRegistry = true;
+        }
+
+        TacticalUnitRegistry tacticalRegistry = TacticalUnitRegistry.Instance;
+        if (tacticalRegistry == null)
         {
             if (logMissingRegistry)
             {
-                Debug.LogError($"{nameof(EnemyContext)} on {name}에는 씬의 {nameof(EnemyRegistry)}가 필요합니다.", this);
+                Debug.LogError($"{nameof(EnemyContext)} on {name}에는 씬의 {nameof(TacticalUnitRegistry)}가 필요합니다.", this);
                 enabled = false;
             }
 
             return;
         }
 
-        registry.RegisterEnemy(this);
-        registeredToRegistry = true;
+        tacticalRegistry.Register(this);
+        registeredToTacticalRegistry = true;
     }
 
     /// <summary>
@@ -116,6 +153,12 @@ public class EnemyContext : MonoBehaviour
         if (gridActor == null)
         {
             Debug.LogError($"{nameof(EnemyContext)} on {name}에는 {nameof(GridActor)} 참조가 필요합니다.", this);
+            return false;
+        }
+
+        if (health == null)
+        {
+            Debug.LogError($"{nameof(EnemyContext)} on {name}에는 {nameof(ActorHealth)} 참조가 필요합니다.", this);
             return false;
         }
 

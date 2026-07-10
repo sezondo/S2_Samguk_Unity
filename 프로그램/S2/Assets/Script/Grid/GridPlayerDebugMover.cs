@@ -10,7 +10,7 @@ public class GridPlayerDebugMover : MonoBehaviour
 {
     [Header("Debug")]
     // 플레이어 공통 참조와 턴 데이터를 제공하는 필수 Context다.
-    [SerializeField] private PlayerContext playerContext;
+    [SerializeField] private TacticalUnitContext playerContext;
     // true면 플레이어 턴일 때만 WASD 디버그 이동을 허용한다.
     [SerializeField] private bool requirePlayerTurn = true;
     // 목표 칸이 막혔을 때 로그를 출력할지 정한다.
@@ -87,7 +87,7 @@ public class GridPlayerDebugMover : MonoBehaviour
             return;
         }
 
-        int cost = playerContext.TurnData.MoveActionPointCost;
+        int cost = playerContext.UnitData.MoveActionPointCost;
         if (cost > 0 && !playerContext.ActionPoint.TrySpend(cost))
         {
             Debug.LogWarning($"{nameof(GridPlayerDebugMover)}: 이동은 되었지만 AP 소비에 실패했습니다. AP 흐름을 확인해야 합니다.", this);
@@ -110,7 +110,7 @@ public class GridPlayerDebugMover : MonoBehaviour
             return false;
         }
 
-        int cost = playerContext.TurnData.MoveActionPointCost;
+        int cost = playerContext.UnitData.MoveActionPointCost;
         if (cost > 0 && !playerContext.ActionPoint.CanSpend(cost))
         {
             if (logTurnOrApBlockedMove)
@@ -171,7 +171,7 @@ public class GridPlayerDebugMover : MonoBehaviour
     {
         if (playerContext == null)
         {
-            Debug.LogError($"{nameof(GridPlayerDebugMover)} on {name}에는 {nameof(PlayerContext)} 참조가 필요합니다.", this);
+            Debug.LogError($"{nameof(GridPlayerDebugMover)} on {name}에는 {nameof(TacticalUnitContext)} 참조가 필요합니다.", this);
             return false;
         }
 
@@ -188,16 +188,16 @@ public class GridPlayerDebugMover : MonoBehaviour
     /// </summary>
     private bool HasValidData()
     {
-        PlayerTurnData turnData = playerContext.TurnData;
-        if (turnData == null)
+        ControllableUnitData unitData = playerContext.UnitData;
+        if (unitData == null)
         {
-            Debug.LogError($"{nameof(GridPlayerDebugMover)} on {name}에는 {nameof(PlayerTurnData)} 참조가 필요합니다.", this);
+            Debug.LogError($"{nameof(GridPlayerDebugMover)} on {name}에는 {nameof(ControllableUnitData)} 참조가 필요합니다.", this);
             return false;
         }
 
-        if (turnData.MoveActionPointCost <= 0)
+        if (unitData.MoveActionPointCost <= 0)
         {
-            Debug.LogError($"{nameof(GridPlayerDebugMover)} on {name}의 {nameof(PlayerTurnData)} 이동 AP 비용은 0보다 커야 합니다.", this);
+            Debug.LogError($"{nameof(GridPlayerDebugMover)} on {name}의 {nameof(ControllableUnitData)} 이동 AP 비용은 0보다 커야 합니다.", this);
             return false;
         }
 

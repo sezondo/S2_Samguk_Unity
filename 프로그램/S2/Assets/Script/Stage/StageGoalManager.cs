@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using UnityEngine;
 
 /// <summary>
@@ -8,8 +9,6 @@ using UnityEngine;
 public class StageGoalManager : MonoBehaviour, IActionLogicEventHandler
 {
     [Header("Reference")]
-    // 플레이어 이동 완료 이벤트를 제공하는 플레이어 Context다.
-    [SerializeField] private PlayerContext playerContext;
     // 이번 스테이지의 목표 칸 정보다.
     [SerializeField] private StageGoal stageGoal;
 
@@ -48,6 +47,13 @@ public class StageGoalManager : MonoBehaviour, IActionLogicEventHandler
     /// </summary>
     private void Start()
     {
+        if (TacticalUnitRegistry.Instance == null)
+        {
+            Debug.LogError($"{nameof(StageGoalManager)} on {name}에는 플레이어 진영 유닛 조회에 사용할 {nameof(TacticalUnitRegistry)}가 필요합니다.", this);
+            enabled = false;
+            return;
+        }
+
         CheckCurrentPlayerPosition();
     }
 
@@ -69,7 +75,20 @@ public class StageGoalManager : MonoBehaviour, IActionLogicEventHandler
             return;
         }
 
-        TryCompleteStage(playerContext.GridActor.GridPosition, null);
+        if (TacticalUnitRegistry.Instance == null)
+        {
+            return;
+        }
+
+        IReadOnlyList<TacticalUnitContext> units = TacticalUnitRegistry.Instance.PlayerControllableUnits;
+        for (int i = 0; i < units.Count; i++)
+        {
+            TacticalUnitContext unit = units[i];
+            if (unit != null && unit.IsAlive)
+            {
+                TryCompleteStage(unit.GridActor.GridPosition, null);
+            }
+        }
     }
 
     /// <summary>
@@ -77,7 +96,7 @@ public class StageGoalManager : MonoBehaviour, IActionLogicEventHandler
     /// </summary>
     private void HandleMoveCompleted(MoveCompletedLogicEvent logicEvent, ActionResolutionContext context)
     {
-        if (logicEvent.Actor != playerContext.GridActor)
+        if (!IsPlayerFactionActor(logicEvent.Actor))
         {
             return;
         }
@@ -90,10 +109,8 @@ public class StageGoalManager : MonoBehaviour, IActionLogicEventHandler
     /// </summary>
     public bool CanHandle(IActionLogicEvent logicEvent)
     {
-        GridActor playerActor = playerContext != null ? playerContext.GridActor : null;
-        return playerActor != null &&
-            logicEvent is MoveCompletedLogicEvent moveCompleted &&
-            moveCompleted.Actor == playerActor;
+        return logicEvent is MoveCompletedLogicEvent moveCompleted &&
+            IsPlayerFactionActor(moveCompleted.Actor);
     }
 
     /// <summary>
@@ -134,17 +151,6 @@ public class StageGoalManager : MonoBehaviour, IActionLogicEventHandler
     /// </summary>
     private bool HasValidReference()
     {
-        if (playerContext == null)
-        {
-            Debug.LogError($"{nameof(StageGoalManager)} on {name}에는 {nameof(PlayerContext)} 참조가 필요합니다.", this);
-            return false;
-        }
-
-        if (!playerContext.HasValidReference())
-        {
-            return false;
-        }
-
         if (stageGoal == null)
         {
             Debug.LogError($"{nameof(StageGoalManager)} on {name}에는 {nameof(StageGoal)} 참조가 필요합니다.", this);
@@ -152,5 +158,16 @@ public class StageGoalManager : MonoBehaviour, IActionLogicEventHandler
         }
 
         return true;
+    }
+
+    /// <summary>
+    /// 지정한 GridActor가 등록된 살아 있는 플레이어 진영 유닛인지 확인한다.
+    /// </summary>
+    private static bool IsPlayerFactionActor(GridActor actor)
+    {
+        return actor != null &&
+            TacticalUnitRegistry.Instance != null &&
+            TacticalUnitRegistry.Instance.TryGetPlayerControllableUnit(actor, out TacticalUnitContext unit) &&
+            unit.IsAlive;
     }
 }

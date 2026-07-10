@@ -4,11 +4,9 @@ using UnityEngine;
 /// 플레이어 행동 하나의 논리 처리와 연출 큐 실행 시점을 조정한다.
 /// 논리 이벤트가 모두 처리된 뒤 연출 큐를 재생한다.
 /// </summary>
-public class PlayerActionFlowController : MonoBehaviour
+public class PlayerUnitActionFlowController : MonoBehaviour
 {
     [Header("Reference")]
-    // 플레이어 행동 실행에 필요한 핵심 참조 주머니다.
-    [SerializeField] private PlayerContext playerContext;
     // 논리 결과 연출을 재생할 씬 단위 연출 큐다.
     [SerializeField] private ActionPresentationQueue presentationQueue;
 
@@ -17,24 +15,29 @@ public class PlayerActionFlowController : MonoBehaviour
     [SerializeField] private bool logBlockedAction = true;
 
     // 씬에서 사용하는 플레이어 행동 흐름 조정자 인스턴스다.
-    public static PlayerActionFlowController Instance { get; private set; }
+    public static PlayerUnitActionFlowController Instance { get; private set; }
+    // 현재 플레이어 제어 매니저가 선택한 전술 유닛이다.
+    private TacticalUnitContext ActiveUnit => PlayerUnitControlManager.Instance != null
+        ? PlayerUnitControlManager.Instance.ActiveUnit
+        : null;
 
     /// <summary>
-    /// 씬의 단일 PlayerActionFlowController 인스턴스를 등록한다.
+    /// 씬의 단일 플레이어 유닛 행동 흐름 조정자 인스턴스를 등록한다.
     /// </summary>
     private void Awake()
     {
         if (Instance != null && Instance != this)
         {
-            Debug.LogWarning($"{nameof(PlayerActionFlowController)}: 이미 인스턴스가 있습니다. 중복 오브젝트 {name}의 컴포넌트를 비활성화합니다.", this);
+            Debug.LogWarning($"{nameof(PlayerUnitActionFlowController)}: 이미 인스턴스가 있습니다. 중복 오브젝트 {name}의 컴포넌트를 비활성화합니다.", this);
             enabled = false;
             return;
         }
 
         Instance = this;
 
-        if (!HasValidReference())
+        if (presentationQueue == null)
         {
+            Debug.LogError($"{nameof(PlayerUnitActionFlowController)} on {name}에는 {nameof(ActionPresentationQueue)} 참조가 필요합니다.", this);
             enabled = false;
         }
     }
@@ -61,7 +64,7 @@ public class PlayerActionFlowController : MonoBehaviour
         }
 
         ActionResolutionContext resolutionContext = new(presentationQueue);
-        if (!playerContext.GridMoveAction.TryExecuteMoveTo(targetPosition, resolutionContext))
+        if (!ActiveUnit.GridMoveAction.TryExecuteMoveTo(targetPosition, resolutionContext))
         {
             return false;
         }
@@ -81,14 +84,14 @@ public class PlayerActionFlowController : MonoBehaviour
             return false;
         }
 
-        if (playerContext.HackAction == null)
+        if (ActiveUnit.HackAction == null)
         {
-            Debug.LogError($"{nameof(PlayerActionFlowController)} on {name}에는 {nameof(PlayerContext)}에 연결된 {nameof(PlayerHackAction)} 참조가 필요합니다.", this);
+            Debug.Log($"{nameof(PlayerUnitActionFlowController)}: 현재 유닛 {ActiveUnit.name}은 해킹 능력이 없습니다.", this);
             return false;
         }
 
         ActionResolutionContext resolutionContext = new(presentationQueue);
-        if (!playerContext.HackAction.TryExecuteHack(target, resolutionContext))
+        if (!ActiveUnit.HackAction.TryExecuteHack(target, resolutionContext))
         {
             return false;
         }
@@ -108,14 +111,14 @@ public class PlayerActionFlowController : MonoBehaviour
             return false;
         }
 
-        if (playerContext.SwordThrowAction == null)
+        if (ActiveUnit.SwordThrowAction == null)
         {
-            Debug.LogError($"{nameof(PlayerActionFlowController)} on {name}에는 {nameof(PlayerContext)}에 연결된 {nameof(PlayerSwordThrowAction)} 참조가 필요합니다.", this);
+            Debug.Log($"{nameof(PlayerUnitActionFlowController)}: 현재 유닛 {ActiveUnit.name}은 검 투척 능력이 없습니다.", this);
             return false;
         }
 
         ActionResolutionContext resolutionContext = new(presentationQueue);
-        if (!playerContext.SwordThrowAction.TryExecuteSwordThrow(targetPosition, resolutionContext))
+        if (!ActiveUnit.SwordThrowAction.TryExecuteSwordThrow(targetPosition, resolutionContext))
         {
             return false;
         }
@@ -135,14 +138,14 @@ public class PlayerActionFlowController : MonoBehaviour
             return false;
         }
 
-        if (playerContext.SwordRecallAction == null)
+        if (ActiveUnit.SwordRecallAction == null)
         {
-            Debug.LogError($"{nameof(PlayerActionFlowController)} on {name}에는 {nameof(PlayerContext)}에 연결된 {nameof(PlayerSwordRecallAction)} 참조가 필요합니다.", this);
+            Debug.Log($"{nameof(PlayerUnitActionFlowController)}: 현재 유닛 {ActiveUnit.name}은 검 회수 능력이 없습니다.", this);
             return false;
         }
 
         ActionResolutionContext resolutionContext = new(presentationQueue);
-        if (!playerContext.SwordRecallAction.TryExecuteSwordRecall(resolutionContext))
+        if (!ActiveUnit.SwordRecallAction.TryExecuteSwordRecall(resolutionContext))
         {
             return false;
         }
@@ -162,14 +165,14 @@ public class PlayerActionFlowController : MonoBehaviour
             return false;
         }
 
-        if (playerContext.MeleeAttackAction == null)
+        if (ActiveUnit.MeleeAttackAction == null)
         {
-            Debug.LogError($"{nameof(PlayerActionFlowController)} on {name}에는 {nameof(PlayerContext)}에 연결된 {nameof(PlayerMeleeAttackAction)} 참조가 필요합니다.", this);
+            Debug.Log($"{nameof(PlayerUnitActionFlowController)}: 현재 유닛 {ActiveUnit.name}은 근접 공격 능력이 없습니다.", this);
             return false;
         }
 
         ActionResolutionContext resolutionContext = new(presentationQueue);
-        if (!playerContext.MeleeAttackAction.TryExecuteMeleeAttack(targetPosition, resolutionContext))
+        if (!ActiveUnit.MeleeAttackAction.TryExecuteMeleeAttack(targetPosition, resolutionContext))
         {
             return false;
         }
@@ -189,14 +192,14 @@ public class PlayerActionFlowController : MonoBehaviour
             return false;
         }
 
-        if (playerContext.GunAttackAction == null)
+        if (ActiveUnit.GunAttackAction == null)
         {
-            Debug.LogError($"{nameof(PlayerActionFlowController)} on {name}에는 {nameof(PlayerContext)}에 연결된 {nameof(PlayerGunAttackAction)} 참조가 필요합니다.", this);
+            Debug.Log($"{nameof(PlayerUnitActionFlowController)}: 현재 유닛 {ActiveUnit.name}은 총 공격 능력이 없습니다.", this);
             return false;
         }
 
         ActionResolutionContext resolutionContext = new(presentationQueue);
-        if (!playerContext.GunAttackAction.TryExecuteGunAttack(targetPosition, resolutionContext))
+        if (!ActiveUnit.GunAttackAction.TryExecuteGunAttack(targetPosition, resolutionContext))
         {
             return false;
         }
@@ -211,7 +214,22 @@ public class PlayerActionFlowController : MonoBehaviour
     /// </summary>
     private bool CanStartAction()
     {
-        if (!HasValidReference())
+        if (!HasValidSceneReference())
+        {
+            return false;
+        }
+
+        if (ActiveUnit == null)
+        {
+            if (logBlockedAction)
+            {
+                Debug.Log($"{nameof(PlayerUnitActionFlowController)}: 현재 선택된 조작 유닛이 없습니다.", this);
+            }
+
+            return false;
+        }
+
+        if (!ActiveUnit.HasValidReference() || !ActiveUnit.IsAlive || ActiveUnit.ActionPoint.Current <= 0)
         {
             return false;
         }
@@ -220,7 +238,7 @@ public class PlayerActionFlowController : MonoBehaviour
         {
             if (logBlockedAction)
             {
-                Debug.Log($"{nameof(PlayerActionFlowController)}: 연출 큐가 실행 중이라 새 행동을 시작할 수 없습니다.", this);
+                Debug.Log($"{nameof(PlayerUnitActionFlowController)}: 연출 큐가 실행 중이라 새 행동을 시작할 수 없습니다.", this);
             }
 
             return false;
@@ -232,22 +250,17 @@ public class PlayerActionFlowController : MonoBehaviour
     /// <summary>
     /// 행동 흐름 조정에 필요한 필수 참조가 연결되어 있는지 확인한다.
     /// </summary>
-    private bool HasValidReference()
+    private bool HasValidSceneReference()
     {
-        if (playerContext == null)
+        if (PlayerUnitControlManager.Instance == null)
         {
-            Debug.LogError($"{nameof(PlayerActionFlowController)} on {name}에는 {nameof(PlayerContext)} 참조가 필요합니다.", this);
-            return false;
-        }
-
-        if (!playerContext.HasValidReference())
-        {
+            Debug.LogError($"{nameof(PlayerUnitActionFlowController)} on {name}에는 씬의 {nameof(PlayerUnitControlManager)}가 필요합니다.", this);
             return false;
         }
 
         if (presentationQueue == null)
         {
-            Debug.LogError($"{nameof(PlayerActionFlowController)} on {name}에는 {nameof(ActionPresentationQueue)} 참조가 필요합니다.", this);
+            Debug.LogError($"{nameof(PlayerUnitActionFlowController)} on {name}에는 {nameof(ActionPresentationQueue)} 참조가 필요합니다.", this);
             return false;
         }
 

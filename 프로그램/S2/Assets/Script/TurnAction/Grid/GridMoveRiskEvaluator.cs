@@ -6,13 +6,13 @@ using UnityEngine;
 /// 플레이어 이동 경로가 적 감지 칸에 들어가는지 평가하고, 첫 위험 칸을 표시한다.
 /// 실제 애드 연출과 이동 중단은 후속 액션 시퀀스 단계에서 연결한다.
 /// </summary>
-[RequireComponent(typeof(PlayerContext))]
+[RequireComponent(typeof(TacticalUnitContext))]
 [RequireComponent(typeof(PlayerGridMoveAction))]
 public class GridMoveRiskEvaluator : MonoBehaviour, IActionLogicEventHandler
 {
     [Header("Source")]
     // 플레이어 공통 참조와 이동 행동 컴포넌트를 제공하는 필수 Context다.
-    [SerializeField] private PlayerContext playerContext;
+    [SerializeField] private TacticalUnitContext playerContext;
 
     [Header("Warning Highlight")]
     // true면 경로 미리보기 중 첫 애드 위험 칸을 하이라이트로 표시한다.
@@ -340,7 +340,7 @@ public class GridMoveRiskEvaluator : MonoBehaviour, IActionLogicEventHandler
     {
         if (playerContext == null)
         {
-            Debug.LogError($"{nameof(GridMoveRiskEvaluator)} on {name}에는 {nameof(PlayerContext)} 참조가 필요합니다.", this);
+            Debug.LogError($"{nameof(GridMoveRiskEvaluator)} on {name}에는 {nameof(TacticalUnitContext)} 참조가 필요합니다.", this);
             return false;
         }
 
@@ -351,7 +351,7 @@ public class GridMoveRiskEvaluator : MonoBehaviour, IActionLogicEventHandler
 
         if (playerContext.GridMoveAction == null)
         {
-            Debug.LogError($"{nameof(GridMoveRiskEvaluator)} on {name}에는 {nameof(PlayerContext)}에 연결된 {nameof(PlayerGridMoveAction)} 참조가 필요합니다.", this);
+            Debug.LogError($"{nameof(GridMoveRiskEvaluator)} on {name}에는 {nameof(TacticalUnitContext)}에 연결된 {nameof(PlayerGridMoveAction)} 참조가 필요합니다.", this);
             return false;
         }
 

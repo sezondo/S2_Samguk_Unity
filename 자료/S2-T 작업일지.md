@@ -1270,3 +1270,86 @@
 - `Tset` 씬의 기존 `SwordActionPresenter`에는 `ownerActor` 연결을 유지한다.
 - 플레이어 연출 오브젝트에 `PlayerMeleeAttackPresenter`, `PlayerGunAttackPresenter`를 추가하고 각각 플레이어 `GridActor`를 `ownerActor`로 연결한다.
 - 플레이 모드에서 검 투척/회수, 검 보유/미보유 근접 공격, 총 공격이 각각 한 Presenter에서만 처리되는지 확인한다.
+
+## 2026-07-09 다중 전술 유닛 기반 전환
+
+## 핵심
+- `UnitFaction`, `UnitControlType`, `UnitAbilityType`을 추가해 진영, 조작 주체, 필수 행동 능력을 분리했다.
+- `PlayerContext`를 `TacticalUnitContext`, `PlayerTurnData`를 `ControllableUnitData`, `PlayerActionFlowController`를 `PlayerUnitActionFlowController`로 변경했다.
+- 기존 스크립트와 데이터 에셋 GUID는 유지했고 `turnData` 필드는 `FormerlySerializedAs`로 기존 참조를 보존했다.
+- `TacticalUnitContext`가 데이터상 필수 능력과 실제 행동 컴포넌트 구성을 검사하게 했다.
+- `ITacticalUnit`, `TacticalUnitRegistry`를 추가해 플레이어와 적을 진영 기준으로 조회할 통로를 열었다.
+- `PlayerInputReader`를 씬 단일 입력 인스턴스로 변경했다.
+- `PlayerUnitControlManager`를 추가해 클릭 선택, AP 0 유닛 선택 차단, 행동 모드 전체 취소, AP 소진 시 다음 유닛 자동 전환을 처리하게 했다.
+- 기존 행동별 입력 컨트롤러는 이후 정리 작업에서 제거했고 `PlayerUnitInputController`가 현재 선택 유닛의 입력을 통합 처리한다.
+- 능력이 없는 유닛의 행동 선택은 정상적인 사용 불가 안내로 처리하고 데이터상 필수 능력 누락은 구성 오류로 처리하게 구분했다.
+- 검 없는 해커는 자기 위치 기준으로 해킹하고 검 없는 근접 유닛은 맨손 공격을 사용하도록 기존 행동을 확장했다.
+- `EnemyTargetSelector`를 추가해 경계 반응과 적 턴 AI가 가장 가까운 살아 있는 플레이어 진영 유닛을 기준으로 행동하게 했다.
+- `StageGoalManager`를 단일 플레이어 참조에서 조작 가능한 플레이어 진영 유닛 전체 기준으로 변경했다.
+- 선택 시각 표시는 이번 작업에서 제외했다.
+- 유진 사망 게임 오버는 `ControllableUnitData.DefeatOnDeath` 데이터 자리만 추가하고 실제 흐름은 연결하지 않았다.
+
+## 검증
+- `dotnet build Assembly-CSharp.csproj --no-restore` 통과.
+- 경고 0개, 오류 0개.
+
+## 인스펙터 연결 필요
+- 씬에 `TacticalUnitRegistry`, `PlayerUnitControlManager`, `PlayerUnitInputController`를 각각 하나만 배치한다.
+- `PlayerUnitActionFlowController`에는 `ActionPresentationQueue` 참조를 유지한다.
+- 각 `TacticalUnitContext`에 `ControllableUnitData`, `GridActor`, `ActorHealth`, `ActionPoint`와 데이터 능력표에 맞는 행동 컴포넌트를 연결한다.
+- 각 `EnemyContext`에 기존 `ActorHealth`를 새 Health 필드로 연결한다.
+- 기존 행동별 입력 컨트롤러는 코드에서 제거했고 `PlayerUnitInputController` 하나만 씬 입력을 처리한다.
+
+## 다음
+- Unity가 스크립트 이름 변경과 기존 GUID를 정상 반영하는지 확인한다.
+- 현재 유진 데이터의 필수 능력을 Move/Gun/Hack/Sword/Melee로 설정하고 Context 구성을 검증한다.
+- Move/Gun 아군 데이터와 유닛을 추가해 클릭 선택, AP별 자동 전환, 비보유 행동 차단을 플레이 모드에서 확인한다.
+- 적 발각 반응과 적 턴 공격 표적이 가장 가까운 플레이어 진영 유닛으로 바뀌는지 확인한다.
+
+## 2026-07-10 TurnAction 명칭/폴더 정리
+
+## 핵심
+- 코드에서 쓰는 전술 유닛 데이터 명칭을 `UnitData`로 통일했다.
+- 기존 직렬화 참조 보존을 위해 `TacticalUnitContext`의 `[FormerlySerializedAs("turnData")]`만 남겼다.
+- 직렬화 보존용으로 남겨 두었던 행동별 입력 컨트롤러 스텁을 삭제했다.
+- 입력 처리는 `PlayerUnitInputController` 하나만 담당한다.
+- `TurnAction` 폴더를 `Core`, `Grid`, `Input`, `Player` 하위 폴더로 정리했다.
+- `.meta`를 함께 이동해 기존 스크립트 GUID는 유지했다.
+
+## 검증
+- `dotnet build Assembly-CSharp.csproj --no-restore` 통과.
+- 경고 0개, 오류 0개.
+
+## 인스펙터 연결 필요
+- 씬에 남아 있는 기존 행동별 입력 컨트롤러 컴포넌트는 Missing Script가 될 수 있으므로 제거한다.
+- `PlayerUnitInputController`만 씬 단일 입력 처리 컴포넌트로 둔다.
+
+## 2026-07-10 다중 유닛 테스트 세팅 점검 및 다음 목표 정리
+
+## 핵심
+- `Tset` 씬 기준 다중 전술 유닛 테스트 세팅을 점검했다.
+- 씬에 `TacticalUnitRegistry`, `PlayerUnitControlManager`, `PlayerUnitInputController`, `PlayerUnitActionFlowController`가 배치된 것을 확인했다.
+- `TacticalUnitContext`는 유진과 동료 테스트 유닛에 각각 연결되어 있다.
+- 유진 테스트 데이터는 `RequiredAbilities = Move + Gun + Hack + Sword + Melee` 구성이며, 실제 행동 컴포넌트 연결도 해당 조합과 일치한다.
+- 동료 테스트 데이터는 현재 `RequiredAbilities = Move + Melee` 구성이다. 일반 총기 동료 테스트가 목적이면 `Move + Gun`으로 데이터와 컴포넌트 구성을 바꿔야 한다.
+- `EnemyContext`는 적 2기에 연결되어 있고, 적 데이터, `GridActor`, `ActorHealth`, `EnemyGridSight`, `EnemyAlertState`, `EnemyActionPoint`, `EnemyTurnAgent`, `EnemyAttackAction` 연결을 확인했다.
+- 삭제된 기존 행동별 입력 컨트롤러 GUID가 `Tset` 씬과 프리팹에 남아 있지 않은 것을 확인했다.
+- `StageGoalManager`가 씬에 2개 남아 있는 것을 확인했다. 현재 구조에서는 스테이지 단위 매니저 1개만 유지하는 것이 맞다.
+
+## 검증
+- `dotnet build Assembly-CSharp.csproj --no-restore` 통과.
+- 경고 0개, 오류 0개.
+- `Tset` 씬에서 삭제된 구 입력 컨트롤러 GUID 잔존 검색 결과 없음.
+
+## 정리 필요
+- `StageGoalManager`는 씬 단위 오브젝트 하나에만 유지한다.
+- 현재 `StageStateManager`가 참조하는 `StageGoalManager`를 기준으로 남기고, 다른 유닛 오브젝트에 붙은 중복 `StageGoalManager`는 제거한다.
+- 동료 테스트 유닛의 역할을 확정한다.
+  - 근접 동료면 현재 `Move + Melee` 유지.
+  - 총기 동료면 데이터 `RequiredAbilities`를 `Move + Gun`으로 바꾸고 `PlayerGunAmmo`, `PlayerGunAttackAction`을 연결한다.
+
+## 다음 작업 목표
+- 현재 다중 유닛/적 AI/행동 논리 위에 실제 아트를 씌워 연출을 만든다.
+- 우선순위는 플레이어 조작 유닛 선택, 이동, 총 공격, 근접 공격, 검 투척/회수, 해킹, 적 공격, 피격/사망 연출이다.
+- 사망 연출은 기존 논리 기준인 `DamageResult.KilledByThisDamage`와 `ActorDiedLogicEvent` 흐름에 맞춰 연결한다.
+- 시체는 `GridActor.ReleaseCellOccupation()` 이후 논리 점유는 해제하되, 화면상 시체 스프라이트/애니메이션은 남기는 방향으로 처리한다.

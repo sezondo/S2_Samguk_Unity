@@ -11,7 +11,7 @@ public class PlayerGunAttackAction : MonoBehaviour
 
     [Header("Gun Attack")]
     // 플레이어 공통 참조와 총알 상태를 제공하는 Context다.
-    [SerializeField] private PlayerContext playerContext;
+    [SerializeField] private TacticalUnitContext playerContext;
     // true면 플레이어 턴일 때만 총 공격 행동을 선택하고 실행할 수 있다.
     [SerializeField] private bool requirePlayerTurn = true;
 
@@ -25,7 +25,7 @@ public class PlayerGunAttackAction : MonoBehaviour
     private bool isGunAttackSelected;
 
     public bool IsGunAttackSelected => isGunAttackSelected;
-    public int GunAttackRange => playerContext.TurnData.GunAttackRange;
+    public int GunAttackRange => playerContext.UnitData.GunAttackRange;
 
     // 총 공격 행동 선택 상태가 됐을 때 발생한다.
     public event Action GunAttackSelected;
@@ -115,7 +115,7 @@ public class PlayerGunAttackAction : MonoBehaviour
             return false;
         }
 
-        int actionPointCost = playerContext.TurnData.GunAttackActionPointCost;
+        int actionPointCost = playerContext.UnitData.GunAttackActionPointCost;
         ActionPoint actionPoint = playerContext.ActionPoint;
         PlayerGunAmmo gunAmmo = playerContext.GunAmmo;
         if (!actionPoint.CanSpend(actionPointCost) || !gunAmmo.CanSpend(AmmoCost))
@@ -140,7 +140,7 @@ public class PlayerGunAttackAction : MonoBehaviour
         GunAttackCanceled?.Invoke();
 
         GridPosition attackerPosition = playerContext.GridActor.GridPosition;
-        int damage = playerContext.TurnData.GunAttackDamage;
+        int damage = playerContext.UnitData.GunAttackDamage;
         resolutionContext.Publish(new ApplyDamageLogicEvent(
             playerContext.GridActor,
             targetActor,
@@ -210,7 +210,7 @@ public class PlayerGunAttackAction : MonoBehaviour
             return false;
         }
 
-        int actionPointCost = playerContext.TurnData.GunAttackActionPointCost;
+        int actionPointCost = playerContext.UnitData.GunAttackActionPointCost;
         ActionPoint actionPoint = playerContext.ActionPoint;
         if (!actionPoint.CanSpend(actionPointCost))
         {
@@ -297,31 +297,31 @@ public class PlayerGunAttackAction : MonoBehaviour
     {
         if (playerContext == null)
         {
-            Debug.LogError($"{nameof(PlayerGunAttackAction)} on {name}에는 {nameof(PlayerContext)} 참조가 필요합니다.", this);
+            Debug.LogError($"{nameof(PlayerGunAttackAction)} on {name}에는 {nameof(TacticalUnitContext)} 참조가 필요합니다.", this);
             return false;
         }
 
-        if (playerContext.TurnData == null)
+        if (playerContext.UnitData == null)
         {
-            Debug.LogError($"{nameof(PlayerGunAttackAction)} on {name}에는 {nameof(PlayerContext)}에 연결된 {nameof(PlayerTurnData)} 참조가 필요합니다.", this);
+            Debug.LogError($"{nameof(PlayerGunAttackAction)} on {name}에는 {nameof(TacticalUnitContext)}에 연결된 {nameof(ControllableUnitData)} 참조가 필요합니다.", this);
             return false;
         }
 
         if (playerContext.GridActor == null)
         {
-            Debug.LogError($"{nameof(PlayerGunAttackAction)} on {name}에는 {nameof(PlayerContext)}에 연결된 {nameof(GridActor)} 참조가 필요합니다.", this);
+            Debug.LogError($"{nameof(PlayerGunAttackAction)} on {name}에는 {nameof(TacticalUnitContext)}에 연결된 {nameof(GridActor)} 참조가 필요합니다.", this);
             return false;
         }
 
         if (playerContext.ActionPoint == null)
         {
-            Debug.LogError($"{nameof(PlayerGunAttackAction)} on {name}에는 {nameof(PlayerContext)}에 연결된 {nameof(ActionPoint)} 참조가 필요합니다.", this);
+            Debug.LogError($"{nameof(PlayerGunAttackAction)} on {name}에는 {nameof(TacticalUnitContext)}에 연결된 {nameof(ActionPoint)} 참조가 필요합니다.", this);
             return false;
         }
 
         if (playerContext.GunAmmo == null || !playerContext.GunAmmo.enabled)
         {
-            Debug.LogError($"{nameof(PlayerGunAttackAction)} on {name}에는 {nameof(PlayerContext)}에 연결된 활성 {nameof(PlayerGunAmmo)} 참조가 필요합니다.", this);
+            Debug.LogError($"{nameof(PlayerGunAttackAction)} on {name}에는 {nameof(TacticalUnitContext)}에 연결된 활성 {nameof(PlayerGunAmmo)} 참조가 필요합니다.", this);
             return false;
         }
 
@@ -333,28 +333,28 @@ public class PlayerGunAttackAction : MonoBehaviour
     /// </summary>
     private bool HasValidData()
     {
-        PlayerTurnData turnData = playerContext.TurnData;
-        if (turnData.GunAttackActionPointCost <= 0)
+        ControllableUnitData unitData = playerContext.UnitData;
+        if (unitData.GunAttackActionPointCost <= 0)
         {
-            Debug.LogError($"{nameof(PlayerGunAttackAction)} on {name}의 {nameof(PlayerTurnData)} 총 공격 AP 비용은 0보다 커야 합니다.", this);
+            Debug.LogError($"{nameof(PlayerGunAttackAction)} on {name}의 {nameof(ControllableUnitData)} 총 공격 AP 비용은 0보다 커야 합니다.", this);
             return false;
         }
 
-        if (turnData.GunAttackRange < 0)
+        if (unitData.GunAttackRange < 0)
         {
-            Debug.LogError($"{nameof(PlayerGunAttackAction)} on {name}의 {nameof(PlayerTurnData)} 총 공격 사거리는 0 이상이어야 합니다.", this);
+            Debug.LogError($"{nameof(PlayerGunAttackAction)} on {name}의 {nameof(ControllableUnitData)} 총 공격 사거리는 0 이상이어야 합니다.", this);
             return false;
         }
 
-        if (turnData.GunAttackDamage <= 0)
+        if (unitData.GunAttackDamage <= 0)
         {
-            Debug.LogError($"{nameof(PlayerGunAttackAction)} on {name}의 {nameof(PlayerTurnData)} 총 공격 피해량은 0보다 커야 합니다.", this);
+            Debug.LogError($"{nameof(PlayerGunAttackAction)} on {name}의 {nameof(ControllableUnitData)} 총 공격 피해량은 0보다 커야 합니다.", this);
             return false;
         }
 
-        if (turnData.MaxGunAmmo <= 0)
+        if (unitData.MaxGunAmmo <= 0)
         {
-            Debug.LogError($"{nameof(PlayerGunAttackAction)} on {name}의 {nameof(PlayerTurnData)} 최대 총알 수는 0보다 커야 합니다.", this);
+            Debug.LogError($"{nameof(PlayerGunAttackAction)} on {name}의 {nameof(ControllableUnitData)} 최대 총알 수는 0보다 커야 합니다.", this);
             return false;
         }
 

@@ -9,8 +9,6 @@ using UnityEngine;
 public class EnemyTurnCoordinator : MonoBehaviour
 {
     [Header("Reference")]
-    // 적이 공격 대상으로 사용할 플레이어 Context다.
-    [SerializeField] private PlayerContext playerContext;
     // 적 턴이 끝난 뒤 플레이어 턴으로 넘길 턴 매니저다.
     [SerializeField] private TurnManager turnManager;
     // 적 행동 연출 이벤트를 재생할 연출 큐다.
@@ -30,11 +28,7 @@ public class EnemyTurnCoordinator : MonoBehaviour
     /// </summary>
     private void Awake()
     {
-        if (playerContext == null || !playerContext.HasValidReference())
-        {
-            Debug.LogError($"{nameof(EnemyTurnCoordinator)} on {name}에는 유효한 {nameof(PlayerContext)} 참조가 필요합니다.", this);
-            enabled = false;
-        }
+        // 씬 단위 참조는 초기화 순서가 끝난 Start와 실행 시점에 검사한다.
     }
 
     /// <summary>
@@ -134,7 +128,7 @@ public class EnemyTurnCoordinator : MonoBehaviour
             enemy.ActionPoint.RefillForTurn();
 
             ActionResolutionContext resolutionContext = new(presentationQueue);
-            bool acted = turnAgent.TryExecuteTurn(playerContext, resolutionContext);
+            bool acted = turnAgent.TryExecuteTurn(resolutionContext);
             resolutionContext.Resolve();
 
             if (acted || presentationQueue.QueuedEventCount > 0)
@@ -202,17 +196,6 @@ public class EnemyTurnCoordinator : MonoBehaviour
     /// </summary>
     public bool HasValidReference()
     {
-        if (playerContext == null)
-        {
-            Debug.LogError($"{nameof(EnemyTurnCoordinator)} on {name}에는 {nameof(PlayerContext)} 참조가 필요합니다.", this);
-            return false;
-        }
-
-        if (!playerContext.HasValidReference())
-        {
-            return false;
-        }
-
         if (turnManager == null && TurnManager.Instance != null)
         {
             turnManager = TurnManager.Instance;
@@ -238,6 +221,12 @@ public class EnemyTurnCoordinator : MonoBehaviour
         if (EnemyRegistry.Instance == null)
         {
             Debug.LogError($"{nameof(EnemyTurnCoordinator)} on {name}에는 {nameof(EnemyRegistry)}가 필요합니다.", this);
+            return false;
+        }
+
+        if (TacticalUnitRegistry.Instance == null)
+        {
+            Debug.LogError($"{nameof(EnemyTurnCoordinator)} on {name}에는 {nameof(TacticalUnitRegistry)}가 필요합니다.", this);
             return false;
         }
 

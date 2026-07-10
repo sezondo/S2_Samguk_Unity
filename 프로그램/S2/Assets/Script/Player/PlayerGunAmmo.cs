@@ -2,13 +2,13 @@ using UnityEngine;
 
 /// <summary>
 /// 플레이어 총 공격에 사용하는 현재 총알 수를 보관하고 소비를 처리한다.
-/// 총알 최대값은 PlayerTurnData에서 읽고, 현재 총알은 이 컴포넌트의 런타임 상태로만 관리한다.
+/// 총알 최대값은 ControllableUnitData에서 읽고, 현재 총알은 이 컴포넌트의 런타임 상태로만 관리한다.
 /// </summary>
 public class PlayerGunAmmo : MonoBehaviour
 {
     [Header("Reference")]
     // 총알 최대값을 읽을 플레이어 Context다.
-    [SerializeField] private PlayerContext playerContext;
+    [SerializeField] private TacticalUnitContext playerContext;
 
     [Header("Ammo")]
     // 현재 남아 있는 총알 수다.
@@ -21,7 +21,7 @@ public class PlayerGunAmmo : MonoBehaviour
     [SerializeField] private bool logAmmo = true;
 
     public int CurrentAmmo => currentAmmo;
-    public int MaxAmmo => playerContext.TurnData.MaxGunAmmo;
+    public int MaxAmmo => playerContext.UnitData.MaxGunAmmo;
 
     /// <summary>
     /// 총알 상태에 필요한 참조와 데이터를 확인하고 시작 총알을 세팅한다.
@@ -98,13 +98,13 @@ public class PlayerGunAmmo : MonoBehaviour
     {
         if (playerContext == null)
         {
-            Debug.LogError($"{nameof(PlayerGunAmmo)} on {name}에는 {nameof(PlayerContext)} 참조가 필요합니다.", this);
+            Debug.LogError($"{nameof(PlayerGunAmmo)} on {name}에는 {nameof(TacticalUnitContext)} 참조가 필요합니다.", this);
             return false;
         }
 
-        if (playerContext.TurnData == null)
+        if (playerContext.UnitData == null)
         {
-            Debug.LogError($"{nameof(PlayerGunAmmo)} on {name}에는 {nameof(PlayerContext)}에 연결된 {nameof(PlayerTurnData)} 참조가 필요합니다.", this);
+            Debug.LogError($"{nameof(PlayerGunAmmo)} on {name}에는 {nameof(TacticalUnitContext)}에 연결된 {nameof(ControllableUnitData)} 참조가 필요합니다.", this);
             return false;
         }
 
@@ -116,9 +116,9 @@ public class PlayerGunAmmo : MonoBehaviour
     /// </summary>
     public bool HasValidData()
     {
-        if (playerContext.TurnData.MaxGunAmmo <= 0)
+        if (playerContext.UnitData.MaxGunAmmo <= 0)
         {
-            Debug.LogError($"{nameof(PlayerGunAmmo)} on {name}의 {nameof(PlayerTurnData)} 최대 총알 수는 0보다 커야 합니다.", this);
+            Debug.LogError($"{nameof(PlayerGunAmmo)} on {name}의 {nameof(ControllableUnitData)} 최대 총알 수는 0보다 커야 합니다.", this);
             return false;
         }
 

@@ -10,7 +10,7 @@ public class PlayerHackAction : MonoBehaviour
 {
     [Header("Hack Action")]
     // 플레이어 공통 참조와 턴 데이터를 제공하는 필수 Context다.
-    [SerializeField] private PlayerContext playerContext;
+    [SerializeField] private TacticalUnitContext playerContext;
     // true면 플레이어 턴일 때만 해킹 행동을 선택하고 실행할 수 있다.
     [SerializeField] private bool requirePlayerTurn = true;
 
@@ -40,7 +40,7 @@ public class PlayerHackAction : MonoBehaviour
     private bool isHackSelected;
 
     public bool IsHackSelected => isHackSelected;
-    public int HackRange => playerContext.TurnData.HackRange;
+    public int HackRange => playerContext.UnitData.HackRange;
 
     // 해킹 행동 선택 상태가 됐을 때 발생한다.
     public event Action HackSelected;
@@ -136,7 +136,7 @@ public class PlayerHackAction : MonoBehaviour
             return false;
         }
 
-        int cost = playerContext.TurnData.HackActionPointCost;
+        int cost = playerContext.UnitData.HackActionPointCost;
         ActionPoint actionPoint = playerContext.ActionPoint;
         if (cost > 0 && !actionPoint.TrySpend(cost))
         {
@@ -223,7 +223,7 @@ public class PlayerHackAction : MonoBehaviour
             return false;
         }
 
-        int cost = playerContext.TurnData.HackActionPointCost;
+        int cost = playerContext.UnitData.HackActionPointCost;
         ActionPoint actionPoint = playerContext.ActionPoint;
         if (cost > 0 && !actionPoint.CanSpend(cost))
         {
@@ -264,7 +264,9 @@ public class PlayerHackAction : MonoBehaviour
         }
 
         targetPosition = target.GridPosition;
-        GridPosition hackOriginPosition = playerContext.SwordState.CurrentPosition;
+        GridPosition hackOriginPosition = playerContext.HasAbility(UnitAbilityType.Sword) && playerContext.SwordState != null
+            ? playerContext.SwordState.CurrentPosition
+            : playerContext.GridActor.GridPosition;
         int distance = hackOriginPosition.ManhattanDistanceTo(targetPosition);
         if (distance > HackRange)
         {
@@ -327,7 +329,7 @@ public class PlayerHackAction : MonoBehaviour
     {
         if (playerContext == null)
         {
-            Debug.LogError($"{nameof(PlayerHackAction)} on {name}에는 {nameof(PlayerContext)} 참조가 필요합니다.", this);
+            Debug.LogError($"{nameof(PlayerHackAction)} on {name}에는 {nameof(TacticalUnitContext)} 참조가 필요합니다.", this);
             return false;
         }
 
@@ -338,19 +340,19 @@ public class PlayerHackAction : MonoBehaviour
 
         if (playerContext.GridActor == null)
         {
-            Debug.LogError($"{nameof(PlayerHackAction)} on {name}에는 {nameof(PlayerContext)}에 연결된 {nameof(GridActor)} 참조가 필요합니다.", this);
+            Debug.LogError($"{nameof(PlayerHackAction)} on {name}에는 {nameof(TacticalUnitContext)}에 연결된 {nameof(GridActor)} 참조가 필요합니다.", this);
             return false;
         }
 
         if (playerContext.ActionPoint == null)
         {
-            Debug.LogError($"{nameof(PlayerHackAction)} on {name}에는 {nameof(PlayerContext)}에 연결된 {nameof(ActionPoint)} 참조가 필요합니다.", this);
+            Debug.LogError($"{nameof(PlayerHackAction)} on {name}에는 {nameof(TacticalUnitContext)}에 연결된 {nameof(ActionPoint)} 참조가 필요합니다.", this);
             return false;
         }
 
-        if (playerContext.SwordState == null)
+        if (playerContext.HasAbility(UnitAbilityType.Sword) && playerContext.SwordState == null)
         {
-            Debug.LogError($"{nameof(PlayerHackAction)} on {name}에는 {nameof(PlayerContext)}에 연결된 {nameof(PlayerSwordState)} 참조가 필요합니다.", this);
+            Debug.LogError($"{nameof(PlayerHackAction)} on {name}의 검 능력 기반 해킹에는 {nameof(PlayerSwordState)} 참조가 필요합니다.", this);
             return false;
         }
 
@@ -362,22 +364,22 @@ public class PlayerHackAction : MonoBehaviour
     /// </summary>
     private bool HasValidData()
     {
-        PlayerTurnData turnData = playerContext.TurnData;
-        if (turnData == null)
+        ControllableUnitData unitData = playerContext.UnitData;
+        if (unitData == null)
         {
-            Debug.LogError($"{nameof(PlayerHackAction)} on {name}에는 {nameof(PlayerTurnData)} 참조가 필요합니다.", this);
+            Debug.LogError($"{nameof(PlayerHackAction)} on {name}에는 {nameof(ControllableUnitData)} 참조가 필요합니다.", this);
             return false;
         }
 
-        if (turnData.HackRange < 0)
+        if (unitData.HackRange < 0)
         {
-            Debug.LogError($"{nameof(PlayerHackAction)} on {name}의 {nameof(PlayerTurnData)} 해킹 가능 거리는 0 이상이어야 합니다.", this);
+            Debug.LogError($"{nameof(PlayerHackAction)} on {name}의 {nameof(ControllableUnitData)} 해킹 가능 거리는 0 이상이어야 합니다.", this);
             return false;
         }
 
-        if (turnData.HackActionPointCost <= 0)
+        if (unitData.HackActionPointCost <= 0)
         {
-            Debug.LogError($"{nameof(PlayerHackAction)} on {name}의 {nameof(PlayerTurnData)} 해킹 AP 비용은 0보다 커야 합니다.", this);
+            Debug.LogError($"{nameof(PlayerHackAction)} on {name}의 {nameof(ControllableUnitData)} 해킹 AP 비용은 0보다 커야 합니다.", this);
             return false;
         }
 

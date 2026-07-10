@@ -32,6 +32,8 @@ public class EnemyTurnAgent : MonoBehaviour
     private readonly List<GridPosition> pathBuffer = new();
     // 후보 점수 로그를 담는 재사용 버퍼다.
     private readonly List<EnemyTacticalPositionScoreResult> scoreResults = new();
+    // 플레이어 진영에서 가장 가까운 살아 있는 표적을 선택한다.
+    private readonly EnemyTargetSelector targetSelector = new();
 
     /// <summary>
     /// 적 턴 행동에 필요한 참조와 데이터를 확인한다.
@@ -49,14 +51,24 @@ public class EnemyTurnAgent : MonoBehaviour
     /// <summary>
     /// 이 적의 턴 행동을 실행하고 논리/연출 이벤트를 지정한 문맥에 기록한다.
     /// </summary>
-    public bool TryExecuteTurn(PlayerContext playerContext, ActionResolutionContext resolutionContext)
+    public bool TryExecuteTurn(ActionResolutionContext resolutionContext)
     {
-        if (!CanAct(playerContext, resolutionContext))
+        if (!CanAct(resolutionContext))
         {
             return false;
         }
 
-        GridActor playerActor = playerContext.GridActor;
+        if (!targetSelector.TrySelectNearestPlayerUnit(enemyContext.GridActor.GridPosition, out TacticalUnitContext targetUnit))
+        {
+            if (logTurnAction)
+            {
+                Debug.Log($"{nameof(EnemyTurnAgent)}: {enemyContext.name} 적이 공격할 살아 있는 플레이어 진영 유닛을 찾지 못했습니다.", this);
+            }
+
+            return false;
+        }
+
+        GridActor playerActor = targetUnit.GridActor;
         bool acted = false;
 
         if (enemyContext.AttackAction.CanAttack(playerActor))
@@ -245,16 +257,10 @@ public class EnemyTurnAgent : MonoBehaviour
     /// <summary>
     /// 이 적이 현재 턴 행동을 실행할 수 있는지 확인한다.
     /// </summary>
-    private bool CanAct(PlayerContext playerContext, ActionResolutionContext resolutionContext)
+    private bool CanAct(ActionResolutionContext resolutionContext)
     {
         if (!HasValidReference() || !HasValidData())
         {
-            return false;
-        }
-
-        if (playerContext == null || !playerContext.HasValidReference())
-        {
-            Debug.LogError($"{nameof(EnemyTurnAgent)} on {name}에는 유효한 {nameof(PlayerContext)}가 필요합니다.", this);
             return false;
         }
 
@@ -270,8 +276,7 @@ public class EnemyTurnAgent : MonoBehaviour
             return false;
         }
 
-        ActorHealth enemyHealth = enemyContext.GridActor.GetComponent<ActorHealth>();
-        if (enemyHealth != null && enemyHealth.IsDead)
+        if (!enemyContext.IsAlive)
         {
             if (logTurnAction)
             {
@@ -286,17 +291,6 @@ public class EnemyTurnAgent : MonoBehaviour
             if (logTurnAction)
             {
                 Debug.Log($"{nameof(EnemyTurnAgent)}: {enemyContext.name} 적은 경계 상태가 아니라 적 턴 행동을 생략합니다.", this);
-            }
-
-            return false;
-        }
-
-        ActorHealth playerHealth = playerContext.GridActor.GetComponent<ActorHealth>();
-        if (playerHealth != null && playerHealth.IsDead)
-        {
-            if (logTurnAction)
-            {
-                Debug.Log($"{nameof(EnemyTurnAgent)}: 플레이어가 전투불능이라 {enemyContext.name} 적이 행동하지 않습니다.", this);
             }
 
             return false;

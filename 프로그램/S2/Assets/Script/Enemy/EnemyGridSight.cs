@@ -98,8 +98,7 @@ public class EnemyGridSight : MonoBehaviour
     /// </summary>
     public bool CanDetect(GridPosition targetPosition)
     {
-        ActorHealth health = actor != null ? actor.GetComponent<ActorHealth>() : null;
-        if (health != null && health.IsDead)
+        if (!enemyContext.IsAlive)
         {
             return false;
         }

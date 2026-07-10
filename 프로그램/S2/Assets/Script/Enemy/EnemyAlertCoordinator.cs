@@ -7,10 +7,6 @@ using UnityEngine;
 /// </summary>
 public class EnemyAlertCoordinator : MonoBehaviour, IActionLogicEventHandler
 {
-    [Header("Source")]
-    // 플레이어의 이동 위험 평가 이벤트를 제공하는 필수 Context다.
-    [SerializeField] private PlayerContext playerContext;
-
     [Header("Log")]
     // true면 애드 전파 대상 계산과 상태 전환 요청 결과를 Unity 콘솔에 출력한다.
     [SerializeField] private bool logAlertSpread = true;
@@ -20,10 +16,7 @@ public class EnemyAlertCoordinator : MonoBehaviour, IActionLogicEventHandler
     /// </summary>
     private void Awake()
     {
-        if (!HasValidReference())
-        {
-            enabled = false;
-        }
+        // 논리 이벤트와 전술 유닛 등록소는 실행 시점에 검사한다.
     }
 
     /// <summary>
@@ -39,15 +32,15 @@ public class EnemyAlertCoordinator : MonoBehaviour, IActionLogicEventHandler
     /// </summary>
     private void Start()
     {
-        if (!HasValidReference())
-        {
-            enabled = false;
-            return;
-        }
-
         if (EnemyRegistry.Instance == null)
         {
             Debug.LogError($"{nameof(EnemyAlertCoordinator)} on {name}에는 애드 전파 대상 조회에 사용할 씬의 {nameof(EnemyRegistry)}가 필요합니다.", this);
+            enabled = false;
+        }
+
+        if (TacticalUnitRegistry.Instance == null)
+        {
+            Debug.LogError($"{nameof(EnemyAlertCoordinator)} on {name}에는 플레이어 진영 인식에 사용할 씬의 {nameof(TacticalUnitRegistry)}가 필요합니다.", this);
             enabled = false;
         }
     }
@@ -228,27 +221,7 @@ public class EnemyAlertCoordinator : MonoBehaviour, IActionLogicEventHandler
             return false;
         }
 
-        ActorHealth health = enemy.GridActor != null ? enemy.GridActor.GetComponent<ActorHealth>() : null;
-        return health == null || !health.IsDead;
-    }
-
-    /// <summary>
-    /// 애드 전파에 필요한 필수 참조가 연결되어 있는지 확인한다.
-    /// </summary>
-    private bool HasValidReference()
-    {
-        if (playerContext == null)
-        {
-            Debug.LogError($"{nameof(EnemyAlertCoordinator)} on {name}에는 {nameof(PlayerContext)} 참조가 필요합니다.", this);
-            return false;
-        }
-
-        if (!playerContext.HasValidReference())
-        {
-            return false;
-        }
-
-        return true;
+        return enemy.IsAlive;
     }
 
     /// <summary>

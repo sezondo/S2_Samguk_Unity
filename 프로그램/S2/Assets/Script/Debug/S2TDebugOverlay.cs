@@ -9,10 +9,6 @@ using UnityEngine;
 public class S2TDebugOverlay : MonoBehaviour, IActionLogicEventHandler
 {
     [Header("Reference")]
-    // 플레이어의 AP, 위치, 행동 선택 상태를 읽기 위한 선택 참조다.
-    [SerializeField] private PlayerContext playerContext;
-    // 플레이어 HP를 화면에 표시하기 위한 선택 참조다.
-    [SerializeField] private ActorHealth playerHealth;
     // 스테이지 진행 상태를 표시하기 위한 선택 참조다.
     [SerializeField] private StageStateManager stageStateManager;
 
@@ -60,6 +56,10 @@ public class S2TDebugOverlay : MonoBehaviour, IActionLogicEventHandler
     private GUIStyle boxStyle;
     // 단색 배경을 그리기 위한 런타임 텍스처다.
     private Texture2D backgroundTexture;
+    // 현재 플레이어 제어 매니저가 선택한 전술 유닛이다.
+    private TacticalUnitContext ActiveUnit => PlayerUnitControlManager.Instance != null
+        ? PlayerUnitControlManager.Instance.ActiveUnit
+        : null;
 
     /// <summary>
     /// 논리 이벤트 버스에 디버그 이벤트 수신자로 등록한다.
@@ -204,6 +204,7 @@ public class S2TDebugOverlay : MonoBehaviour, IActionLogicEventHandler
     private void AppendPlayerState()
     {
         builder.AppendLine("[Player]");
+        TacticalUnitContext playerContext = ActiveUnit;
         if (playerContext == null)
         {
             builder.AppendLine("Context: None");
@@ -227,9 +228,16 @@ public class S2TDebugOverlay : MonoBehaviour, IActionLogicEventHandler
     /// </summary>
     private void AppendPlayerActionPoint()
     {
+        TacticalUnitContext playerContext = ActiveUnit;
+        if (playerContext == null)
+        {
+            builder.AppendLine("AP: None");
+            return;
+        }
+
         ActionPoint actionPoint = playerContext.ActionPoint;
-        PlayerTurnData turnData = playerContext.TurnData;
-        if (actionPoint == null || turnData == null)
+        ControllableUnitData unitData = playerContext.UnitData;
+        if (actionPoint == null || unitData == null)
         {
             builder.AppendLine("AP: None");
             return;
@@ -238,7 +246,7 @@ public class S2TDebugOverlay : MonoBehaviour, IActionLogicEventHandler
         builder.Append("AP: ");
         builder.Append(actionPoint.Current);
         builder.Append(" / ");
-        builder.AppendLine(turnData.MaxActionPoint.ToString());
+        builder.AppendLine(unitData.MaxActionPoint.ToString());
     }
 
     /// <summary>
@@ -246,6 +254,7 @@ public class S2TDebugOverlay : MonoBehaviour, IActionLogicEventHandler
     /// </summary>
     private void AppendPlayerHealth()
     {
+        ActorHealth playerHealth = ActiveUnit != null ? ActiveUnit.Health : null;
         if (playerHealth == null)
         {
             builder.AppendLine("HP: None");
@@ -265,6 +274,13 @@ public class S2TDebugOverlay : MonoBehaviour, IActionLogicEventHandler
     /// </summary>
     private void AppendSwordState()
     {
+        TacticalUnitContext playerContext = ActiveUnit;
+        if (playerContext == null)
+        {
+            builder.AppendLine("Sword: None");
+            return;
+        }
+
         PlayerSwordState swordState = playerContext.SwordState;
         if (swordState == null)
         {
@@ -283,6 +299,13 @@ public class S2TDebugOverlay : MonoBehaviour, IActionLogicEventHandler
     /// </summary>
     private void AppendGunState()
     {
+        TacticalUnitContext playerContext = ActiveUnit;
+        if (playerContext == null)
+        {
+            builder.AppendLine("Gun Ammo: None");
+            return;
+        }
+
         PlayerGunAmmo gunAmmo = playerContext.GunAmmo;
         if (gunAmmo == null)
         {
@@ -301,6 +324,13 @@ public class S2TDebugOverlay : MonoBehaviour, IActionLogicEventHandler
     /// </summary>
     private void AppendActionSelectionState()
     {
+        TacticalUnitContext playerContext = ActiveUnit;
+        if (playerContext == null)
+        {
+            builder.AppendLine("Action Selection: None");
+            return;
+        }
+
         builder.Append("Move Selected: ");
         builder.AppendLine(playerContext.GridMoveAction != null ? playerContext.GridMoveAction.IsMoveSelected.ToString() : "None");
         builder.Append("Hack Selected: ");

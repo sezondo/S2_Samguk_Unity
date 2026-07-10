@@ -8,7 +8,7 @@ public class PlayerSwordState : MonoBehaviour, IActionLogicEventHandler
 {
     [Header("Reference")]
     // 플레이어 위치와 행동 데이터를 제공하는 Context다.
-    [SerializeField] private PlayerContext playerContext;
+    [SerializeField] private TacticalUnitContext playerContext;
 
     [Header("Initial State")]
     // true면 시작 시 검 기준 칸을 플레이어 현재 칸으로 맞춘다.
@@ -118,13 +118,13 @@ public class PlayerSwordState : MonoBehaviour, IActionLogicEventHandler
     {
         if (playerContext == null)
         {
-            Debug.LogError($"{nameof(PlayerSwordState)} on {name}에는 {nameof(PlayerContext)} 참조가 필요합니다.", this);
+            Debug.LogError($"{nameof(PlayerSwordState)} on {name}에는 {nameof(TacticalUnitContext)} 참조가 필요합니다.", this);
             return false;
         }
 
         if (playerContext.GridActor == null)
         {
-            Debug.LogError($"{nameof(PlayerSwordState)} on {name}에는 {nameof(PlayerContext)}에 연결된 {nameof(GridActor)} 참조가 필요합니다.", this);
+            Debug.LogError($"{nameof(PlayerSwordState)} on {name}에는 {nameof(TacticalUnitContext)}에 연결된 {nameof(GridActor)} 참조가 필요합니다.", this);
             return false;
         }
 

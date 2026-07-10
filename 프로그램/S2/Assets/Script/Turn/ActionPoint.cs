@@ -9,7 +9,7 @@ public class ActionPoint : MonoBehaviour
 {
     [Header("AP")]
     // 플레이어 공통 참조와 턴 데이터를 제공하는 필수 Context다.
-    [SerializeField] private PlayerContext playerContext;
+    [SerializeField] private TacticalUnitContext playerContext;
     // true면 플레이어 턴이 시작될 때 AP를 자동 보충한다.
     [SerializeField] private bool refillOnPlayerTurnStart = true;
     // AP가 바뀔 때 Unity 콘솔에 로그를 남길지 정한다.
@@ -18,7 +18,7 @@ public class ActionPoint : MonoBehaviour
     // 현재 남아 있는 AP다.
     public int Current { get; private set; }
     // 음수 설정을 막은 실제 최대 AP 값이다.
-    public int Max => playerContext.TurnData.MaxActionPoint;
+    public int Max => playerContext.UnitData.MaxActionPoint;
 
     // AP가 바뀔 때 현재 AP와 최대 AP를 알려준다.
     public event Action<int, int> ActionPointChanged;
@@ -27,7 +27,7 @@ public class ActionPoint : MonoBehaviour
     private TurnManager subscribedTurnManager;
 
     /// <summary>
-    /// 같은 오브젝트의 PlayerContext 참조를 준비한다.
+    /// 전술 유닛 Context와 AP 데이터를 검사한다.
     /// </summary>
     private void Awake()
     {
@@ -97,7 +97,7 @@ public class ActionPoint : MonoBehaviour
     /// </summary>
     public void RefillForTurn()
     {
-        SetCurrent(playerContext.TurnData.StartTurnActionPoint);
+        SetCurrent(playerContext.UnitData.StartTurnActionPoint);
     }
 
     /// <summary>
@@ -136,7 +136,7 @@ public class ActionPoint : MonoBehaviour
     /// </summary>
     private void SetCurrent(int value)
     {
-        int clampedMax = playerContext.TurnData.MaxActionPoint;
+        int clampedMax = playerContext.UnitData.MaxActionPoint;
         int nextValue = Mathf.Clamp(value, 0, clampedMax);
         if (Current == nextValue)
         {
@@ -158,7 +158,7 @@ public class ActionPoint : MonoBehaviour
     {
         if (playerContext == null)
         {
-            Debug.LogError($"{nameof(ActionPoint)} on {name}에는 {nameof(PlayerContext)} 참조가 필요합니다.", this);
+            Debug.LogError($"{nameof(ActionPoint)} on {name}에는 {nameof(TacticalUnitContext)} 참조가 필요합니다.", this);
             return false;
         }
 
@@ -175,28 +175,28 @@ public class ActionPoint : MonoBehaviour
     /// </summary>
     private bool HasValidData()
     {
-        PlayerTurnData turnData = playerContext.TurnData;
-        if (turnData == null)
+        ControllableUnitData unitData = playerContext.UnitData;
+        if (unitData == null)
         {
-            Debug.LogError($"{nameof(ActionPoint)} on {name}에는 {nameof(PlayerTurnData)} 참조가 필요합니다.", this);
+            Debug.LogError($"{nameof(ActionPoint)} on {name}에는 {nameof(ControllableUnitData)} 참조가 필요합니다.", this);
             return false;
         }
 
-        if (turnData.MaxActionPoint <= 0)
+        if (unitData.MaxActionPoint <= 0)
         {
-            Debug.LogError($"{nameof(ActionPoint)} on {name}의 {nameof(PlayerTurnData)} 최대 AP는 0보다 커야 합니다.", this);
+            Debug.LogError($"{nameof(ActionPoint)} on {name}의 {nameof(ControllableUnitData)} 최대 AP는 0보다 커야 합니다.", this);
             return false;
         }
 
-        if (turnData.StartTurnActionPoint < 0)
+        if (unitData.StartTurnActionPoint < 0)
         {
-            Debug.LogError($"{nameof(ActionPoint)} on {name}의 {nameof(PlayerTurnData)} 턴 시작 AP는 0 이상이어야 합니다.", this);
+            Debug.LogError($"{nameof(ActionPoint)} on {name}의 {nameof(ControllableUnitData)} 턴 시작 AP는 0 이상이어야 합니다.", this);
             return false;
         }
 
-        if (turnData.StartTurnActionPoint > turnData.MaxActionPoint)
+        if (unitData.StartTurnActionPoint > unitData.MaxActionPoint)
         {
-            Debug.LogError($"{nameof(ActionPoint)} on {name}의 {nameof(PlayerTurnData)} 턴 시작 AP는 최대 AP보다 클 수 없습니다.", this);
+            Debug.LogError($"{nameof(ActionPoint)} on {name}의 {nameof(ControllableUnitData)} 턴 시작 AP는 최대 AP보다 클 수 없습니다.", this);
             return false;
         }
 

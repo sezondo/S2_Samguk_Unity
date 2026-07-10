@@ -11,7 +11,7 @@ public class PlayerGridMoveAction : MonoBehaviour
 {
     [Header("Move Action")]
     // 플레이어 공통 참조와 턴 데이터를 제공하는 필수 Context다.
-    [SerializeField] private PlayerContext playerContext;
+    [SerializeField] private TacticalUnitContext playerContext;
     // true면 플레이어 턴일 때만 이동 행동을 선택하고 실행할 수 있다.
     [SerializeField] private bool requirePlayerTurn = true;
 
@@ -64,7 +64,7 @@ public class PlayerGridMoveAction : MonoBehaviour
     // 현재 AP로 한 번에 이동할 수 있는 최대 칸 수다.
     public int MoveRange => CalculateAffordableMoveSegmentCount() * MoveDistancePerActionPoint;
     // AP 1개 구간당 이동 가능한 칸 수다.
-    public int MoveDistancePerActionPoint => playerContext.TurnData.MoveDistancePerActionPoint;
+    public int MoveDistancePerActionPoint => playerContext.UnitData.MoveDistancePerActionPoint;
 
     // 이동 가능 칸 목록을 화면에 표시해야 할 때 발생한다.
     public event Action<IReadOnlyList<GridPosition>> MoveRangeShown;
@@ -267,7 +267,7 @@ public class PlayerGridMoveAction : MonoBehaviour
             return false;
         }
 
-        int cost = playerContext.TurnData.MoveActionPointCost;
+        int cost = playerContext.UnitData.MoveActionPointCost;
         ActionPoint actionPoint = playerContext.ActionPoint;
         if (cost > 0 && !actionPoint.CanSpend(cost))
         {
@@ -392,7 +392,7 @@ public class PlayerGridMoveAction : MonoBehaviour
         }
 
         int segmentCount = Mathf.CeilToInt(pathLength / (float)MoveDistancePerActionPoint);
-        return segmentCount * playerContext.TurnData.MoveActionPointCost;
+        return segmentCount * playerContext.UnitData.MoveActionPointCost;
     }
 
     /// <summary>
@@ -400,7 +400,7 @@ public class PlayerGridMoveAction : MonoBehaviour
     /// </summary>
     private int CalculateAffordableMoveSegmentCount()
     {
-        int segmentCost = playerContext.TurnData.MoveActionPointCost;
+        int segmentCost = playerContext.UnitData.MoveActionPointCost;
         if (segmentCost <= 0)
         {
             return 0;
@@ -458,7 +458,7 @@ public class PlayerGridMoveAction : MonoBehaviour
     {
         if (playerContext == null)
         {
-            Debug.LogError($"{nameof(PlayerGridMoveAction)} on {name}에는 {nameof(PlayerContext)} 참조가 필요합니다.", this);
+            Debug.LogError($"{nameof(PlayerGridMoveAction)} on {name}에는 {nameof(TacticalUnitContext)} 참조가 필요합니다.", this);
             return false;
         }
 
@@ -475,22 +475,22 @@ public class PlayerGridMoveAction : MonoBehaviour
     /// </summary>
     private bool HasValidData()
     {
-        PlayerTurnData turnData = playerContext.TurnData;
-        if (turnData == null)
+        ControllableUnitData unitData = playerContext.UnitData;
+        if (unitData == null)
         {
-            Debug.LogError($"{nameof(PlayerGridMoveAction)} on {name}에는 {nameof(PlayerTurnData)} 참조가 필요합니다.", this);
+            Debug.LogError($"{nameof(PlayerGridMoveAction)} on {name}에는 {nameof(ControllableUnitData)} 참조가 필요합니다.", this);
             return false;
         }
 
-        if (turnData.MoveDistancePerActionPoint <= 0)
+        if (unitData.MoveDistancePerActionPoint <= 0)
         {
-            Debug.LogError($"{nameof(PlayerGridMoveAction)} on {name}의 {nameof(PlayerTurnData)} AP당 이동 거리는 0보다 커야 합니다.", this);
+            Debug.LogError($"{nameof(PlayerGridMoveAction)} on {name}의 {nameof(ControllableUnitData)} AP당 이동 거리는 0보다 커야 합니다.", this);
             return false;
         }
 
-        if (turnData.MoveActionPointCost <= 0)
+        if (unitData.MoveActionPointCost <= 0)
         {
-            Debug.LogError($"{nameof(PlayerGridMoveAction)} on {name}의 {nameof(PlayerTurnData)} 이동 AP 비용은 0보다 커야 합니다.", this);
+            Debug.LogError($"{nameof(PlayerGridMoveAction)} on {name}의 {nameof(ControllableUnitData)} 이동 AP 비용은 0보다 커야 합니다.", this);
             return false;
         }
 

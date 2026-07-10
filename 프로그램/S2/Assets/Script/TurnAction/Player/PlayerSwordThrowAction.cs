@@ -9,7 +9,7 @@ public class PlayerSwordThrowAction : MonoBehaviour
 {
     [Header("Sword Throw Action")]
     // 플레이어 공통 참조와 검 상태를 제공하는 Context다.
-    [SerializeField] private PlayerContext playerContext;
+    [SerializeField] private TacticalUnitContext playerContext;
     // true면 플레이어 턴일 때만 검 투척 행동을 선택하고 실행할 수 있다.
     [SerializeField] private bool requirePlayerTurn = true;
 
@@ -23,7 +23,7 @@ public class PlayerSwordThrowAction : MonoBehaviour
     private bool isSwordThrowSelected;
 
     public bool IsSwordThrowSelected => isSwordThrowSelected;
-    public int SwordThrowRange => playerContext.TurnData.SwordThrowRange;
+    public int SwordThrowRange => playerContext.UnitData.SwordThrowRange;
 
     // 검 투척 행동 선택 상태가 됐을 때 발생한다.
     public event Action SwordThrowSelected;
@@ -113,7 +113,7 @@ public class PlayerSwordThrowAction : MonoBehaviour
             return false;
         }
 
-        int cost = playerContext.TurnData.SwordThrowActionPointCost;
+        int cost = playerContext.UnitData.SwordThrowActionPointCost;
         ActionPoint actionPoint = playerContext.ActionPoint;
         if (cost > 0 && !actionPoint.TrySpend(cost))
         {
@@ -160,7 +160,7 @@ public class PlayerSwordThrowAction : MonoBehaviour
             return false;
         }
 
-        int damage = playerContext.TurnData.SwordThrowDamage;
+        int damage = playerContext.UnitData.SwordThrowDamage;
         resolutionContext.Publish(new ApplyDamageLogicEvent(
             playerContext.GridActor,
             targetActor,
@@ -230,7 +230,7 @@ public class PlayerSwordThrowAction : MonoBehaviour
             return false;
         }
 
-        int cost = playerContext.TurnData.SwordThrowActionPointCost;
+        int cost = playerContext.UnitData.SwordThrowActionPointCost;
         ActionPoint actionPoint = playerContext.ActionPoint;
         if (cost > 0 && !actionPoint.CanSpend(cost))
         {
@@ -286,31 +286,31 @@ public class PlayerSwordThrowAction : MonoBehaviour
     {
         if (playerContext == null)
         {
-            Debug.LogError($"{nameof(PlayerSwordThrowAction)} on {name}에는 {nameof(PlayerContext)} 참조가 필요합니다.", this);
+            Debug.LogError($"{nameof(PlayerSwordThrowAction)} on {name}에는 {nameof(TacticalUnitContext)} 참조가 필요합니다.", this);
             return false;
         }
 
-        if (playerContext.TurnData == null)
+        if (playerContext.UnitData == null)
         {
-            Debug.LogError($"{nameof(PlayerSwordThrowAction)} on {name}에는 {nameof(PlayerContext)}에 연결된 {nameof(PlayerTurnData)} 참조가 필요합니다.", this);
+            Debug.LogError($"{nameof(PlayerSwordThrowAction)} on {name}에는 {nameof(TacticalUnitContext)}에 연결된 {nameof(ControllableUnitData)} 참조가 필요합니다.", this);
             return false;
         }
 
         if (playerContext.GridActor == null)
         {
-            Debug.LogError($"{nameof(PlayerSwordThrowAction)} on {name}에는 {nameof(PlayerContext)}에 연결된 {nameof(GridActor)} 참조가 필요합니다.", this);
+            Debug.LogError($"{nameof(PlayerSwordThrowAction)} on {name}에는 {nameof(TacticalUnitContext)}에 연결된 {nameof(GridActor)} 참조가 필요합니다.", this);
             return false;
         }
 
         if (playerContext.ActionPoint == null)
         {
-            Debug.LogError($"{nameof(PlayerSwordThrowAction)} on {name}에는 {nameof(PlayerContext)}에 연결된 {nameof(ActionPoint)} 참조가 필요합니다.", this);
+            Debug.LogError($"{nameof(PlayerSwordThrowAction)} on {name}에는 {nameof(TacticalUnitContext)}에 연결된 {nameof(ActionPoint)} 참조가 필요합니다.", this);
             return false;
         }
 
         if (playerContext.SwordState == null)
         {
-            Debug.LogError($"{nameof(PlayerSwordThrowAction)} on {name}에는 {nameof(PlayerContext)}에 연결된 {nameof(PlayerSwordState)} 참조가 필요합니다.", this);
+            Debug.LogError($"{nameof(PlayerSwordThrowAction)} on {name}에는 {nameof(TacticalUnitContext)}에 연결된 {nameof(PlayerSwordState)} 참조가 필요합니다.", this);
             return false;
         }
 
@@ -322,22 +322,22 @@ public class PlayerSwordThrowAction : MonoBehaviour
     /// </summary>
     private bool HasValidData()
     {
-        PlayerTurnData turnData = playerContext.TurnData;
-        if (turnData.SwordThrowRange < 0)
+        ControllableUnitData unitData = playerContext.UnitData;
+        if (unitData.SwordThrowRange < 0)
         {
-            Debug.LogError($"{nameof(PlayerSwordThrowAction)} on {name}의 {nameof(PlayerTurnData)} 검 투척 사거리는 0 이상이어야 합니다.", this);
+            Debug.LogError($"{nameof(PlayerSwordThrowAction)} on {name}의 {nameof(ControllableUnitData)} 검 투척 사거리는 0 이상이어야 합니다.", this);
             return false;
         }
 
-        if (turnData.SwordThrowActionPointCost <= 0)
+        if (unitData.SwordThrowActionPointCost <= 0)
         {
-            Debug.LogError($"{nameof(PlayerSwordThrowAction)} on {name}의 {nameof(PlayerTurnData)} 검 투척 AP 비용은 0보다 커야 합니다.", this);
+            Debug.LogError($"{nameof(PlayerSwordThrowAction)} on {name}의 {nameof(ControllableUnitData)} 검 투척 AP 비용은 0보다 커야 합니다.", this);
             return false;
         }
 
-        if (turnData.SwordThrowDamage <= 0)
+        if (unitData.SwordThrowDamage <= 0)
         {
-            Debug.LogError($"{nameof(PlayerSwordThrowAction)} on {name}의 {nameof(PlayerTurnData)} 검 투척 피해량은 0보다 커야 합니다.", this);
+            Debug.LogError($"{nameof(PlayerSwordThrowAction)} on {name}의 {nameof(ControllableUnitData)} 검 투척 피해량은 0보다 커야 합니다.", this);
             return false;
         }
 

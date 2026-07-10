@@ -1,6 +1,6 @@
-﻿# S2-T 현재 구현 구조
+# S2-T 현재 구현 구조
 
-최신 기준: 2026-07-04
+최신 기준: 2026-07-09
 브랜치: `turn-based-stealth`
 프로젝트 명칭: `S2-T`
 
@@ -1796,3 +1796,116 @@ Unity 플레이 모드에서 공격 / 피해 1차 통로를 확인했다.
 - `EnemyGridSight.CanDetect()`는 자기 `ActorHealth.IsDead`가 true면 감지하지 않는다.
 - `EnemyAlertCoordinator`는 죽은 적을 애드 전파 수신 대상에서 제외한다.
 - `EnemyTurnAgent`는 기존처럼 죽은 적의 적 턴 행동을 생략한다.
+
+## 2026-07-09 다중 전술 유닛 / 진영 / 제어권 구조
+
+### 공통 구분
+
+- `UnitFaction`: `Player`, `Enemy`, `Neutral` 진영을 구분한다.
+- `UnitControlType`: `Player`, `AI`, `None`으로 행동 결정 주체를 구분한다.
+- 진영과 조작권은 서로 독립이다.
+
+### TacticalUnitContext / ControllableUnitData
+
+- 기존 `PlayerContext`는 `TacticalUnitContext`로 변경했다.
+- 기존 `PlayerTurnData`는 `ControllableUnitData`로 변경했다.
+- `RequiredAbilities`는 유닛이 반드시 갖춰야 하는 `Move`, `Gun`, `Hack`, `Sword`, `Melee`, `HeavyGun` 능력 조합을 선언한다.
+- `TacticalUnitContext.HasValidAbilityComposition()`은 데이터의 필수 능력과 실제 행동 컴포넌트 구성이 정확히 일치하는지 검사한다.
+- 필수 능력 컴포넌트 누락과 데이터에 선언되지 않은 추가 행동 컴포넌트는 모두 구성 오류로 처리한다.
+- `DefeatOnDeath`는 유진 같은 핵심 유닛 사망 시 패배 조건으로 사용할 기록용 데이터이며 아직 게임 오버 흐름에는 연결하지 않았다.
+
+### 전술 유닛 등록소
+
+- `ITacticalUnit`은 진영, `GridActor`, `ActorHealth`, 생존 여부를 제공한다.
+- `TacticalUnitRegistry`는 플레이어와 적을 포함한 모든 전술 유닛을 등록한다.
+- 플레이어 진영이면서 `UnitControlType.Player`인 유닛은 별도 조작 가능 목록에도 등록한다.
+- `EnemyRegistry`는 기존 적 전용 시스템 호환을 위해 유지한다.
+
+### 입력 / 선택 / 제어권
+
+- `PlayerInputReader`는 씬 단일 인스턴스로 동작한다.
+- 기존 행동별 입력 컨트롤러는 제거됐고 실제 입력은 `PlayerUnitInputController`가 통합 처리한다.
+- `PlayerUnitControlManager.ActiveUnit`이 현재 플레이어가 조작할 전술 유닛을 보관한다.
+- 플레이어 진영, 플레이어 조작권, 생존, AP 1 이상 조건을 만족해야 선택할 수 있다.
+- 연출 큐 실행 중에도 유닛 선택은 가능하지만 `PlayerUnitActionFlowController`가 실제 행동 실행을 차단한다.
+- 다른 유닛 선택 시 이전 유닛의 모든 행동 모드와 이동 미리보기를 해제한다.
+- 현재 유닛 AP가 0이 되면 등록 순서 기준 다음 AP 보유 유닛으로 자동 전환한다.
+- 모든 유닛 AP가 0이면 `ActiveUnit`을 비우고 다음 플레이어 턴 AP 보충 이벤트에서 다시 선택한다.
+
+### 선택 능력 처리
+
+- 현재 유닛에게 행동 컴포넌트가 없는 것은 정상적인 능력 부재로 취급하고 안내 로그만 출력한다.
+- 데이터가 능력을 필수로 선언했는데 해당 컴포넌트가 없으면 구성 오류로 처리한다.
+- 해킹 유닛이 검 능력을 가지면 검 위치를 해킹 사거리 기준으로 사용하고, 검 능력이 없으면 자기 위치를 기준으로 사용한다.
+- 근접 공격 유닛이 검 능력을 가지며 검을 회수한 상태면 검 근접 공격을 사용하고, 아니면 맨손 근접 공격을 사용한다.
+
+### 플레이어 발각 / 적 표적
+
+- 경계 상태가 된 적은 살아 있는 모든 플레이어 진영 유닛을 표적 후보로 인식한다.
+- `EnemyTargetSelector`는 적 위치 기준 맨해튼 거리가 가장 가까운 살아 있는 플레이어 진영 유닛을 선택한다.
+- 같은 거리면 전술 유닛 등록 순서가 빠른 유닛을 선택한다.
+- 경계 진입 반응 이동과 적 턴 AI가 같은 표적 선정 기준을 사용한다.
+
+### 아직 연결하지 않은 항목
+
+- 유닛 선택 및 조작 가능 상태의 실제 발판/테두리 시각 표시는 후속 작업으로 남긴다.
+- `DefeatOnDeath` 기반 게임 오버 처리는 후속 작업으로 남긴다.
+- `HeavyGun`은 능력 구성표 자리만 열었고 실제 행동 컴포넌트는 아직 없다.
+
+## TurnAction 폴더 구조
+- `TurnAction/Core`: 행동 로직 이벤트 버스, 이벤트 타입, 해석 컨텍스트, 이벤트 인터페이스를 둔다.
+- `TurnAction/Grid`: 이동 범위/경로/위험도 표시와 평가 컴포넌트를 둔다.
+- `TurnAction/Input`: 씬 단일 플레이어 유닛 입력 컨트롤러를 둔다.
+- `TurnAction/Player`: 플레이어 조작 유닛의 실제 행동 실행 컴포넌트와 행동 플로우 컨트롤러를 둔다.
+
+## 2026-07-10 현재 테스트 기준 정리
+
+### 씬 단위 필수 매니저
+
+`Tset` 씬 테스트 기준으로 다음 컴포넌트는 씬에 하나씩 둔다.
+
+- `TacticalUnitRegistry`: 플레이어/적/중립 전술 유닛 등록소.
+- `PlayerUnitControlManager`: 현재 조작 유닛 선택과 AP 소진 자동 전환 관리.
+- `PlayerUnitInputController`: 씬 단일 입력을 현재 조작 유닛 행동으로 변환.
+- `PlayerUnitActionFlowController`: 행동 논리 실행 후 `ActionPresentationQueue` 재생.
+- `PlayerInputReader`: 입력 원본.
+- `ActionPresentationQueue`: 논리 결과 연출 큐.
+- `EnemyRegistry`: 기존 적 전용 등록소 호환용.
+- `StageGoalManager`: 스테이지 목표 판정 매니저. 씬에 1개만 둔다.
+- `StageStateManager`: 스테이지 클리어/실패 상태 관리.
+
+### 현재 테스트 유닛 구성
+
+- 유진 테스트 유닛: `Move + Gun + Hack + Sword + Melee`.
+- 동료 테스트 유닛: 현재 `Move + Melee`.
+- 동료를 일반 총기 아군으로 테스트할 경우 `ControllableUnitData.RequiredAbilities`를 `Move + Gun`으로 바꾸고, 실제 연결도 `GridMoveAction`, `GridMoveRiskEvaluator`, `GridMoveRangeHighlighter`, `PlayerGunAmmo`, `PlayerGunAttackAction`만 남긴다.
+
+### 인스펙터 점검 기준
+
+`TacticalUnitContext`는 데이터의 `RequiredAbilities`와 실제 연결된 선택 행동 컴포넌트가 정확히 일치해야 한다.
+
+- `Move`: `PlayerGridMoveAction`, `GridMoveRiskEvaluator`, `GridMoveRangeHighlighter`.
+- `Gun`: `PlayerGunAmmo`, `PlayerGunAttackAction`.
+- `Hack`: `PlayerHackAction`.
+- `Sword`: `PlayerSwordState`, `PlayerSwordThrowAction`, `PlayerSwordRecallAction`.
+- `Melee`: `PlayerMeleeAttackAction`.
+- `HeavyGun`: 타입만 열려 있고 실제 행동 컴포넌트는 아직 없다.
+
+데이터에 선언되지 않은 행동 컴포넌트가 연결되어 있거나, 데이터에 선언된 행동 컴포넌트가 빠져 있으면 `TacticalUnitContext`가 구성 오류를 출력하고 비활성화된다.
+
+### 아트 적용 연출 작업 목표
+
+다음 단계는 현재 논리/입력/대상 선정 구조 위에 실제 아트를 씌워 연출 품질을 올리는 것이다.
+
+우선 연결할 연출 항목:
+
+- 현재 조작 유닛 선택 표시.
+- 이동 경로/도착 연출의 실제 캐릭터 이동 애니메이션 보강.
+- 플레이어 총 공격 발사/탄흔/피격 연출.
+- 근접 공격 타격 연출.
+- 검 투척/회수 궤적과 피격 연출.
+- 해킹 시작/성공/대상 반응 연출.
+- 적 원거리 공격 연출.
+- 피격/사망/시체 표시 연출.
+
+사망 연출은 논리적으로 `ActorHealth.IsDead`, `ActorDiedLogicEvent`, `DamageResult.KilledByThisDamage`, `GridActor.ReleaseCellOccupation()` 기준을 유지한다. 즉 죽은 액터는 칸 점유를 해제하지만, 화면상 사망 애니메이션과 시체 표현은 Presenter/Visual 계층에서 처리한다.

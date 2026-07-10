@@ -9,7 +9,7 @@ public class PlayerMeleeAttackAction : MonoBehaviour
 {
     [Header("Melee Attack")]
     // 플레이어 공통 참조와 검 상태를 제공하는 Context다.
-    [SerializeField] private PlayerContext playerContext;
+    [SerializeField] private TacticalUnitContext playerContext;
     // true면 플레이어 턴일 때만 근접 공격 행동을 선택하고 실행할 수 있다.
     [SerializeField] private bool requirePlayerTurn = true;
 
@@ -112,7 +112,7 @@ public class PlayerMeleeAttackAction : MonoBehaviour
             return false;
         }
 
-        int cost = playerContext.TurnData.MeleeAttackActionPointCost;
+        int cost = playerContext.UnitData.MeleeAttackActionPointCost;
         ActionPoint actionPoint = playerContext.ActionPoint;
         if (cost > 0 && !actionPoint.TrySpend(cost))
         {
@@ -120,8 +120,10 @@ public class PlayerMeleeAttackAction : MonoBehaviour
             return false;
         }
 
-        bool hasSword = playerContext.SwordState.IsRecalled;
-        int damage = hasSword ? playerContext.TurnData.MeleeDamageWithSword : playerContext.TurnData.MeleeDamageWithoutSword;
+        bool hasSword = playerContext.HasAbility(UnitAbilityType.Sword) &&
+            playerContext.SwordState != null &&
+            playerContext.SwordState.IsRecalled;
+        int damage = hasSword ? playerContext.UnitData.MeleeDamageWithSword : playerContext.UnitData.MeleeDamageWithoutSword;
 
         isMeleeAttackSelected = false;
         MeleeAttackCanceled?.Invoke();
@@ -198,7 +200,7 @@ public class PlayerMeleeAttackAction : MonoBehaviour
             return false;
         }
 
-        int cost = playerContext.TurnData.MeleeAttackActionPointCost;
+        int cost = playerContext.UnitData.MeleeAttackActionPointCost;
         ActionPoint actionPoint = playerContext.ActionPoint;
         if (cost > 0 && !actionPoint.CanSpend(cost))
         {
@@ -263,31 +265,31 @@ public class PlayerMeleeAttackAction : MonoBehaviour
     {
         if (playerContext == null)
         {
-            Debug.LogError($"{nameof(PlayerMeleeAttackAction)} on {name}에는 {nameof(PlayerContext)} 참조가 필요합니다.", this);
+            Debug.LogError($"{nameof(PlayerMeleeAttackAction)} on {name}에는 {nameof(TacticalUnitContext)} 참조가 필요합니다.", this);
             return false;
         }
 
-        if (playerContext.TurnData == null)
+        if (playerContext.UnitData == null)
         {
-            Debug.LogError($"{nameof(PlayerMeleeAttackAction)} on {name}에는 {nameof(PlayerContext)}에 연결된 {nameof(PlayerTurnData)} 참조가 필요합니다.", this);
+            Debug.LogError($"{nameof(PlayerMeleeAttackAction)} on {name}에는 {nameof(TacticalUnitContext)}에 연결된 {nameof(ControllableUnitData)} 참조가 필요합니다.", this);
             return false;
         }
 
         if (playerContext.GridActor == null)
         {
-            Debug.LogError($"{nameof(PlayerMeleeAttackAction)} on {name}에는 {nameof(PlayerContext)}에 연결된 {nameof(GridActor)} 참조가 필요합니다.", this);
+            Debug.LogError($"{nameof(PlayerMeleeAttackAction)} on {name}에는 {nameof(TacticalUnitContext)}에 연결된 {nameof(GridActor)} 참조가 필요합니다.", this);
             return false;
         }
 
         if (playerContext.ActionPoint == null)
         {
-            Debug.LogError($"{nameof(PlayerMeleeAttackAction)} on {name}에는 {nameof(PlayerContext)}에 연결된 {nameof(ActionPoint)} 참조가 필요합니다.", this);
+            Debug.LogError($"{nameof(PlayerMeleeAttackAction)} on {name}에는 {nameof(TacticalUnitContext)}에 연결된 {nameof(ActionPoint)} 참조가 필요합니다.", this);
             return false;
         }
 
-        if (playerContext.SwordState == null)
+        if (playerContext.HasAbility(UnitAbilityType.Sword) && playerContext.SwordState == null)
         {
-            Debug.LogError($"{nameof(PlayerMeleeAttackAction)} on {name}에는 {nameof(PlayerContext)}에 연결된 {nameof(PlayerSwordState)} 참조가 필요합니다.", this);
+            Debug.LogError($"{nameof(PlayerMeleeAttackAction)} on {name}의 검 보유 근접 공격에는 {nameof(PlayerSwordState)} 참조가 필요합니다.", this);
             return false;
         }
 
@@ -299,22 +301,22 @@ public class PlayerMeleeAttackAction : MonoBehaviour
     /// </summary>
     private bool HasValidData()
     {
-        PlayerTurnData turnData = playerContext.TurnData;
-        if (turnData.MeleeAttackActionPointCost <= 0)
+        ControllableUnitData unitData = playerContext.UnitData;
+        if (unitData.MeleeAttackActionPointCost <= 0)
         {
-            Debug.LogError($"{nameof(PlayerMeleeAttackAction)} on {name}의 {nameof(PlayerTurnData)} 근접 공격 AP 비용은 0보다 커야 합니다.", this);
+            Debug.LogError($"{nameof(PlayerMeleeAttackAction)} on {name}의 {nameof(ControllableUnitData)} 근접 공격 AP 비용은 0보다 커야 합니다.", this);
             return false;
         }
 
-        if (turnData.MeleeDamageWithSword <= 0)
+        if (unitData.MeleeDamageWithSword <= 0)
         {
-            Debug.LogError($"{nameof(PlayerMeleeAttackAction)} on {name}의 {nameof(PlayerTurnData)} 검 보유 근접 피해량은 0보다 커야 합니다.", this);
+            Debug.LogError($"{nameof(PlayerMeleeAttackAction)} on {name}의 {nameof(ControllableUnitData)} 검 보유 근접 피해량은 0보다 커야 합니다.", this);
             return false;
         }
 
-        if (turnData.MeleeDamageWithoutSword <= 0)
+        if (unitData.MeleeDamageWithoutSword <= 0)
         {
-            Debug.LogError($"{nameof(PlayerMeleeAttackAction)} on {name}의 {nameof(PlayerTurnData)} 검 없음 근접 피해량은 0보다 커야 합니다.", this);
+            Debug.LogError($"{nameof(PlayerMeleeAttackAction)} on {name}의 {nameof(ControllableUnitData)} 검 없음 근접 피해량은 0보다 커야 합니다.", this);
             return false;
         }
 

@@ -1,12 +1,25 @@
 using UnityEngine;
 
 /// <summary>
-/// S2-T 플레이어의 턴 기반 행동 수치를 보관하는 데이터 에셋이다.
-/// AP, 이동 범위, 이동 비용처럼 여러 플레이어 컴포넌트가 공유하는 값을 한 곳에서 관리한다.
+/// 플레이어가 조작할 수 있는 전술 유닛의 능력 구성과 턴 기반 행동 수치를 보관하는 데이터 에셋이다.
+/// 데이터에 선언된 필수 능력과 실제 행동 컴포넌트 구성은 TacticalUnitContext가 대조한다.
 /// </summary>
-[CreateAssetMenu(menuName = "Scriptable/PlayerTurnData", fileName = "PlayerTurnData")]
-public class PlayerTurnData : ScriptableObject
+[CreateAssetMenu(menuName = "Scriptable/ControllableUnitData", fileName = "ControllableUnitData")]
+public class ControllableUnitData : ScriptableObject
 {
+    [Header("Identity")]
+    // 디버그와 UI에서 사용할 전술 유닛 표시 이름이다.
+    [SerializeField] private string displayName = "전술 유닛";
+    // 이 데이터의 유닛이 반드시 갖춰야 하는 행동 능력 조합이다.
+    [SerializeField] private UnitAbilityType requiredAbilities =
+        UnitAbilityType.Move |
+        UnitAbilityType.Gun |
+        UnitAbilityType.Hack |
+        UnitAbilityType.Sword |
+        UnitAbilityType.Melee;
+    // 이 유닛이 사망했을 때 스테이지 패배 조건으로 사용할지 나타낸다. 현재는 기록용이다.
+    [SerializeField] private bool defeatOnDeath;
+
     [Header("AP")]
     // 플레이어가 가질 수 있는 최대 AP다.
     [SerializeField] private int maxActionPoint = 3;
@@ -55,6 +68,9 @@ public class PlayerTurnData : ScriptableObject
     // 플레이어가 보유할 수 있는 총알 수다. 현재 총알은 PlayerGunAmmo가 런타임 상태로 보관한다.
     [SerializeField] private int maxGunAmmo = 3;
 
+    public string DisplayName => displayName;
+    public UnitAbilityType RequiredAbilities => requiredAbilities;
+    public bool DefeatOnDeath => defeatOnDeath;
     public int MaxActionPoint => maxActionPoint;
     public int StartTurnActionPoint => startTurnActionPoint;
     public int MoveDistancePerActionPoint => moveDistancePerActionPoint;
@@ -73,4 +89,12 @@ public class PlayerTurnData : ScriptableObject
     public int GunAttackRange => gunAttackRange;
     public int GunAttackDamage => gunAttackDamage;
     public int MaxGunAmmo => maxGunAmmo;
+
+    /// <summary>
+    /// 지정한 행동 능력이 데이터상 필수 능력인지 확인한다.
+    /// </summary>
+    public bool RequiresAbility(UnitAbilityType ability)
+    {
+        return ability != UnitAbilityType.None && (requiredAbilities & ability) == ability;
+    }
 }

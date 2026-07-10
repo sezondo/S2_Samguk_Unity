@@ -7,7 +7,7 @@ public class PlayerSwordRecallAction : MonoBehaviour
 {
     [Header("Sword Recall Action")]
     // 플레이어 공통 참조와 검 상태를 제공하는 Context다.
-    [SerializeField] private PlayerContext playerContext;
+    [SerializeField] private TacticalUnitContext playerContext;
     // true면 플레이어 턴일 때만 검 회수 행동을 실행할 수 있다.
     [SerializeField] private bool requirePlayerTurn = true;
 
@@ -47,7 +47,7 @@ public class PlayerSwordRecallAction : MonoBehaviour
         GridPosition fromPosition = playerContext.SwordState.CurrentPosition;
         GridPosition toPosition = playerContext.GridActor.GridPosition;
 
-        int cost = playerContext.TurnData.SwordRecallActionPointCost;
+        int cost = playerContext.UnitData.SwordRecallActionPointCost;
         ActionPoint actionPoint = playerContext.ActionPoint;
         if (cost > 0 && !actionPoint.TrySpend(cost))
         {
@@ -104,7 +104,7 @@ public class PlayerSwordRecallAction : MonoBehaviour
             return false;
         }
 
-        int cost = playerContext.TurnData.SwordRecallActionPointCost;
+        int cost = playerContext.UnitData.SwordRecallActionPointCost;
         ActionPoint actionPoint = playerContext.ActionPoint;
         if (cost > 0 && !actionPoint.CanSpend(cost))
         {
@@ -133,31 +133,31 @@ public class PlayerSwordRecallAction : MonoBehaviour
     {
         if (playerContext == null)
         {
-            Debug.LogError($"{nameof(PlayerSwordRecallAction)} on {name}에는 {nameof(PlayerContext)} 참조가 필요합니다.", this);
+            Debug.LogError($"{nameof(PlayerSwordRecallAction)} on {name}에는 {nameof(TacticalUnitContext)} 참조가 필요합니다.", this);
             return false;
         }
 
-        if (playerContext.TurnData == null)
+        if (playerContext.UnitData == null)
         {
-            Debug.LogError($"{nameof(PlayerSwordRecallAction)} on {name}에는 {nameof(PlayerContext)}에 연결된 {nameof(PlayerTurnData)} 참조가 필요합니다.", this);
+            Debug.LogError($"{nameof(PlayerSwordRecallAction)} on {name}에는 {nameof(TacticalUnitContext)}에 연결된 {nameof(ControllableUnitData)} 참조가 필요합니다.", this);
             return false;
         }
 
         if (playerContext.GridActor == null)
         {
-            Debug.LogError($"{nameof(PlayerSwordRecallAction)} on {name}에는 {nameof(PlayerContext)}에 연결된 {nameof(GridActor)} 참조가 필요합니다.", this);
+            Debug.LogError($"{nameof(PlayerSwordRecallAction)} on {name}에는 {nameof(TacticalUnitContext)}에 연결된 {nameof(GridActor)} 참조가 필요합니다.", this);
             return false;
         }
 
         if (playerContext.ActionPoint == null)
         {
-            Debug.LogError($"{nameof(PlayerSwordRecallAction)} on {name}에는 {nameof(PlayerContext)}에 연결된 {nameof(ActionPoint)} 참조가 필요합니다.", this);
+            Debug.LogError($"{nameof(PlayerSwordRecallAction)} on {name}에는 {nameof(TacticalUnitContext)}에 연결된 {nameof(ActionPoint)} 참조가 필요합니다.", this);
             return false;
         }
 
         if (playerContext.SwordState == null)
         {
-            Debug.LogError($"{nameof(PlayerSwordRecallAction)} on {name}에는 {nameof(PlayerContext)}에 연결된 {nameof(PlayerSwordState)} 참조가 필요합니다.", this);
+            Debug.LogError($"{nameof(PlayerSwordRecallAction)} on {name}에는 {nameof(TacticalUnitContext)}에 연결된 {nameof(PlayerSwordState)} 참조가 필요합니다.", this);
             return false;
         }
 
@@ -169,10 +169,10 @@ public class PlayerSwordRecallAction : MonoBehaviour
     /// </summary>
     private bool HasValidData()
     {
-        PlayerTurnData turnData = playerContext.TurnData;
-        if (turnData.SwordRecallActionPointCost <= 0)
+        ControllableUnitData unitData = playerContext.UnitData;
+        if (unitData.SwordRecallActionPointCost <= 0)
         {
-            Debug.LogError($"{nameof(PlayerSwordRecallAction)} on {name}의 {nameof(PlayerTurnData)} 검 회수 AP 비용은 0보다 커야 합니다.", this);
+            Debug.LogError($"{nameof(PlayerSwordRecallAction)} on {name}의 {nameof(ControllableUnitData)} 검 회수 AP 비용은 0보다 커야 합니다.", this);
             return false;
         }
 

@@ -23,6 +23,8 @@ public class EnemyAlertReactionCoordinator : MonoBehaviour, IActionLogicEventHan
 
     // 경계 반응 이동 경로 계산기다.
     private readonly EnemyTacticalMovePlanner movePlanner = new();
+    // 경계 반응 시 가장 가까운 살아 있는 플레이어 진영 유닛을 찾는다.
+    private readonly EnemyTargetSelector targetSelector = new();
     // 최종 목표까지의 이동 경로 버퍼다.
     private readonly List<GridPosition> pathBuffer = new();
     // 후보별 점수 로그 출력용 버퍼다.
@@ -116,10 +118,16 @@ public class EnemyAlertReactionCoordinator : MonoBehaviour, IActionLogicEventHan
         }
 
         GridPosition startPosition = enemyContext.GridActor.GridPosition;
+        GridPosition reactionTargetPosition = logicEvent.KnownPlayerPosition;
+        if (targetSelector.TrySelectNearestPlayerUnit(startPosition, out TacticalUnitContext nearestPlayerUnit))
+        {
+            reactionTargetPosition = nearestPlayerUnit.GridActor.GridPosition;
+        }
+
         if (!movePlanner.TryFindBestCoverReactionPath(
                 GridManager.Instance,
                 startPosition,
-                logicEvent.KnownPlayerPosition,
+                reactionTargetPosition,
                 moveRange,
                 scoreSettings,
                 pathBuffer,
