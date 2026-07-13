@@ -207,6 +207,7 @@ public class EnemyTurnAgent : MonoBehaviour
                 enemyContext,
                 previousPosition,
                 nextPosition,
+                MovePresentationPhaseUtility.GetPhase(i, path.Count),
                 "적 턴 이동 연출"));
             previousPosition = nextPosition;
         }

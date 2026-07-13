@@ -46,7 +46,7 @@ public class DebugPresentationQueueTester : MonoBehaviour
             return;
         }
 
-        queue.Enqueue(PresentationEvent.MoveActor(sampleMoveActor, sampleMoveFromPosition, sampleMoveToPosition, "디버그 이동 연출"));
+        queue.Enqueue(PresentationEvent.MoveActor(sampleMoveActor, sampleMoveFromPosition, sampleMoveToPosition, MovePresentationPhase.Single, "디버그 이동 연출"));
         queue.Enqueue(PresentationEvent.AlertDetected(new GridPosition(1, 0), null, "디버그 발각 연출"));
         queue.Enqueue(PresentationEvent.StageCleared("디버그 클리어 연출"));
 

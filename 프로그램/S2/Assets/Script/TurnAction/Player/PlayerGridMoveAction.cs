@@ -192,8 +192,9 @@ public class PlayerGridMoveAction : MonoBehaviour
         }
 
         GridPosition previousPosition = actor.GridPosition;
-        foreach (GridPosition step in movePathBuffer)
+        for (int i = 0; i < movePathBuffer.Count; i++)
         {
+            GridPosition step = movePathBuffer[i];
             if (!actor.TryMoveTo(step))
             {
                 LogBlockedTarget(step, "GridActor 이동 요청이 실패했습니다");
@@ -201,7 +202,8 @@ public class PlayerGridMoveAction : MonoBehaviour
                 return false;
             }
 
-            resolutionContext.EnqueuePresentation(PresentationEvent.MoveActor(actor, previousPosition, step, "플레이어 이동 연출"));
+            MovePresentationPhase movePhase = MovePresentationPhaseUtility.GetPhase(i, movePathBuffer.Count);
+            resolutionContext.EnqueuePresentation(PresentationEvent.MoveActor(actor, previousPosition, step, movePhase, "플레이어 이동 연출"));
             resolutionContext.Publish(new MoveStepEnteredLogicEvent(actor, step));
             // 이동 연출 사이에 발각 같은 후속 연출 이벤트가 끼어들 수 있도록 칸 단위로 논리 이벤트를 즉시 처리한다.
             resolutionContext.Resolve();

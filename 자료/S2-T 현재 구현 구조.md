@@ -1,16 +1,19 @@
 # S2-T 현재 구현 구조
 
-최신 기준: 2026-07-09
-브랜치: `turn-based-stealth`
+최신 기준: 2026-07-14
+브랜치: `main`
 프로젝트 명칭: `S2-T`
 
 이 문서는 현재 S2의 메인 개발 방향인 보드게임식 턴제 잠입 퍼즐/전술 게임 S2-T의 구현 구조를 빠르게 파악하기 위한 문서다.
 작업 순서, 과거 실험 기록, 변경 이력은 `S2-T 작업일지.md`에서 관리한다.
 
+문서를 읽을 때는 상단의 `최신 기준 요약`, `현재 한계`, `다음 작업`과 가장 최근 날짜의 구조 설명을 현재 기준으로 삼는다.
+아래의 이전 날짜별 구조는 구현 변화 추적을 위해 남긴 이력이며, 내용이 충돌하면 더 최근 항목을 우선한다. 특히 `PlayerContext`, `PlayerTurnData`, 행동별 입력 컨트롤러, 개별 공격 Presenter 설명은 각각 `TacticalUnitContext`, `ControllableUnitData`, 통합 입력 계층, `CombatActionPresenter` 이전 구조다.
+
 ## 최신 기준 요약
 
 - S2-T는 사이버 조선 세계관을 유지한 현재 메인 개발 방향의 보드게임식 턴제 잠입 퍼즐/전술 게임이다.
-- 플레이어는 한 명이며, AP를 사용해 격자 보드에서 이동/해킹/검 행동/공격을 실행한다.
+- 플레이어 진영은 여러 조작 유닛으로 구성되며, 각 유닛이 AP와 능력 구성을 가지고 이동/해킹/검 행동/공격을 실행한다.
 - 이동은 목표 칸을 선택하면 BFS 경로를 따라 한 칸씩 처리하는 구조다.
 - 이동 가능 범위는 현재 AP와 AP당 이동 거리 기준으로 계산한다.
 - 적 시야는 `EnemyGridSight`가 그리드 칸 단위로 계산한다.
@@ -22,11 +25,14 @@
 - Presenter의 색상 요청은 VisualRoot의 `ActorVisualController`가 실제 스프라이트에 적용한다.
 - 적 턴에는 경계 상태이고 전투불능이 아닌 적이 `EnemyActionPoint`의 AP를 사용해 원거리 공격과 엄폐 이동을 순서대로 수행한다.
 - 적 턴 AI는 `EnemyTacticalMovePlanner`와 `EnemyTacticalPositionScorer`를 재사용해 공격 가능한 엄폐 위치 또는 최고 엄폐 위치를 고른다.
+- 행동 판정은 논리 계층에서 먼저 확정하고, `ActionPresentationQueue`가 연출 이벤트를 순서대로 재생한다.
+- 전투 연출은 씬 단일 `CombatActionPresenter`가 공격자와 피격자의 자세를 같은 프레임에 전환하고 데이터에 지정된 시간 뒤 상태를 정리한다.
+- 캐릭터 연출 연결은 `ActorPresentationRegistry`와 `ActorPresentationBinding`이 관리하며, `ActorVisualController`가 Animator 상태와 좌우 방향을 적용한다.
 
 ## 현재 목표
 
-S2-T의 현재 구현 목표는 `이동 -> 위험 경고 -> 발각 이벤트 -> 애드 전파 -> 적 상태 전환 -> 적 턴 공격/엄폐 이동`까지의 최소 전술 루프를 안정화하는 것이다.
-현재 실제 피해와 전투 연출 이벤트 통로, 적 경계 반응, 적 턴 AI 1차 통로는 열려 있다. 카메라 연출, UI 경고, 이동 일시 정지, 실제 투사체/피격/사망 애니메이션은 아직 구현하지 않는다.
+S2-T의 현재 구현 목표는 완성된 다중 유닛/행동 판정/적 AI 통로 위에 실제 캐릭터 아트와 연출을 단계적으로 연결하는 것이다.
+2026-07-14 기준 공격자·피격자 동시 자세, 사망 자세 유지, 공격 종류별 유지 시간, 좌우 방향 전환을 포함한 통합 전투 애니메이션 기반은 인스펙터 연결과 플레이 모드 확인을 마쳤다. 다음 우선순위는 조작 유닛 선택 표시와 검·해킹·공격 이펙트이며, 카메라 연출은 캐릭터 연출이 안정된 뒤 확장한다.
 
 ## 씬 구성 기준
 
@@ -36,11 +42,14 @@ S2-T의 현재 구현 목표는 `이동 -> 위험 경고 -> 발각 이벤트 -> 
 
 - `GridManager`: 보드 크기, 좌표 변환, 칸 상태, 점유 상태를 관리한다.
 - `TurnManager`: 플레이어/적 턴 전환 이벤트를 관리한다.
-- 플레이어 토큰: `PlayerContext`, `GridActor`, `ActionPoint`, `PlayerGridMoveAction`, `GridMoveRiskEvaluator`, `GridMoveRangeHighlighter`를 가진다.
-- 적 토큰: `EnemyContext`, `GridActor`, `EnemyGridSight`, `EnemyAlertState`, `EnemyActionPoint`, `EnemyTurnAgent`, `EnemyAttackAction`을 가진다.
+- 플레이어 진영 유닛: `TacticalUnitContext`, `GridActor`, `ActionPoint`와 `ControllableUnitData.RequiredAbilities`에 맞는 행동 컴포넌트를 가진다.
+- 적 유닛: `EnemyContext`, `GridActor`, `EnemyGridSight`, `EnemyAlertState`, `EnemyActionPoint`, `EnemyTurnAgent`, `EnemyAttackAction`을 가진다.
+- `TacticalUnitRegistry`: 플레이어/적/중립 전술 유닛을 통합 등록한다.
+- `PlayerUnitControlManager`, `PlayerUnitInputController`, `PlayerUnitActionFlowController`: 조작 유닛 선택, 입력 전달, 논리 실행과 연출 큐 재생을 관리한다.
 - `EnemyRegistry`: 현재 씬의 활성 `EnemyContext` 목록을 관리한다.
 - `EnemyAlertCoordinator`: 플레이어 발각 이벤트와 피해 이벤트를 받아 애드 전파를 처리한다.
 - `EnemyTurnCoordinator`: 적 턴 시작 시 활성 적을 순서대로 실행하고 연출 큐 완료 후 다음 적을 처리한다.
+- `ActorPresentationRegistry`, `CombatActionPresenter`: 논리 Actor와 화면 Visual을 연결하고 통합 전투 애니메이션을 조정한다.
 - Dialogue/VFX 관련 오브젝트는 필요한 테스트에서만 배치한다.
 
 ## 코드 폴더 구조
@@ -49,8 +58,11 @@ S2-T의 현재 구현 목표는 `이동 -> 위험 경고 -> 발각 이벤트 -> 
 
 - `Assets/Script/Grid`: 격자 좌표, 보드 상태, 점유, 경로 탐색.
 - `Assets/Script/Turn`: 턴 진행과 AP 관리.
-- `Assets/Script/TurnAction`: 플레이어 이동 행동, 이동 범위 표시, 이동 경로 위험 평가.
-- `Assets/Script/Player`: 플레이어 핵심 참조를 모으는 `PlayerContext`.
+- `Assets/Script/TurnAction/Core`: 행동 로직 이벤트, 해석 컨텍스트, 공통 인터페이스.
+- `Assets/Script/TurnAction/Grid`: 이동 범위/경로/위험도 표시와 평가.
+- `Assets/Script/TurnAction/Input`: 현재 조작 유닛에 입력을 전달하는 씬 단일 입력 계층.
+- `Assets/Script/TurnAction/Player`: 플레이어 진영의 실제 행동 실행과 행동 흐름.
+- `Assets/Script/Player`: 플레이어 진영 관련 데이터와 제어 구성.
 - `Assets/Script/Enemy`: 적 핵심 참조, 시야, 등록소, 애드 전파, 발각 상태, 적 턴 AI, 적 AP, 적 원거리 공격.
 - `Assets/Script/DataScript/Data`: 플레이어/적/대사/해킹 데이터 에셋.
 - `Assets/Script/Dialogue`: 말풍선 대사 시스템.
@@ -459,21 +471,20 @@ AP 수치는 `PlayerContext.TurnData`의 `PlayerTurnData`에서 읽는다.
 
 - 플레이어 이동 중 발각 시 이동을 일시 정지하지 않는다.
 - 발각 시 카메라 줌, 경고 UI, 컷인 연출은 없다.
-- 적 상태는 `Normal`, `Alerted` 두 단계뿐이다.
-- 적 AI 반응은 아직 없다.
-- 애드 전파는 단일 단계이며 연쇄 전파는 아직 없다.
+- 적 상태는 `Normal`, `Alerted` 두 단계이며 애드 전파는 단일 단계다.
 - 플레이어 시야/정보 공개 기준이 없어 보이지 않는 적의 위험 경고 숨김은 아직 없다.
-- 공격, 검 투척, 검 회수는 아직 핵심 루프에 연결되지 않았다.
-- 해킹은 1차 통로만 열려 있으며, 실제 씬 연결과 해킹 대상 효과는 아직 구현 전이다.
+- 통합 전투 애니메이션은 연결됐지만 발사체, 탄흔, 타격 이펙트, 검 Visual과 이동 경로 이펙트는 아직 없다.
+- `MovePresentationDataTest`는 현재 `UseMoveAnimation`, `PlayIdleAnimationOnComplete`가 꺼져 있어 이동 애니메이션 상태 전환은 활성화하지 않은 상태다.
+- 발각용 `Alert` 애니메이션은 선택 기능이며 현재 테스트 적에서는 비활성화되어 색상 점멸만 사용한다.
 - 클리어 UI, 결과 화면, 다음 스테이지 전환, 메뉴/스토리 화면은 아직 구현하지 않았다.
 
 ## 다음 작업
 
-1. 이동/발각/애드/클리어까지의 현재 최소 루프는 유지한다.
-2. 다음 작업은 `Tset` 씬에 `HackableRegistry`, `PlayerHackAction`, `PlayerHackInputController`, `HackableObject`, `HackPresenter`를 연결해 1차 해킹 통로를 플레이 모드에서 확인하는 것이다.
-3. 이후 해킹 대상별 실제 효과와 검 투척/검 회수 루프로 확장한다.
-4. 발각 시 카메라 줌, 경고 아이콘, 컷인 같은 후속 연출은 해킹 루프 이후 Presenter 기준으로 확장한다.
-5. 맵 크기와 적 배치 밀도 기준이 잡히면 애드 연쇄 전파 구조를 BFS/큐 기반으로 확장한다.
+1. 현재 조작 유닛 선택 표시를 추가한다.
+2. 검 Visual의 한 프레임 위치 이동과 이동 경로 이펙트를 연결한다.
+3. 해킹 시작/성공/대상 반응 연출을 연결한다.
+4. 총·근접·적 공격의 발사체/탄흔/타격 이펙트를 통합 전투 연출 위에 추가한다.
+5. 캐릭터 연출이 안정된 뒤 공격자와 피격자 사이를 강조하는 카메라 줌/컷 연출을 추가한다.
 
 
 ## Stage Goal / 승리 조건
@@ -1909,3 +1920,93 @@ Unity 플레이 모드에서 공격 / 피해 1차 통로를 확인했다.
 - 피격/사망/시체 표시 연출.
 
 사망 연출은 논리적으로 `ActorHealth.IsDead`, `ActorDiedLogicEvent`, `DamageResult.KilledByThisDamage`, `GridActor.ReleaseCellOccupation()` 기준을 유지한다. 즉 죽은 액터는 칸 점유를 해제하지만, 화면상 사망 애니메이션과 시체 표현은 Presenter/Visual 계층에서 처리한다.
+
+## Git 브랜치 기준
+
+- 2026-07-10 기준 S2-T 작업 기준 브랜치는 `main`이다.
+- 기존 개발 브랜치 `turn-based-stealth`는 로컬 `main`에 fast-forward 병합 완료됐다.
+- 로컬 `main`과 `turn-based-stealth`는 커밋 `0fef79e` 기준으로 같은 내용을 가진다.
+- 원격 `origin/main` 반영은 별도 `git push origin main`이 필요하다.
+
+## 통합 전투 애니메이션 연출 구조 - 2026-07-13
+
+### CombatActionPresenter
+
+`CombatActionPresenter`는 씬에 하나만 배치하는 통합 전투 연출 감독이다.
+`PresentationEventType.CombatAction`만 처리하며, 공격 판정이나 피해 적용에는 관여하지 않는다.
+
+처리 흐름:
+
+1. `PresentationEvent.Actor`, `TargetActor`로 공격자와 피격자를 확인한다.
+2. `ActorPresentationRegistry`에서 양쪽 `ActorVisualController`를 찾는다.
+3. 두 Actor가 서로 마주보도록 마지막 좌우 방향을 갱신한다.
+4. `AttackPresentationKind`에 맞는 공격자 상태와 `DamageResult.KilledByThisDamage`에 맞는 피격 또는 사망 상태를 같은 프레임에 재생한다.
+5. `CombatPresentationData`에 지정된 시간 동안 두 자세를 유지한다.
+6. 공격자와 살아 있는 피격자는 `Idle`로 복귀하고, 사망한 피격자는 `Death` 마지막 상태를 유지한다.
+7. `PresentationEventHandle.Complete()`를 호출해 다음 큐 이벤트를 진행한다.
+
+현재 처리 대상으로 사용하는 공격 종류:
+
+- `SwordThrow`
+- `MeleeWithSword`
+- `MeleeUnarmed`
+- `PlayerGun`
+- `EnemyRanged`
+
+기존 `PlayerGunAttackPresenter`, `PlayerMeleeAttackPresenter`, `EnemyAttackPresenter`는 제거했다.
+`SwordActionPresenter`는 피해가 없는 `SwordThrow`와 `SwordRecall`만 처리한다.
+피해가 발생한 검 투척은 액션이 `AttackPresentationKind.SwordThrow`를 전달하며 `CombatActionPresenter`가 처리한다.
+
+### ActorPresentationRegistry / ActorPresentationBinding
+
+- `ActorPresentationRegistry`는 씬 단위로 `GridActor -> ActorVisualController` 연결을 관리한다.
+- `ActorPresentationBinding`은 캐릭터별 논리 `GridActor`와 화면 `ActorVisualController`를 등록소에 등록한다.
+- 논리 액션과 `GridActor`는 Animator나 화면 연출 컴포넌트를 직접 참조하지 않는다.
+- 중복 Actor 등록이나 Animator 누락은 fallback 없이 한국어 오류 로그를 남기고 해당 바인딩을 비활성화한다.
+
+### CombatPresentationData
+
+전투 연출 튜닝을 보관하는 `ScriptableObject`다.
+
+공격 종류별 값:
+
+- `AttackKind`: 액션에서 전달한 공격 표현 종류.
+- `AttackerAnimationStateName`: 공격자에게 재생할 한 프레임 Animator 상태.
+- `PresentationDuration`: 공격자와 피격자 자세를 동시에 유지할 시간.
+
+공통 값:
+
+- `HitAnimationStateName`
+- `DeathAnimationStateName`
+- `IdleAnimationStateName`
+- `CrossFadeDuration`: 한 프레임 이미지 즉시 전환은 0을 사용한다.
+
+데이터 에셋 자체에 `HasValidData()`를 두지 않고 `CombatActionPresenter.HasValidData()`가 상태 이름, 시간, 공격 종류 중복을 검사한다.
+
+### ActorVisualController 애니메이션 / 방향 책임
+
+- Presenter가 요청한 Animator 상태를 재생한다.
+- 마지막으로 요청한 상태 이름을 기억하며 루프 상태는 같은 상태 재시작을 생략할 수 있다.
+- 기본 일러스트가 왼쪽을 향한다는 기준으로 `SpriteRenderer.flipX`를 적용한다.
+- 목표 X 좌표가 오른쪽이면 오른쪽, 왼쪽이면 왼쪽을 바라본다.
+- 수직 이동이나 같은 X 좌표 대상은 마지막 좌우 방향을 유지한다.
+- 큐 순서, 연출 시간 대기, 피해/사망 판정은 담당하지 않는다.
+
+### 연속 이동 애니메이션 단계
+
+한 칸 단위 `MoveActor`, `EnemyReactionMove` 이벤트는 전체 경로에서 다음 `MovePresentationPhase`를 가진다.
+
+- `Single`: 한 칸 이동. Move 재생 후 Idle 복귀.
+- `Start`: 연속 이동 첫 칸. Move 재생.
+- `Continue`: 중간 칸. 위치만 보간하고 애니메이션 상태를 다시 시작하지 않음.
+- `End`: 마지막 칸. 위치 보간 후 Idle 복귀.
+
+플레이어 이동, 적 경계 반응 이동, 적 턴 이동이 같은 단계 계산을 사용한다.
+따라서 여러 칸 이동 중 칸마다 `Move -> Idle -> Move`가 반복되지 않는다.
+
+### 검 Visual 보류 범위
+
+- 검 투척 논리는 현재처럼 검 위치를 즉시 갱신한다.
+- 피해 없는 검 투척은 `SwordThrow` 이벤트, 피해가 있는 검 투척은 `CombatAction + AttackPresentationKind.SwordThrow`를 사용한다.
+- `FromPosition`, `ToPosition`, `ExecutionPosition` 통로는 유지한다.
+- 실제 검 Visual은 후속 작업에서 한 프레임 위치 이동과 이동 경로를 따라 이펙트를 배치하는 방식으로 연결한다.

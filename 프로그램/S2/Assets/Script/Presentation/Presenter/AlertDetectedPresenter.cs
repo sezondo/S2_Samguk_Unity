@@ -25,6 +25,14 @@ public class AlertDetectedPresenter : MonoBehaviour
     // 발각 연출 중 경고색을 표시할 횟수다.
     [SerializeField] private int flashCount = 3;
 
+    [Header("Animation")]
+    // true면 발각 점멸과 함께 한 프레임 발각 자세를 재생한다.
+    [SerializeField] private bool playAlertAnimation;
+    // 발각 연출 중 재생할 Animator 상태 이름이다.
+    [SerializeField] private string alertAnimationStateName = "Alert";
+    // 발각 연출이 끝난 뒤 복귀할 Animator 상태 이름이다.
+    [SerializeField] private string idleAnimationStateName = "Idle";
+
     [Header("Debug")]
     // true면 발각 연출 시작과 종료 흐름을 Unity 콘솔에 출력한다.
     [SerializeField] private bool logAlertFlow;
@@ -145,6 +153,11 @@ public class AlertDetectedPresenter : MonoBehaviour
             Debug.Log($"{nameof(AlertDetectedPresenter)}: {targetEnemy.name}의 발각 연출을 시작합니다. 발각 칸: {presentationEvent.EventPosition}", this);
         }
 
+        if (playAlertAnimation)
+        {
+            visualController.TryPlayAnimationState(alertAnimationStateName, 0f);
+        }
+
         for (int i = 0; i < flashCount; i++)
         {
             visualController.ApplyColor(warningColor);
@@ -168,6 +181,11 @@ public class AlertDetectedPresenter : MonoBehaviour
     private void CompleteActiveAlert(PresentationEventHandle handle)
     {
         ApplyCurrentStateColor();
+        if (playAlertAnimation)
+        {
+            visualController.TryPlayAnimationState(idleAnimationStateName, 0f, false);
+        }
+
         alertCoroutine = null;
         activeHandle = null;
         handle.Complete();
@@ -195,6 +213,11 @@ public class AlertDetectedPresenter : MonoBehaviour
             return false;
         }
 
+        if (playAlertAnimation && !visualController.HasValidAnimationReference())
+        {
+            return false;
+        }
+
         return true;
     }
 
@@ -212,6 +235,13 @@ public class AlertDetectedPresenter : MonoBehaviour
         if (flashCount <= 0)
         {
             Debug.LogError($"{nameof(AlertDetectedPresenter)} on {name}의 점멸 횟수는 1 이상이어야 합니다.", this);
+            return false;
+        }
+
+        if (playAlertAnimation &&
+            (string.IsNullOrWhiteSpace(alertAnimationStateName) || string.IsNullOrWhiteSpace(idleAnimationStateName)))
+        {
+            Debug.LogError($"{nameof(AlertDetectedPresenter)} on {name}의 발각 또는 대기 애니메이션 상태 이름이 비어 있습니다.", this);
             return false;
         }
 

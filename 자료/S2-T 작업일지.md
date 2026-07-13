@@ -1353,3 +1353,84 @@
 - 우선순위는 플레이어 조작 유닛 선택, 이동, 총 공격, 근접 공격, 검 투척/회수, 해킹, 적 공격, 피격/사망 연출이다.
 - 사망 연출은 기존 논리 기준인 `DamageResult.KilledByThisDamage`와 `ActorDiedLogicEvent` 흐름에 맞춰 연결한다.
 - 시체는 `GridActor.ReleaseCellOccupation()` 이후 논리 점유는 해제하되, 화면상 시체 스프라이트/애니메이션은 남기는 방향으로 처리한다.
+
+## 2026-07-10 main 브랜치 기준 전환
+
+## 핵심
+- 기존 S2-T 작업 브랜치였던 `turn-based-stealth`의 내용을 로컬 `main` 브랜치에 fast-forward 병합했다.
+- 병합 후 로컬 `main`과 `turn-based-stealth`는 같은 커밋 `0fef79e`를 가리킨다.
+- `main`에 별도 선행 커밋이 없어서 강제 덮어쓰기나 reset 없이 fast-forward 방식으로 처리했다.
+- 이후 S2-T 작업 기준 브랜치는 로컬 기준 `main`으로 전환한다.
+- 원격 `origin/main` 반영은 아직 별도 push가 필요하다.
+
+## 검증
+- 현재 브랜치가 `main`인 것을 확인했다.
+- `git status --short` 기준 작업 트리가 깨끗한 것을 확인했다.
+- `main..turn-based-stealth` 차이가 없는 것을 확인했다.
+
+## 다음
+- 이후 작업은 `main`에서 이어간다.
+- 원격 저장소의 `main`도 같은 상태로 맞춰야 하면 `git push origin main`을 별도로 실행한다.
+
+## 2026-07-13 통합 전투 애니메이션 연출 기반
+
+## 핵심
+- `CombatActionPresenter`를 추가해 `CombatAction` 하나에서 공격자와 피격자의 한 프레임 애니메이션을 동시에 전환하고, 공격 종류별 지정 시간 뒤 생존 Actor를 `Idle`로 복귀시키도록 했다.
+- 공격 종류는 기존 액션이 `ApplyDamageLogicEvent`에 넣는 `AttackPresentationKind`를 그대로 사용한다.
+- 피격자는 `DamageResult.KilledByThisDamage`에 따라 `Hit` 또는 `Death` 상태를 사용하며, 사망자는 전투 연출 종료 뒤 `Idle`로 복귀하지 않는다.
+- `ActorPresentationRegistry`, `ActorPresentationBinding`을 추가해 논리 `GridActor`와 화면 `ActorVisualController`를 연출 계층에서 연결하게 했다.
+- `CombatPresentationData`를 추가해 공격 종류별 공격자 상태 이름과 동시 연출 유지 시간, 공통 `Hit`/`Death`/`Idle` 상태 이름을 데이터로 관리하게 했다.
+- `ActorVisualController`에 마지막 애니메이션 상태 기억, 같은 상태 재시작 방지 옵션, 기본 왼쪽 일러스트 기준 좌우 플립 기능을 추가했다.
+- `PlayerGunAttackPresenter`, `PlayerMeleeAttackPresenter`, `EnemyAttackPresenter`를 삭제하고 통합 전투 연출 책임을 `CombatActionPresenter`로 이동했다.
+- `SwordActionPresenter`는 피해가 없는 검 투척과 검 회수만 처리하며, 피해가 발생한 검 투척은 기존 `AttackPresentationKind.SwordThrow`를 통해 통합 전투 연출로 처리한다.
+- 검 Visual과 검 이동 궤적 이펙트는 이번 작업에서 구현하지 않았고 `FromPosition`, `ToPosition`, `SwordThrow` 공격 종류 통로를 유지했다.
+- 한 칸 단위 이동 이벤트에 `Single`, `Start`, `Continue`, `End` 단계를 추가해 연속 이동 중 매 칸 `Move -> Idle` 전환이 반복되지 않게 했다.
+- 플레이어 이동, 적 경계 반응 이동, 적 턴 이동이 같은 이동 단계 규칙을 사용한다.
+- `AlertDetectedPresenter`에 선택적으로 `Alert` 자세를 재생하고 연출 종료 뒤 `Idle`로 복귀하는 통로를 추가했다.
+
+## 검증
+- `dotnet build Assembly-CSharp.csproj --no-restore` 통과.
+- 경고 0개, 오류 0개.
+- 씬과 데이터 에셋의 인스펙터 연결 및 플레이 모드 연출 확인은 아직 진행하지 않았다.
+
+## 인스펙터 연결 필요
+- 씬 단위 오브젝트에 `ActorPresentationRegistry`, `CombatActionPresenter`를 각각 하나씩 배치한다.
+- `CombatActionPresenter`에 `ActorPresentationRegistry`와 새 `CombatPresentationData` 에셋을 연결한다.
+- 각 캐릭터 연출 오브젝트에 `ActorPresentationBinding`을 추가하고 해당 `GridActor`, `ActorVisualController`를 연결한다.
+- 각 `ActorVisualController`에 `SpriteRenderer`, `Animator`를 연결한다.
+- `CombatPresentationData`에 `SwordThrow`, `MeleeWithSword`, `MeleeUnarmed`, `PlayerGun`, `EnemyRanged` 항목과 상태 이름, 유지 시간을 설정한다.
+- 삭제한 기존 공격 Presenter가 붙어 있던 씬 오브젝트에서 Missing Script 컴포넌트를 제거한다.
+- 이동 애니메이션을 사용할 `MovePresentationData`에서 `UseMoveAnimation`, `PlayIdleAnimationOnComplete`와 상태 이름을 설정한다.
+- 발각 자세를 사용할 적의 `AlertDetectedPresenter`에서 `Play Alert Animation`을 켜고 상태 이름을 확인한다.
+
+## 다음
+- Unity에서 새 스크립트 임포트 후 Missing Script와 필수 참조를 정리한다.
+- 유진과 적 한 기 기준으로 이동 방향 플립, 연속 이동, 총/근접/적 공격의 동시 공격·피격 자세, 사망 자세 유지 흐름을 플레이 모드에서 확인한다.
+- 검 Visual은 후속 작업에서 한 프레임 위치 이동과 이동 경로 이펙트 방식으로 연결한다.
+
+## 2026-07-14 통합 전투 애니메이션 인스펙터 연결 및 테스트 확인
+
+## 핵심
+- `Tset` 씬에 씬 단일 `ActorPresentationRegistry`, `CombatActionPresenter`와 캐릭터별 `ActorPresentationBinding`, `ActorVisualController` 연결을 완료했다.
+- `CombatPresentationDataTest`에 `SwordThrow`, `MeleeWithSword`, `MeleeUnarmed`, `PlayerGun`, `EnemyRanged` 상태를 등록하고 각 동시 연출 유지 시간을 `0.5초`로 설정했다.
+- 한 프레임 애니메이션을 즉시 교체하기 위해 전투 상태 `CrossFadeDuration`은 `0`으로 설정했다.
+- 기존 공격 Presenter가 제거된 씬 구성과 새 통합 Presenter 참조를 점검했다.
+- 현재 코드와 인스펙터 구성으로 플레이 모드 테스트를 완료했다.
+
+## 확인 사항
+- 공격자와 피격자 애니메이션은 `CombatAction` 한 이벤트에서 동시에 전환한다.
+- 생존자는 지정 시간 뒤 `Idle`로 복귀하고, 사망자는 `Death` 상태를 유지한다.
+- 기본 왼쪽 방향 일러스트는 마지막 수평 이동 방향 또는 상대 위치 기준으로 좌우 플립한다.
+- `MovePresentationDataTest`의 `UseMoveAnimation`, `PlayIdleAnimationOnComplete`는 현재 꺼져 있으므로 이동 애니메이션 상태 전환은 활성화하지 않았다.
+- 발각 `Alert` 애니메이션도 현재 테스트 적에서는 끈 상태이며 기존 색상 점멸 연출을 유지한다.
+
+## 문서 정리
+- `S2-T 현재 구현 구조.md`의 최신 기준일과 브랜치를 `2026-07-14`, `main`으로 갱신했다.
+- 상단 요약과 씬/폴더 구조에서 단일 플레이어 및 구 입력 구조 설명을 다중 전술 유닛 기준으로 교체했다.
+- 이미 구현된 공격·검·적 AI 항목이 미구현으로 남아 있던 `현재 한계`와 `다음 작업`을 실제 상태에 맞게 정리했다.
+- Notion `프로젝트 S2-T`에는 상세 날짜별 이력을 쌓지 않고 현재 상태와 다음 작업만 갱신한다.
+
+## 다음
+- 현재 조작 유닛 선택 표시를 우선 구현한다.
+- 검 Visual의 한 프레임 위치 이동과 경로 이펙트, 해킹 연출, 공격 타격 이펙트를 순서대로 연결한다.
+- 카메라 줌/컷 연출은 캐릭터 연출과 이펙트가 안정된 뒤 추가한다.

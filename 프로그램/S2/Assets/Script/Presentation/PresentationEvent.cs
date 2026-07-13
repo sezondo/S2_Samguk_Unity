@@ -13,6 +13,7 @@ public readonly struct PresentationEvent
     public GridPosition ToPosition { get; }
     public GridPosition EventPosition { get; }
     public GridPosition ExecutionPosition { get; }
+    public MovePresentationPhase MovePhase { get; }
     public AttackPresentationKind AttackKind { get; }
     public DamageResult DamageResult { get; }
     public bool HasDamageResult { get; }
@@ -32,6 +33,7 @@ public readonly struct PresentationEvent
         GridPosition toPosition,
         GridPosition eventPosition,
         GridPosition executionPosition,
+        MovePresentationPhase movePhase,
         AttackPresentationKind attackKind,
         DamageResult damageResult,
         bool hasDamageResult,
@@ -46,6 +48,7 @@ public readonly struct PresentationEvent
         ToPosition = toPosition;
         EventPosition = eventPosition;
         ExecutionPosition = executionPosition;
+        MovePhase = movePhase;
         AttackKind = attackKind;
         DamageResult = damageResult;
         HasDamageResult = hasDamageResult;
@@ -55,9 +58,14 @@ public readonly struct PresentationEvent
     /// <summary>
     /// 액터 이동 연출 이벤트를 만든다.
     /// </summary>
-    public static PresentationEvent MoveActor(GridActor actor, GridPosition fromPosition, GridPosition toPosition, string message = null)
+    public static PresentationEvent MoveActor(
+        GridActor actor,
+        GridPosition fromPosition,
+        GridPosition toPosition,
+        MovePresentationPhase movePhase = MovePresentationPhase.Single,
+        string message = null)
     {
-        return new PresentationEvent(PresentationEventType.MoveActor, actor, null, null, null, fromPosition, toPosition, toPosition, toPosition, AttackPresentationKind.None, default, false, message);
+        return new PresentationEvent(PresentationEventType.MoveActor, actor, null, null, null, fromPosition, toPosition, toPosition, toPosition, movePhase, AttackPresentationKind.None, default, false, message);
     }
 
     /// <summary>
@@ -65,16 +73,21 @@ public readonly struct PresentationEvent
     /// </summary>
     public static PresentationEvent AlertDetected(GridPosition eventPosition, EnemyContext enemy, string message = null)
     {
-        return new PresentationEvent(PresentationEventType.AlertDetected, null, null, enemy, null, default, default, eventPosition, eventPosition, AttackPresentationKind.None, default, false, message);
+        return new PresentationEvent(PresentationEventType.AlertDetected, null, null, enemy, null, default, default, eventPosition, eventPosition, MovePresentationPhase.None, AttackPresentationKind.None, default, false, message);
     }
 
     /// <summary>
     /// 적 반응 이동 연출 이벤트를 만든다.
     /// </summary>
-    public static PresentationEvent EnemyReactionMove(EnemyContext enemy, GridPosition fromPosition, GridPosition toPosition, string message = null)
+    public static PresentationEvent EnemyReactionMove(
+        EnemyContext enemy,
+        GridPosition fromPosition,
+        GridPosition toPosition,
+        MovePresentationPhase movePhase = MovePresentationPhase.Single,
+        string message = null)
     {
         GridActor actor = enemy != null ? enemy.GridActor : null;
-        return new PresentationEvent(PresentationEventType.EnemyReactionMove, actor, null, enemy, null, fromPosition, toPosition, toPosition, toPosition, AttackPresentationKind.None, default, false, message);
+        return new PresentationEvent(PresentationEventType.EnemyReactionMove, actor, null, enemy, null, fromPosition, toPosition, toPosition, toPosition, movePhase, AttackPresentationKind.None, default, false, message);
     }
 
     /// <summary>
@@ -88,7 +101,7 @@ public readonly struct PresentationEvent
         GridPosition executionPosition,
         string message = null)
     {
-        return new PresentationEvent(PresentationEventType.Hack, actor, null, null, hackable, default, executionPosition, targetPosition, executionPosition, AttackPresentationKind.None, default, false, message);
+        return new PresentationEvent(PresentationEventType.Hack, actor, null, null, hackable, default, executionPosition, targetPosition, executionPosition, MovePresentationPhase.None, AttackPresentationKind.None, default, false, message);
     }
 
     /// <summary>
@@ -97,7 +110,7 @@ public readonly struct PresentationEvent
     /// </summary>
     public static PresentationEvent SwordThrow(GridActor actor, GridPosition fromPosition, GridPosition toPosition, string message = null)
     {
-        return new PresentationEvent(PresentationEventType.SwordThrow, actor, null, null, null, fromPosition, toPosition, toPosition, toPosition, AttackPresentationKind.SwordThrow, default, false, message);
+        return new PresentationEvent(PresentationEventType.SwordThrow, actor, null, null, null, fromPosition, toPosition, toPosition, toPosition, MovePresentationPhase.None, AttackPresentationKind.SwordThrow, default, false, message);
     }
 
     /// <summary>
@@ -106,7 +119,7 @@ public readonly struct PresentationEvent
     /// </summary>
     public static PresentationEvent SwordRecall(GridActor actor, GridPosition fromPosition, GridPosition toPosition, string message = null)
     {
-        return new PresentationEvent(PresentationEventType.SwordRecall, actor, null, null, null, fromPosition, toPosition, toPosition, toPosition, AttackPresentationKind.None, default, false, message);
+        return new PresentationEvent(PresentationEventType.SwordRecall, actor, null, null, null, fromPosition, toPosition, toPosition, toPosition, MovePresentationPhase.None, AttackPresentationKind.None, default, false, message);
     }
 
     /// <summary>
@@ -117,7 +130,7 @@ public readonly struct PresentationEvent
     {
         PresentationEventType type = hasSword ? PresentationEventType.MeleeAttackWithSword : PresentationEventType.MeleeAttackUnarmed;
         AttackPresentationKind attackKind = hasSword ? AttackPresentationKind.MeleeWithSword : AttackPresentationKind.MeleeUnarmed;
-        return new PresentationEvent(type, actor, null, null, null, fromPosition, targetPosition, targetPosition, targetPosition, attackKind, default, false, message);
+        return new PresentationEvent(type, actor, null, null, null, fromPosition, targetPosition, targetPosition, targetPosition, MovePresentationPhase.None, attackKind, default, false, message);
     }
 
     /// <summary>
@@ -132,7 +145,7 @@ public readonly struct PresentationEvent
         DamageResult damageResult,
         string message = null)
     {
-        return new PresentationEvent(PresentationEventType.CombatAction, attacker, targetActor, null, null, fromPosition, targetPosition, targetPosition, targetPosition, attackKind, damageResult, true, message);
+        return new PresentationEvent(PresentationEventType.CombatAction, attacker, targetActor, null, null, fromPosition, targetPosition, targetPosition, targetPosition, MovePresentationPhase.None, attackKind, damageResult, true, message);
     }
 
     /// <summary>
@@ -140,7 +153,7 @@ public readonly struct PresentationEvent
     /// </summary>
     public static PresentationEvent StageCleared(string message = null)
     {
-        return new PresentationEvent(PresentationEventType.StageCleared, null, null, null, null, default, default, default, default, AttackPresentationKind.None, default, false, message);
+        return new PresentationEvent(PresentationEventType.StageCleared, null, null, null, null, default, default, default, default, MovePresentationPhase.None, AttackPresentationKind.None, default, false, message);
     }
 
     /// <summary>
@@ -148,7 +161,7 @@ public readonly struct PresentationEvent
     /// </summary>
     public static PresentationEvent StageFailed(string message = null)
     {
-        return new PresentationEvent(PresentationEventType.StageFailed, null, null, null, null, default, default, default, default, AttackPresentationKind.None, default, false, message);
+        return new PresentationEvent(PresentationEventType.StageFailed, null, null, null, null, default, default, default, default, MovePresentationPhase.None, AttackPresentationKind.None, default, false, message);
     }
 
     /// <summary>
@@ -160,6 +173,6 @@ public readonly struct PresentationEvent
         string targetActorName = TargetActor != null ? TargetActor.name : "없음";
         string enemyName = Enemy != null ? Enemy.name : "없음";
         string hackableName = Hackable != null ? Hackable.name : "없음";
-        return $"{Type} Actor:{actorName} Target:{targetActorName} Enemy:{enemyName} Hackable:{hackableName} From:{FromPosition} To:{ToPosition} Event:{EventPosition} Execution:{ExecutionPosition}";
+        return $"{Type} Actor:{actorName} Target:{targetActorName} Enemy:{enemyName} Hackable:{hackableName} From:{FromPosition} To:{ToPosition} MovePhase:{MovePhase} Event:{EventPosition} Execution:{ExecutionPosition}";
     }
 }

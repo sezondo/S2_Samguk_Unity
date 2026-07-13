@@ -169,7 +169,11 @@ public class GridActorMovePresenter : MonoBehaviour
         Vector3 toWorldPosition = gridManager.GridToWorld(presentationEvent.ToPosition);
 
         visualRoot.position = fromWorldPosition;
-        visualController.TryPlayMoveAnimation(moveData);
+        visualController.FaceFromTo(presentationEvent.FromPosition, presentationEvent.ToPosition);
+        if (StartsMoveAnimation(presentationEvent.MovePhase))
+        {
+            visualController.TryPlayMoveAnimation(moveData);
+        }
 
         if (logMoveFlow)
         {
@@ -188,7 +192,10 @@ public class GridActorMovePresenter : MonoBehaviour
         }
 
         visualRoot.position = toWorldPosition;
-        visualController.TryCompleteMoveAnimation(moveData);
+        if (EndsMoveAnimation(presentationEvent.MovePhase))
+        {
+            visualController.TryCompleteMoveAnimation(moveData);
+        }
 
         if (logMoveFlow)
         {
@@ -214,6 +221,26 @@ public class GridActorMovePresenter : MonoBehaviour
     private bool IsAdjacentMove(PresentationEvent presentationEvent)
     {
         return presentationEvent.FromPosition.ManhattanDistanceTo(presentationEvent.ToPosition) == 1;
+    }
+
+    /// <summary>
+    /// 현재 한 칸 이벤트에서 연속 이동 애니메이션을 시작해야 하는지 확인한다.
+    /// </summary>
+    private static bool StartsMoveAnimation(MovePresentationPhase movePhase)
+    {
+        return movePhase == MovePresentationPhase.Single ||
+            movePhase == MovePresentationPhase.Start ||
+            movePhase == MovePresentationPhase.None;
+    }
+
+    /// <summary>
+    /// 현재 한 칸 이벤트에서 연속 이동 애니메이션을 대기 상태로 복귀시켜야 하는지 확인한다.
+    /// </summary>
+    private static bool EndsMoveAnimation(MovePresentationPhase movePhase)
+    {
+        return movePhase == MovePresentationPhase.Single ||
+            movePhase == MovePresentationPhase.End ||
+            movePhase == MovePresentationPhase.None;
     }
 
     /// <summary>
@@ -279,6 +306,12 @@ public class GridActorMovePresenter : MonoBehaviour
         if (moveData.PlayIdleAnimationOnComplete && string.IsNullOrWhiteSpace(moveData.IdleAnimationStateName))
         {
             Debug.LogError($"{nameof(GridActorMovePresenter)} on {name}의 대기 애니메이션 상태 이름이 비어 있습니다.", this);
+            return false;
+        }
+
+        if ((moveData.UseMoveAnimation || moveData.PlayIdleAnimationOnComplete) &&
+            !visualController.HasValidAnimationReference())
+        {
             return false;
         }
 

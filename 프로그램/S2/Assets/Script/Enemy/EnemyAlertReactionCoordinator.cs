@@ -174,6 +174,7 @@ public class EnemyAlertReactionCoordinator : MonoBehaviour, IActionLogicEventHan
                 enemyContext,
                 previousPosition,
                 nextPosition,
+                MovePresentationPhaseUtility.GetPhase(i, path.Count),
                 "적 경계 엄폐 이동 연출"));
             previousPosition = nextPosition;
         }
