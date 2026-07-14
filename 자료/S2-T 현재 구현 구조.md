@@ -28,11 +28,12 @@
 - 행동 판정은 논리 계층에서 먼저 확정하고, `ActionPresentationQueue`가 연출 이벤트를 순서대로 재생한다.
 - 전투 연출은 씬 단일 `CombatActionPresenter`가 공격자와 피격자의 자세를 같은 프레임에 전환하고 데이터에 지정된 시간 뒤 상태를 정리한다.
 - 캐릭터 연출 연결은 `ActorPresentationRegistry`와 `ActorPresentationBinding`이 관리하며, `ActorVisualController`가 Animator 상태와 좌우 방향을 적용한다.
+- 조작 유닛 선택 표시는 유닛별 `PlayerUnitSelectionPresenter`가 `PlayerUnitControlManager.ActiveUnitChanged`를 받아 자기 유닛의 임시 LineRenderer 링만 켜는 구조다.
 
 ## 현재 목표
 
 S2-T의 현재 구현 목표는 완성된 다중 유닛/행동 판정/적 AI 통로 위에 실제 캐릭터 아트와 연출을 단계적으로 연결하는 것이다.
-2026-07-14 기준 공격자·피격자 동시 자세, 사망 자세 유지, 공격 종류별 유지 시간, 좌우 방향 전환을 포함한 통합 전투 애니메이션 기반은 인스펙터 연결과 플레이 모드 확인을 마쳤다. 다음 우선순위는 조작 유닛 선택 표시와 검·해킹·공격 이펙트이며, 카메라 연출은 캐릭터 연출이 안정된 뒤 확장한다.
+2026-07-14 기준 공격자·피격자 동시 자세, 사망 자세 유지, 공격 종류별 유지 시간, 좌우 방향 전환을 포함한 통합 전투 애니메이션 기반은 인스펙터 연결과 플레이 모드 확인을 마쳤다. 조작 유닛별 임시 선택 링 코드와 `Tset` 씬의 두 플레이어 `VisualRoot` 연결도 완료했다. 다음 우선순위는 선택 전환 세부 확인 후 검·해킹·공격 이펙트를 연결하는 것이다. 카메라 연출은 캐릭터 연출이 안정된 뒤 확장한다.
 
 ## 씬 구성 기준
 
@@ -42,7 +43,7 @@ S2-T의 현재 구현 목표는 완성된 다중 유닛/행동 판정/적 AI 통
 
 - `GridManager`: 보드 크기, 좌표 변환, 칸 상태, 점유 상태를 관리한다.
 - `TurnManager`: 플레이어/적 턴 전환 이벤트를 관리한다.
-- 플레이어 진영 유닛: `TacticalUnitContext`, `GridActor`, `ActionPoint`와 `ControllableUnitData.RequiredAbilities`에 맞는 행동 컴포넌트를 가진다.
+- 플레이어 진영 유닛: `TacticalUnitContext`, `GridActor`, `ActionPoint`, `PlayerUnitSelectionPresenter`와 `ControllableUnitData.RequiredAbilities`에 맞는 행동 컴포넌트를 가진다.
 - 적 유닛: `EnemyContext`, `GridActor`, `EnemyGridSight`, `EnemyAlertState`, `EnemyActionPoint`, `EnemyTurnAgent`, `EnemyAttackAction`을 가진다.
 - `TacticalUnitRegistry`: 플레이어/적/중립 전술 유닛을 통합 등록한다.
 - `PlayerUnitControlManager`, `PlayerUnitInputController`, `PlayerUnitActionFlowController`: 조작 유닛 선택, 입력 전달, 논리 실행과 연출 큐 재생을 관리한다.
@@ -2010,3 +2011,40 @@ Unity 플레이 모드에서 공격 / 피해 1차 통로를 확인했다.
 - 피해 없는 검 투척은 `SwordThrow` 이벤트, 피해가 있는 검 투척은 `CombatAction + AttackPresentationKind.SwordThrow`를 사용한다.
 - `FromPosition`, `ToPosition`, `ExecutionPosition` 통로는 유지한다.
 - 실제 검 Visual은 후속 작업에서 한 프레임 위치 이동과 이동 경로를 따라 이펙트를 배치하는 방식으로 연결한다.
+
+## 조작 유닛 임시 선택 링 구조 - 2026-07-14
+
+### PlayerUnitSelectionPresenter
+
+`PlayerUnitSelectionPresenter`는 플레이어 조작 유닛마다 하나씩 두는 선택 표시 전용 컴포넌트다.
+선택 판정이나 제어권 전환에는 관여하지 않고 기존 `PlayerUnitControlManager.ActiveUnitChanged` 결과만 시각화한다.
+
+현재 동작:
+
+- 담당 `TacticalUnitContext`가 현재 `ActiveUnit`이면 자기 임시 링을 표시한다.
+- 다른 유닛으로 제어권이 넘어가면 기존 링을 끄고 새 유닛의 링을 켠다.
+- AP 소진에 따른 자동 전환과 직접 클릭 선택이 같은 이벤트 통로를 사용한다.
+- `OnEnable`과 `Start`에서 초기화 순서 차이를 보정하고 현재 선택 상태를 즉시 동기화한다.
+- 컴포넌트가 꺼지거나 제거되면 이벤트 구독과 런타임 링 머티리얼을 정리한다.
+- 대상 유닛 참조 누락, 플레이어 조작 유닛이 아닌 대상, 잘못된 반지름·굵기·선분 수는 fallback 없이 한국어 오류로 드러내고 컴포넌트를 비활성화한다.
+
+임시 표시 방식:
+
+- 별도 아트 에셋 없이 `Sprites/Default` 셰이더와 `LineRenderer`로 원형 링을 런타임 생성한다.
+- 유닛마다 위치, 반지름, 선 굵기, 색상, 선분 수, 정렬 순서를 조절할 수 있다.
+- 이후 실제 선택 표시 아트가 준비되면 선택 이벤트 구독 구조는 유지하고 임시 LineRenderer 출력만 아트 오브젝트나 애니메이션으로 교체한다.
+- 현재 이동 연출은 `GridActorMovePresenter`와 `ActorPresentationSynchronizer`가 `VisualRoot.position`을 직접 갱신하므로 Presenter도 각 유닛의 `VisualRoot`에 둔다.
+- `ActorPresentation` 오브젝트는 현재 이동 대상이 아니므로 여기에 선택 표시를 두면 캐릭터 이동을 따라가지 않는다.
+- 현재 `Tset` 씬의 두 플레이어 `VisualRoot`에 Presenter가 연결되어 있으며 임시 테스트 값은 `Radius 3`, `Line Width 0.5`, `Sorting Order -1`이다.
+- 2D 표시 앞뒤는 우선 `Sorting Order`로 맞추며, 링은 캐릭터보다 낮은 값을 사용한다.
+
+현재 코드 컴파일과 `Tset` 씬의 두 플레이어 유닛 연결은 완료했다.
+직접 선택과 AP 자동 전환에서 링이 정확히 전환되는지에 대한 최종 플레이 모드 확인은 남아 있다.
+
+### 후속 카메라 연출 기준
+
+- 선택 링은 캐릭터 이동을 따라야 하므로 계속 유닛별 `VisualRoot` 아래에 둔다.
+- 카메라 줌·컷·컷신 중 링을 숨길 때 각 Presenter를 개별로 찾거나 끄지 않는다.
+- 후속 카메라 시스템에서 씬 단위 게임플레이 표시 허용 상태를 제공하고, 최종 표시 조건을 `현재 선택 유닛 && 게임플레이 표시 허용`으로 확장한다.
+- 카메라 연출 시작 시 전역 표시를 한 번 끄고 종료·중단 시 다시 켜 선택된 유닛의 링만 자동 복구한다.
+- 전역 표시 컨트롤러의 구체적인 클래스와 이벤트는 카메라 연출 구조를 설계할 때 함께 결정한다.

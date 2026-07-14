@@ -1434,3 +1434,55 @@
 - 현재 조작 유닛 선택 표시를 우선 구현한다.
 - 검 Visual의 한 프레임 위치 이동과 경로 이펙트, 해킹 연출, 공격 타격 이펙트를 순서대로 연결한다.
 - 카메라 줌/컷 연출은 캐릭터 연출과 이펙트가 안정된 뒤 추가한다.
+
+## 2026-07-14 조작 유닛 임시 선택 링 코드 구현
+
+## 핵심
+- 플레이어 조작 유닛마다 하나씩 두는 `PlayerUnitSelectionPresenter`를 추가했다.
+- 기존 `PlayerUnitControlManager.ActiveUnitChanged` 이벤트를 구독해 담당 `TacticalUnitContext`가 현재 조작 유닛일 때만 선택 링을 표시한다.
+- 직접 클릭 선택과 AP 소진에 따른 자동 제어권 전환이 기존 단일 선택 이벤트 통로를 그대로 사용한다.
+- 별도 아트 에셋 없이 `LineRenderer`와 런타임 머티리얼로 임시 원형 링을 생성한다.
+- 유닛별로 링 위치, 반지름, 굵기, 색상, 선분 수, 정렬 순서를 인스펙터에서 조절할 수 있게 했다.
+- 선택 판정과 Presentation 책임을 분리했으며 `PlayerUnitControlManager`, `TacticalUnitContext`, 씬 인스펙터는 수정하지 않았다.
+- 이후 실제 아트가 준비되면 선택 이벤트 구독 구조는 유지하고 임시 링 출력만 교체할 수 있다.
+
+## 검증
+- 새 스크립트를 Unity 생성 프로젝트에 임시 포함해 `dotnet build Assembly-CSharp.csproj --no-restore`를 실행했다.
+- 경고 0개, 오류 0개.
+- 임시로 변경한 생성 `.csproj`는 검증 후 원상복구했다.
+- Unity 씬 연결과 플레이 모드 표시는 아직 확인하지 않았다.
+
+## 인스펙터 연결 필요
+- `Tset` 씬의 각 플레이어 조작 유닛 루트에 `PlayerUnitSelectionPresenter`를 추가한다.
+- 각 Presenter의 `Target Unit`에 같은 유닛의 `TacticalUnitContext`를 연결한다.
+- 유진과 동료의 스프라이트 크기에 맞춰 `Local Offset`, `Radius`, `Line Width`, `Sorting Order`를 조정한다.
+
+## 다음
+- 직접 클릭으로 조작 유닛을 바꿀 때 기존 링이 꺼지고 새 유닛 링만 켜지는지 확인한다.
+- AP가 0이 되어 자동 전환될 때 선택 링도 같은 프레임에 이동하는지 확인한다.
+- 이동·공격 연출 중 선택 변경 허용 기준과 링 표시가 충돌하지 않는지 확인한다.
+- 임시 링 확인 후 검 Visual, 해킹 연출, 공격 타격 이펙트를 순서대로 진행한다.
+
+## 2026-07-14 조작 유닛 선택 링 씬 연결 및 후속 기준
+
+## 핵심
+- `Tset` 씬의 두 플레이어 유닛 `VisualRoot`에 `PlayerUnitSelectionPresenter`와 각자의 `TacticalUnitContext`를 연결했다.
+- 현재 이동 구조는 `GridActorMovePresenter`와 `ActorPresentationSynchronizer`가 `VisualRoot.position`을 직접 움직이므로 선택 링도 `VisualRoot` 아래에 두는 것으로 확정했다.
+- 움직이지 않는 `ActorPresentation` 오브젝트에는 선택 링을 두지 않는다.
+- 현재 임시 테스트 값은 두 유닛 모두 `Radius 3`, `Line Width 0.5`, `Sorting Order -1`이다.
+- 캐릭터보다 앞에 표시되던 문제는 링의 `Sorting Order`를 캐릭터보다 낮게 두는 기준으로 정리했다.
+
+## 카메라 연출 메모
+- 후속 카메라 줌·컷·컷신에서 선택 링을 숨길 필요가 생겨도 유닛별 Presenter를 일일이 끄지 않는다.
+- 씬 단위 게임플레이 표시 허용 상태를 추가하고 최종 링 표시 조건을 `현재 선택 유닛 && 게임플레이 표시 허용`으로 확장한다.
+- 카메라 연출 시작 시 전역 표시를 끄고 종료 또는 중단 시 복구해 현재 선택 유닛 링만 다시 표시한다.
+- 구체적인 전역 컨트롤러와 카메라 연출 이벤트 연결은 카메라 시스템 구현 시 함께 설계한다.
+
+## 확인 상태
+- 씬 직렬화 기준 두 `VisualRoot`의 Presenter와 대상 Context 연결을 확인했다.
+- 기본 링 표시와 캐릭터 앞뒤 정렬 조정은 진행했다.
+- 직접 선택 전환, AP 0 자동 전환, 연출 중 선택 변경에 대한 최종 플레이 모드 확인은 남아 있다.
+
+## 다음
+- 선택 링 전환 세부 동작을 플레이 모드에서 마무리 확인한다.
+- 검 Visual의 한 프레임 이동과 경로 이펙트 작업으로 진행한다.
