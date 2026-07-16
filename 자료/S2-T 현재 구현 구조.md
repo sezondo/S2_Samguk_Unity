@@ -1,6 +1,6 @@
 # S2-T 현재 구현 구조
 
-최신 기준: 2026-07-14
+최신 기준: 2026-07-17
 브랜치: `main`
 프로젝트 명칭: `S2-T`
 
@@ -25,15 +25,17 @@
 - Presenter의 색상 요청은 VisualRoot의 `ActorVisualController`가 실제 스프라이트에 적용한다.
 - 적 턴에는 경계 상태이고 전투불능이 아닌 적이 `EnemyActionPoint`의 AP를 사용해 원거리 공격과 엄폐 이동을 순서대로 수행한다.
 - 적 턴 AI는 `EnemyTacticalMovePlanner`와 `EnemyTacticalPositionScorer`를 재사용해 공격 가능한 엄폐 위치 또는 최고 엄폐 위치를 고른다.
+- 플레이어와 적의 피해 행동은 `ApplyDamageLogicEvent`를 발행하고 `DamageResolutionCoordinator`가 실제 피해와 사망 이벤트를 확정한다.
+- 해킹은 `PlayerHackAction`이 `HackableObject`를 대상으로 AP와 사거리를 검사하고 논리·연출 이벤트를 발행한다.
 - 행동 판정은 논리 계층에서 먼저 확정하고, `ActionPresentationQueue`가 연출 이벤트를 순서대로 재생한다.
 - 전투 연출은 씬 단일 `CombatActionPresenter`가 공격자와 피격자의 자세를 같은 프레임에 전환하고 데이터에 지정된 시간 뒤 상태를 정리한다.
-- 캐릭터 연출 연결은 `ActorPresentationRegistry`와 `ActorPresentationBinding`이 관리하며, `ActorVisualController`가 Animator 상태와 좌우 방향을 적용한다.
+- 캐릭터 연출 연결은 `ActorPresentationRegistry`와 `ActorPresentationBinding`이 관리하며, `ActorVisualController`가 Animator 상태와 좌우 방향을 적용한다. 현재 원본 캐릭터 아트의 기본 방향은 오른쪽이다.
 - 조작 유닛 선택 표시는 유닛별 `PlayerUnitSelectionPresenter`가 `PlayerUnitControlManager.ActiveUnitChanged`를 받아 자기 유닛의 임시 LineRenderer 링만 켜는 구조다.
 
 ## 현재 목표
 
 S2-T의 현재 구현 목표는 완성된 다중 유닛/행동 판정/적 AI 통로 위에 실제 캐릭터 아트와 연출을 단계적으로 연결하는 것이다.
-2026-07-14 기준 공격자·피격자 동시 자세, 사망 자세 유지, 공격 종류별 유지 시간, 좌우 방향 전환을 포함한 통합 전투 애니메이션 기반은 인스펙터 연결과 플레이 모드 확인을 마쳤다. 조작 유닛별 임시 선택 링 코드와 `Tset` 씬의 두 플레이어 `VisualRoot` 연결도 완료했다. 다음 우선순위는 선택 전환 세부 확인 후 검·해킹·공격 이펙트를 연결하는 것이다. 카메라 연출은 캐릭터 연출이 안정된 뒤 확장한다.
+2026-07-17 기준 공격자·피격자 동시 자세, 사망 자세 유지, 공격 종류별 유지 시간, 좌우 방향 전환을 포함한 통합 전투 애니메이션 기반은 인스펙터 연결과 플레이 모드 확인을 마쳤다. 원본 캐릭터 아트의 기본 방향은 오른쪽 기준으로 전환했다. 조작 유닛별 임시 선택 링 코드와 `Tset` 씬의 두 플레이어 `VisualRoot` 연결도 완료했다. 다음 우선순위는 선택 링의 직접 선택·AP 자동 전환·연출 중 선택 변경 동작을 최종 확인한 뒤 검·해킹·공격 이펙트를 연결하는 것이다. 카메라 연출은 캐릭터 연출이 안정된 뒤 확장한다.
 
 ## 씬 구성 기준
 
@@ -156,11 +158,11 @@ Unity 월드 좌표와 분리해서 턴제 규칙은 `GridPosition` 기준으로
 - 턴 시작/종료 이벤트 발행.
 - 임시 디버그 턴 종료 키 입력 처리.
 
-현재 적 턴 행동 AI는 아직 구현하지 않았다.
+적 턴 행동은 `EnemyTurnCoordinator`가 활성 적을 순서대로 실행하고, 각 `EnemyTurnAgent`가 경계 상태·AP·표적·엄폐 점수를 기준으로 이동과 공격을 결정한다.
 
 ### ActionPoint
 
-`ActionPoint`는 플레이어의 AP를 관리한다.
+`ActionPoint`는 플레이어 조작 전술 유닛의 AP를 관리한다.
 
 책임:
 
@@ -168,53 +170,66 @@ Unity 월드 좌표와 분리해서 턴제 규칙은 `GridPosition` 기준으로
 - `CanSpend()`, `TrySpend()`로 AP 소비 처리.
 - AP 변경 이벤트 발행.
 
-AP 수치는 `PlayerContext.TurnData`의 `PlayerTurnData`에서 읽는다.
+AP 수치는 `TacticalUnitContext.UnitData`의 `ControllableUnitData`에서 읽는다.
 필수 참조나 데이터가 없으면 fallback 없이 오류를 남기고 컴포넌트를 비활성화한다.
 
-## Player 구조
+## 플레이어 조작 전술 유닛 구조
 
-### PlayerTurnData
+### ControllableUnitData
 
-`PlayerTurnData`는 플레이어 턴 기반 수치를 보관하는 `ScriptableObject`다.
+`ControllableUnitData`는 플레이어가 조작할 수 있는 전술 유닛의 능력 구성과 턴 기반 행동 수치를 보관하는 `ScriptableObject`다.
 
-현재 값:
+주요 값:
 
+- `DisplayName`: 디버그와 UI에서 사용할 표시 이름.
+- `RequiredAbilities`: 유닛이 반드시 갖춰야 하는 행동 능력 조합.
+- `DefeatOnDeath`: 핵심 유닛 사망 실패 조건 연결용 값. 현재는 기록용.
 - `MaxActionPoint`: 최대 AP.
 - `StartTurnActionPoint`: 턴 시작 시 보충 AP.
 - `MoveDistancePerActionPoint`: AP 1개 구간당 이동 가능 칸 수.
 - `MoveRange`: 기존 호환용 이동 범위 값. 새 이동 구조에서는 직접 사용하지 않는다.
 - `MoveActionPointCost`: 이동 거리 구간 1개가 소비하는 AP 비용.
+- 해킹, 검 투척·회수, 근접 공격, 총 공격의 사거리·AP 비용·피해량.
 
 데이터 에셋 자체에는 `HasValidData()` 책임을 두지 않는다.
 데이터를 사용하는 컴포넌트가 필요한 값의 유효성을 직접 검사한다.
 
-### PlayerContext
+### TacticalUnitContext
 
-`PlayerContext`는 플레이어 루트의 참조 주머니다.
+`TacticalUnitContext`는 전술 유닛 루트의 참조 주머니다.
 정책 계산이나 상태 변경을 직접 하지 않는다.
 
-현재 참조:
+주요 참조:
 
-- `PlayerTurnData TurnData`
+- `ControllableUnitData UnitData`
 - `GridActor GridActor`
+- `ActorHealth Health`
 - `ActionPoint ActionPoint`
 - `PlayerGridMoveAction GridMoveAction`
 - `GridMoveRiskEvaluator GridMoveRiskEvaluator`
 - `GridMoveRangeHighlighter GridMoveRangeHighlighter`
+- `PlayerHackAction HackAction`
+- `PlayerSwordState SwordState`
+- `PlayerSwordThrowAction SwordThrowAction`
+- `PlayerSwordRecallAction SwordRecallAction`
+- `PlayerMeleeAttackAction MeleeAttackAction`
+- `PlayerGunAmmo GunAmmo`
+- `PlayerGunAttackAction GunAttackAction`
 
-플레이어 계열 컴포넌트는 같은 루트의 핵심 컴포넌트를 직접 `GetComponent<T>()`로 찾지 않고 `PlayerContext`에서 꺼내 쓴다.
+플레이어 계열 컴포넌트는 같은 루트의 핵심 컴포넌트를 직접 `GetComponent<T>()`로 찾지 않고 `TacticalUnitContext`에서 꺼내 쓴다.
+`TacticalUnitContext`는 `ControllableUnitData.RequiredAbilities`와 실제 행동 컴포넌트 구성이 정확히 일치하는지도 검사한다.
 
 ## Player 이동
 
 ### PlayerGridMoveAction
 
-`PlayerGridMoveAction`은 플레이어의 마우스 기반 그리드 이동 행동을 담당한다.
+`PlayerGridMoveAction`은 현재 선택된 플레이어 조작 유닛의 그리드 이동 판정과 실행을 담당한다.
 
-현재 임시 입력:
+입력 연결:
 
-- `M` 키로 이동 행동 선택.
-- 좌클릭으로 목표 칸 선택.
-- 우클릭 또는 Escape로 선택 취소.
+- 씬 단일 `PlayerUnitInputController`가 입력을 해석한다.
+- `PlayerUnitActionFlowController`가 현재 선택 유닛의 이동 실행을 요청하고 논리 처리 후 연출 큐를 재생한다.
+- 행동 전환이나 유닛 전환 시 이동 선택과 경로 미리보기를 취소한다.
 
 책임:
 
@@ -223,8 +238,8 @@ AP 수치는 `PlayerContext.TurnData`의 `PlayerTurnData`에서 읽는다.
 - `GridPathfinder`로 이동 가능 칸과 목표 경로 계산.
 - 이동 시작 시 AP 소비.
 - 경로 칸을 순서대로 이동 처리.
-- 이동 중 각 칸 진입마다 `MoveStepEntered` 이벤트 발행.
-- 이동 완료 시 `MoveCompleted` 이벤트 발행.
+- 이동 중 각 칸 진입마다 `MoveStepEnteredLogicEvent` 발행.
+- 이동 완료 시 `MoveCompletedLogicEvent` 발행.
 - 경로 미리보기 이벤트 발행.
 
 현재 이동은 즉시 순차 처리이며, 중간 발각 시 이동 일시 정지는 아직 구현하지 않았다.
@@ -412,9 +427,9 @@ AP 수치는 `PlayerContext.TurnData`의 `PlayerTurnData`에서 읽는다.
 
 ## Data 에셋
 
-### PlayerTurnData
+### ControllableUnitData
 
-플레이어의 AP와 이동 관련 수치를 보관한다.
+플레이어 조작 유닛의 AP, 이동, 해킹, 검, 근접 공격, 총 공격 수치와 필수 능력 구성을 보관한다.
 실제 유효성 검사는 데이터를 사용하는 컴포넌트가 담당한다.
 
 ### EnemyData
@@ -425,7 +440,7 @@ AP 수치는 `PlayerContext.TurnData`의 `PlayerTurnData`에서 읽는다.
 ### HackableData
 
 해킹 가능한 대상의 기본 데이터 형태다.
-현재 S2-T 핵심 루프에는 아직 직접 연결되어 있지 않다.
+`HackableObject`가 해킹 가능 횟수와 해킹 상태를 관리할 때 사용한다.
 
 ### Dialogue 데이터
 
@@ -461,12 +476,12 @@ AP 수치는 `PlayerContext.TurnData`의 `PlayerTurnData`에서 읽는다.
 ### IDamageable
 
 피해를 받을 수 있는 대상의 공통 규약이다.
-현재 S2-T의 실제 피해 루프는 아직 구현하지 않았다.
+현재 공격 행동은 `ApplyDamageLogicEvent`를 발행하고 `DamageResolutionCoordinator`가 대상의 `IDamageable.TakeDamage()`를 호출한다.
 
 ### IHackable
 
 해킹 가능한 대상의 공통 규약이다.
-현재 S2-T의 검 투척/해킹 루프는 아직 구현하지 않았다.
+`HackableObject`가 구현하며 `PlayerHackAction`이 대상 검사, AP 소비, 해킹 적용과 연출 이벤트 생성을 담당한다.
 
 ## 현재 한계
 
@@ -477,11 +492,12 @@ AP 수치는 `PlayerContext.TurnData`의 `PlayerTurnData`에서 읽는다.
 - 통합 전투 애니메이션은 연결됐지만 발사체, 탄흔, 타격 이펙트, 검 Visual과 이동 경로 이펙트는 아직 없다.
 - `MovePresentationDataTest`는 현재 `UseMoveAnimation`, `PlayIdleAnimationOnComplete`가 꺼져 있어 이동 애니메이션 상태 전환은 활성화하지 않은 상태다.
 - 발각용 `Alert` 애니메이션은 선택 기능이며 현재 테스트 적에서는 비활성화되어 색상 점멸만 사용한다.
+- 임시 선택 링은 두 플레이어 유닛에 연결됐지만 직접 선택, AP 0 자동 전환, 연출 중 선택 변경에 대한 최종 플레이 모드 확인이 남아 있다.
 - 클리어 UI, 결과 화면, 다음 스테이지 전환, 메뉴/스토리 화면은 아직 구현하지 않았다.
 
 ## 다음 작업
 
-1. 현재 조작 유닛 선택 표시를 추가한다.
+1. 현재 조작 유닛 선택 링의 직접 선택, AP 자동 전환, 연출 중 선택 변경 동작을 플레이 모드에서 최종 확인한다.
 2. 검 Visual의 한 프레임 위치 이동과 이동 경로 이펙트를 연결한다.
 3. 해킹 시작/성공/대상 반응 연출을 연결한다.
 4. 총·근접·적 공격의 발사체/탄흔/타격 이펙트를 통합 전투 연출 위에 추가한다.
@@ -507,14 +523,15 @@ AP 수치는 `PlayerContext.TurnData`의 `PlayerTurnData`에서 읽는다.
 
 ### StageGoalManager
 
-`StageGoalManager`는 플레이어 이동 완료 이벤트를 감시해 목표 칸 도달 시 스테이지 클리어를 알린다.
+`StageGoalManager`는 플레이어 진영 유닛의 이동 완료 논리 이벤트를 감시해 목표 칸 도달 시 스테이지 클리어를 알린다.
 
 책임:
 
-- `PlayerContext.GridMoveAction.MoveCompleted` 이벤트를 구독한다.
+- `ActionLogicEventBus`에서 플레이어 진영 유닛의 `MoveCompletedLogicEvent`를 처리한다.
+- 시작 시 `TacticalUnitRegistry.PlayerControllableUnits`의 현재 위치도 확인한다.
 - 이동 완료 위치가 `StageGoal.GoalPosition`과 같으면 클리어 처리한다.
 - `StageCleared` 이벤트를 발행한다.
-- 현재 단계에서는 클리어 로그만 출력한다.
+- 같은 행동 문맥에 `StageClearedLogicEvent`와 `StageCleared` 연출 이벤트를 추가한다.
 
 현재 한계:
 
@@ -2048,3 +2065,14 @@ Unity 플레이 모드에서 공격 / 피해 1차 통로를 확인했다.
 - 후속 카메라 시스템에서 씬 단위 게임플레이 표시 허용 상태를 제공하고, 최종 표시 조건을 `현재 선택 유닛 && 게임플레이 표시 허용`으로 확장한다.
 - 카메라 연출 시작 시 전역 표시를 한 번 끄고 종료·중단 시 다시 켜 선택된 유닛의 링만 자동 복구한다.
 - 전역 표시 컨트롤러의 구체적인 클래스와 이벤트는 카메라 연출 구조를 설계할 때 함께 결정한다.
+
+## 원본 캐릭터 아트 기본 방향 변경 - 2026-07-17
+
+### ActorVisualController
+
+- 원본 캐릭터 아트는 기본적으로 오른쪽을 바라보는 기준을 사용한다.
+- `FaceRight()`는 `SpriteRenderer.flipX`를 끄고 원본 방향을 그대로 표시한다.
+- `FaceLeft()`는 `SpriteRenderer.flipX`를 켜 원본을 수평 반전한다.
+- 인스펙터 필드는 `artworkFacesRight`이며 기본값은 `true`다.
+- 기존 `artworkFacesLeft` 직렬화 값은 `FormerlySerializedAs`로 이어받는다. 현재 `Tset` 씬의 기존 값이 모두 `true`이므로 새 오른쪽 기본 아트 기준으로 그대로 이전된다.
+- `EnemyGridSight.FacingDirection`은 논리적인 그리드 시야 방향이므로 이번 아트 기준 변경의 영향을 받지 않는다.

@@ -1,4 +1,5 @@
 using UnityEngine;
+using UnityEngine.Serialization;
 
 /// <summary>
 /// VisualRoot에 붙어 SpriteRenderer와 Animator 같은 실제 시각 컴포넌트를 제어한다.
@@ -13,8 +14,9 @@ public class ActorVisualController : MonoBehaviour
     [SerializeField] private Animator animator;
 
     [Header("Facing")]
-    // 기본 일러스트가 왼쪽을 바라보므로 true일 때 오른쪽 방향에서 SpriteRenderer를 반전한다.
-    [SerializeField] private bool artworkFacesLeft = true;
+    // 원본 아트가 기본적으로 오른쪽을 바라보는지 나타낸다.
+    [FormerlySerializedAs("artworkFacesLeft")]
+    [SerializeField] private bool artworkFacesRight = true;
 
     [Header("Debug")]
     // true면 애니메이션 요청 흐름을 Unity 콘솔에 출력한다.
@@ -132,7 +134,7 @@ public class ActorVisualController : MonoBehaviour
     }
 
     /// <summary>
-    /// 기본 왼쪽 일러스트가 화면 오른쪽을 바라보도록 반전한다.
+    /// 원본 아트를 화면 오른쪽 방향으로 표시한다.
     /// </summary>
     public void FaceRight()
     {
@@ -140,7 +142,7 @@ public class ActorVisualController : MonoBehaviour
     }
 
     /// <summary>
-    /// 기본 왼쪽 일러스트가 화면 왼쪽을 바라보도록 표시한다.
+    /// 원본 아트를 화면 왼쪽 방향으로 표시한다.
     /// </summary>
     public void FaceLeft()
     {
@@ -153,7 +155,7 @@ public class ActorVisualController : MonoBehaviour
     private void ApplyFacing(bool faceRight)
     {
         IsFacingRight = faceRight;
-        targetRenderer.flipX = artworkFacesLeft ? faceRight : !faceRight;
+        targetRenderer.flipX = artworkFacesRight ? !faceRight : faceRight;
     }
 
     /// <summary>

@@ -1486,3 +1486,41 @@
 ## 다음
 - 선택 링 전환 세부 동작을 플레이 모드에서 마무리 확인한다.
 - 검 Visual의 한 프레임 이동과 경로 이펙트 작업으로 진행한다.
+
+## 2026-07-15 현재 구현 문서 최신화
+
+## 핵심
+- 실제 코드, `Tset` 씬, Git 상태와 `S2-T 현재 구현 구조.md`를 다시 대조했다.
+- 문서 최신 기준일을 `2026-07-15`로 갱신했다.
+- 구 명칭인 `PlayerTurnData` 설명을 현재 명칭과 책임에 맞는 `ControllableUnitData` 설명으로 교체했다.
+- 상단의 턴/AP, 전술 유닛 Context, 이동 입력, 스테이지 목표 설명을 현재 `EnemyTurnCoordinator`, `TacticalUnitContext`, 통합 입력 계층, 논리 이벤트 버스 구조에 맞게 갱신했다.
+- 피해와 해킹 루프가 미구현이라고 남아 있던 과거 설명을 현재 `ApplyDamageLogicEvent -> DamageResolutionCoordinator` 피해 흐름과 `PlayerHackAction -> HackableObject` 해킹 흐름으로 바로잡았다.
+- 이미 구현되고 씬에 연결된 조작 유닛 선택 표시를 신규 구현 항목에서 제외했다.
+- 선택 링의 남은 플레이 모드 확인 항목과 검·해킹·공격 이펙트 순서를 현재 다음 작업으로 정리했다.
+- 과거 날짜별 구조와 작업 기록은 구현 변화 이력으로 유지했다.
+
+## 검증
+- 현재 브랜치는 `main`이며 로컬 `main`과 `origin/main`이 같은 커밋인 것을 확인했다.
+- Git 작업 트리가 깨끗한 상태에서 문서 정리를 시작했다.
+- `Tset` 씬에 주요 씬 단위 매니저가 각각 1개, `EnemyAttackAction`이 2개, `PlayerUnitSelectionPresenter`가 2개 연결된 것을 확인했다.
+- `dotnet build S2.slnx --no-restore` 통과, 경고 0개, 오류 0개 상태를 확인했다.
+
+## 다음
+- 직접 선택, AP 0 자동 전환, 연출 중 선택 변경에서 선택 링이 정확히 전환되는지 플레이 모드에서 최종 확인한다.
+- 확인 후 검 Visual의 한 프레임 이동과 이동 경로 이펙트 작업으로 진행한다.
+
+## 2026-07-17 원본 캐릭터 아트 기본 방향 변경
+
+## 핵심
+- 앞으로 사용하는 원본 캐릭터 아트의 기본 방향을 왼쪽에서 오른쪽으로 변경했다.
+- `ActorVisualController`의 `artworkFacesLeft`를 `artworkFacesRight`로 변경하고 기본값을 `true`로 설정했다.
+- 오른쪽을 바라볼 때 `SpriteRenderer.flipX = false`, 왼쪽을 바라볼 때 `SpriteRenderer.flipX = true`가 되도록 반전 계산을 수정했다.
+- `FormerlySerializedAs("artworkFacesLeft")`를 적용해 기존 씬 직렬화 값을 새 필드로 이어받게 했다.
+- `EnemyGridSight.FacingDirection` 같은 논리 방향 계산은 변경하지 않았다.
+
+## 검증
+- `Tset` 씬의 `ActorVisualController` 네 개가 기존 `artworkFacesLeft: true` 값을 사용하는 것을 확인했다.
+- 기존 값은 새 `artworkFacesRight: true` 의미로 이전되므로 별도 인스펙터 수정이 필요하지 않다.
+
+## 다음
+- Unity 플레이 모드에서 이동과 공격 시 오른쪽은 원본 방향, 왼쪽은 수평 반전으로 표시되는지 확인한다.
