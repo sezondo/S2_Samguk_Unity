@@ -1,3 +1,4 @@
+using System;
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
@@ -30,6 +31,15 @@ public class CombatActionPresenter : MonoBehaviour
     private ActorVisualController activeTargetVisual;
     // 현재 피격자가 이번 피해로 사망했는지 나타낸다.
     private bool activeTargetKilled;
+    // 현재 전투 시작 알림을 보냈는지 나타낸다.
+    private bool combatPresentationStarted;
+    // 현재 시작·종료 알림에 전달할 전투 연출 이벤트다.
+    private PresentationEvent activePresentationEvent;
+
+    // 전투 자세가 시작된 직후 검 같은 부가 Visual에 현재 이벤트를 알린다.
+    public event Action<PresentationEvent> CombatPresentationStarted;
+    // 전투 자세 유지가 끝난 직후 부가 Visual에 현재 이벤트 종료를 알린다.
+    public event Action<PresentationEvent> CombatPresentationCompleted;
 
     /// <summary>
     /// 필수 참조와 전투 연출 데이터를 검사하고 연출 큐 구독을 시도한다.
@@ -69,6 +79,7 @@ public class CombatActionPresenter : MonoBehaviour
             combatCoroutine = null;
         }
 
+        NotifyCombatPresentationCompleted();
         RestoreActiveVisuals();
 
         if (activeHandle != null && !activeHandle.IsCompleted)
@@ -183,6 +194,7 @@ public class CombatActionPresenter : MonoBehaviour
         PresentationEventHandle handle)
     {
         activeHandle = handle;
+        activePresentationEvent = presentationEvent;
 
         GridPosition attackerPosition = presentationEvent.Actor.GridPosition;
         GridPosition targetPosition = presentationEvent.TargetActor.GridPosition;
@@ -198,6 +210,9 @@ public class CombatActionPresenter : MonoBehaviour
             : presentationData.HitAnimationStateName;
         activeTargetVisual.TryPlayAnimationState(targetStateName, presentationData.CrossFadeDuration);
 
+        combatPresentationStarted = true;
+        CombatPresentationStarted?.Invoke(presentationEvent);
+
         if (logCombatFlow)
         {
             Debug.Log($"{nameof(CombatActionPresenter)}: {presentationEvent.AttackKind} 전투 연출을 시작합니다. 공격자: {presentationEvent.Actor.name}, 대상: {presentationEvent.TargetActor.name}, 사망 여부: {activeTargetKilled}", this);
@@ -205,6 +220,7 @@ public class CombatActionPresenter : MonoBehaviour
 
         yield return new WaitForSeconds(entry.PresentationDuration);
 
+        NotifyCombatPresentationCompleted();
         RestoreActiveVisuals();
 
         if (logCombatFlow)
@@ -258,6 +274,22 @@ public class CombatActionPresenter : MonoBehaviour
         activeAttackerVisual = null;
         activeTargetVisual = null;
         activeTargetKilled = false;
+        combatPresentationStarted = false;
+        activePresentationEvent = default;
+    }
+
+    /// <summary>
+    /// 시작 알림을 보낸 전투 연출의 종료를 부가 Visual 구독자에게 한 번만 알린다.
+    /// </summary>
+    private void NotifyCombatPresentationCompleted()
+    {
+        if (!combatPresentationStarted)
+        {
+            return;
+        }
+
+        combatPresentationStarted = false;
+        CombatPresentationCompleted?.Invoke(activePresentationEvent);
     }
 
     /// <summary>

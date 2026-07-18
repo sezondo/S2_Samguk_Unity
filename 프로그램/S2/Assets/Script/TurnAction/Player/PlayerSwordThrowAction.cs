@@ -122,15 +122,18 @@ public class PlayerSwordThrowAction : MonoBehaviour
         }
 
         playerContext.SwordState.SetDeployedPosition(targetPosition);
-        bool requestedDamage = TryRequestDamageAtTarget(fromPosition, targetPosition, resolutionContext);
+        TryRequestDamageAtTarget(fromPosition, targetPosition, resolutionContext);
         isSwordThrowSelected = false;
         SwordThrowCanceled?.Invoke();
 
         resolutionContext.Publish(new SwordThrownLogicEvent(playerContext.GridActor, fromPosition, targetPosition));
-        if (!requestedDamage)
-        {
-            resolutionContext.EnqueuePresentation(PresentationEvent.SwordThrow(playerContext.GridActor, fromPosition, targetPosition, "검 투척 연출"));
-        }
+        // 피해 여부와 관계없이 검 이동을 먼저 보여주고, 피해가 있으면 CombatAction이 뒤이어 재생된다.
+        resolutionContext.EnqueuePresentation(PresentationEvent.SwordMove(
+            playerContext.GridActor,
+            fromPosition,
+            targetPosition,
+            SwordMoveKind.Throw,
+            "검 투척 이동 연출"));
 
         if (logActionState)
         {

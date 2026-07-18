@@ -58,7 +58,12 @@ public class PlayerSwordRecallAction : MonoBehaviour
         playerContext.SwordState.RecallToPlayer();
 
         resolutionContext.Publish(new SwordRecalledLogicEvent(playerContext.GridActor, fromPosition, toPosition));
-        resolutionContext.EnqueuePresentation(PresentationEvent.SwordRecall(playerContext.GridActor, fromPosition, toPosition, "검 회수 연출"));
+        resolutionContext.EnqueuePresentation(PresentationEvent.SwordMove(
+            playerContext.GridActor,
+            fromPosition,
+            toPosition,
+            SwordMoveKind.Recall,
+            "검 회수 이동 연출"));
 
         if (logActionState)
         {

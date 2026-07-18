@@ -31,6 +31,20 @@ public class ActorVisualController : MonoBehaviour
     public bool IsFacingRight { get; private set; }
 
     /// <summary>
+    /// 시작 시 SpriteRenderer의 현재 반전값을 화면상 바라보는 방향으로 변환한다.
+    /// </summary>
+    private void Awake()
+    {
+        if (!HasValidReference())
+        {
+            enabled = false;
+            return;
+        }
+
+        IsFacingRight = artworkFacesRight ? !targetRenderer.flipX : targetRenderer.flipX;
+    }
+
+    /// <summary>
     /// Presenter가 요청한 색상을 Actor 스프라이트에 적용한다.
     /// </summary>
     public void ApplyColor(Color color)

@@ -10,12 +10,23 @@ public enum PresentationEventType
     EnemyReactionMove,
     Attack,
     Hack,
-    SwordThrow,
-    SwordRecall,
+    SwordMove,
     MeleeAttackWithSword,
     MeleeAttackUnarmed,
     CombatAction,
     Interact,
     StageCleared,
     StageFailed,
+}
+
+/// <summary>
+/// 검 Visual이 이동하는 행동의 연출 목적이다.
+/// 논리 행동 종류와 분리해 투척, 해킹 이동, 회수의 화면 처리를 구분한다.
+/// </summary>
+public enum SwordMoveKind
+{
+    None,
+    Throw,
+    Hack,
+    Recall,
 }

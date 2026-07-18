@@ -4,7 +4,7 @@ using UnityEngine;
 
 /// <summary>
 /// 플레이어의 해킹 행동 판정과 실행을 담당한다.
-/// 현재는 해킹 가능 거리와 대상 주변 실행 칸만 계산하고, 검 비행 실제 연출은 후속 Presenter 확장으로 남긴다.
+/// 검 능력 유닛은 대상 주변 실행 칸으로 검을 이동시킨 뒤 해킹 연출을 재생한다.
 /// </summary>
 public class PlayerHackAction : MonoBehaviour
 {
@@ -144,6 +144,11 @@ public class PlayerHackAction : MonoBehaviour
             return false;
         }
 
+        bool usesSword = playerContext.HasAbility(UnitAbilityType.Sword) && playerContext.SwordState != null;
+        GridPosition swordFromPosition = usesSword
+            ? playerContext.SwordState.CurrentPosition
+            : playerContext.GridActor.GridPosition;
+
         target.OnHackStarted();
         target.OnHackCompleted();
 
@@ -151,6 +156,17 @@ public class PlayerHackAction : MonoBehaviour
         HackCanceled?.Invoke();
 
         resolutionContext.Publish(new HackCompletedLogicEvent(playerContext.GridActor, target, targetPosition, executionPosition));
+        if (usesSword)
+        {
+            // 검 능력 유닛은 해킹 연출 전에 검 Visual을 실제 실행 칸으로 이동시킨다.
+            resolutionContext.EnqueuePresentation(PresentationEvent.SwordMove(
+                playerContext.GridActor,
+                swordFromPosition,
+                executionPosition,
+                SwordMoveKind.Hack,
+                "해킹 검 이동 연출"));
+        }
+
         resolutionContext.EnqueuePresentation(PresentationEvent.Hack(playerContext.GridActor, target, targetPosition, executionPosition, "해킹 연출"));
 
         if (logActionState)

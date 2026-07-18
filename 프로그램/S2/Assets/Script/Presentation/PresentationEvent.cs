@@ -14,6 +14,7 @@ public readonly struct PresentationEvent
     public GridPosition EventPosition { get; }
     public GridPosition ExecutionPosition { get; }
     public MovePresentationPhase MovePhase { get; }
+    public SwordMoveKind SwordMoveKind { get; }
     public AttackPresentationKind AttackKind { get; }
     public DamageResult DamageResult { get; }
     public bool HasDamageResult { get; }
@@ -37,7 +38,8 @@ public readonly struct PresentationEvent
         AttackPresentationKind attackKind,
         DamageResult damageResult,
         bool hasDamageResult,
-        string message)
+        string message,
+        SwordMoveKind swordMoveKind = SwordMoveKind.None)
     {
         Type = type;
         Actor = actor;
@@ -49,6 +51,7 @@ public readonly struct PresentationEvent
         EventPosition = eventPosition;
         ExecutionPosition = executionPosition;
         MovePhase = movePhase;
+        SwordMoveKind = swordMoveKind;
         AttackKind = attackKind;
         DamageResult = damageResult;
         HasDamageResult = hasDamageResult;
@@ -105,21 +108,17 @@ public readonly struct PresentationEvent
     }
 
     /// <summary>
-    /// 검 투척 연출 이벤트를 만든다.
-    /// FromPosition은 투척 전 검 위치, ToPosition은 투척 뒤 검 위치다.
+    /// 검 Visual 이동 연출 이벤트를 만든다.
+    /// FromPosition은 이동 전 검 위치, ToPosition은 이동 뒤 검 위치다.
     /// </summary>
-    public static PresentationEvent SwordThrow(GridActor actor, GridPosition fromPosition, GridPosition toPosition, string message = null)
+    public static PresentationEvent SwordMove(
+        GridActor actor,
+        GridPosition fromPosition,
+        GridPosition toPosition,
+        SwordMoveKind swordMoveKind,
+        string message = null)
     {
-        return new PresentationEvent(PresentationEventType.SwordThrow, actor, null, null, null, fromPosition, toPosition, toPosition, toPosition, MovePresentationPhase.None, AttackPresentationKind.SwordThrow, default, false, message);
-    }
-
-    /// <summary>
-    /// 검 회수 연출 이벤트를 만든다.
-    /// FromPosition은 회수 전 검 위치, ToPosition은 회수 뒤 플레이어 위치다.
-    /// </summary>
-    public static PresentationEvent SwordRecall(GridActor actor, GridPosition fromPosition, GridPosition toPosition, string message = null)
-    {
-        return new PresentationEvent(PresentationEventType.SwordRecall, actor, null, null, null, fromPosition, toPosition, toPosition, toPosition, MovePresentationPhase.None, AttackPresentationKind.None, default, false, message);
+        return new PresentationEvent(PresentationEventType.SwordMove, actor, null, null, null, fromPosition, toPosition, toPosition, toPosition, MovePresentationPhase.None, AttackPresentationKind.None, default, false, message, swordMoveKind);
     }
 
     /// <summary>
@@ -173,6 +172,6 @@ public readonly struct PresentationEvent
         string targetActorName = TargetActor != null ? TargetActor.name : "없음";
         string enemyName = Enemy != null ? Enemy.name : "없음";
         string hackableName = Hackable != null ? Hackable.name : "없음";
-        return $"{Type} Actor:{actorName} Target:{targetActorName} Enemy:{enemyName} Hackable:{hackableName} From:{FromPosition} To:{ToPosition} MovePhase:{MovePhase} Event:{EventPosition} Execution:{ExecutionPosition}";
+        return $"{Type} Actor:{actorName} Target:{targetActorName} Enemy:{enemyName} Hackable:{hackableName} From:{FromPosition} To:{ToPosition} MovePhase:{MovePhase} SwordMove:{SwordMoveKind} Event:{EventPosition} Execution:{ExecutionPosition}";
     }
 }

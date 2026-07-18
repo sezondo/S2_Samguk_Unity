@@ -1,6 +1,6 @@
 # S2-T 현재 구현 구조
 
-최신 기준: 2026-07-17
+최신 기준: 2026-07-18
 브랜치: `main`
 프로젝트 명칭: `S2-T`
 
@@ -29,13 +29,17 @@
 - 해킹은 `PlayerHackAction`이 `HackableObject`를 대상으로 AP와 사거리를 검사하고 논리·연출 이벤트를 발행한다.
 - 행동 판정은 논리 계층에서 먼저 확정하고, `ActionPresentationQueue`가 연출 이벤트를 순서대로 재생한다.
 - 전투 연출은 씬 단일 `CombatActionPresenter`가 공격자와 피격자의 자세를 같은 프레임에 전환하고 데이터에 지정된 시간 뒤 상태를 정리한다.
+- 검 Visual 이동은 `SwordMove` 연출 이벤트가 투척·해킹·회수를 구분하고 `SwordActionPresenter`가 실제 위치, 이동 방향 회전, 회수 위치를 적용한다.
+- 피해 검 투척은 `SwordMove -> CombatAction`, 검 기반 해킹은 `SwordMove -> Hack` 순서로 연출 큐에서 처리한다.
+- 검 소지 근접 공격은 `CombatActionPresenter`의 시작·종료 알림을 받아 검을 공격 방향으로 기울였다가 회수 자세로 복구한다.
+- 새 검 Visual과 `SwordActionPresenter` 필수 참조 연결을 완료했고 현재 코드 기준 플레이 모드 테스트를 마쳤다.
 - 캐릭터 연출 연결은 `ActorPresentationRegistry`와 `ActorPresentationBinding`이 관리하며, `ActorVisualController`가 Animator 상태와 좌우 방향을 적용한다. 현재 원본 캐릭터 아트의 기본 방향은 오른쪽이다.
 - 조작 유닛 선택 표시는 유닛별 `PlayerUnitSelectionPresenter`가 `PlayerUnitControlManager.ActiveUnitChanged`를 받아 자기 유닛의 임시 LineRenderer 링만 켜는 구조다.
 
 ## 현재 목표
 
 S2-T의 현재 구현 목표는 완성된 다중 유닛/행동 판정/적 AI 통로 위에 실제 캐릭터 아트와 연출을 단계적으로 연결하는 것이다.
-2026-07-17 기준 공격자·피격자 동시 자세, 사망 자세 유지, 공격 종류별 유지 시간, 좌우 방향 전환을 포함한 통합 전투 애니메이션 기반은 인스펙터 연결과 플레이 모드 확인을 마쳤다. 원본 캐릭터 아트의 기본 방향은 오른쪽 기준으로 전환했다. 조작 유닛별 임시 선택 링 코드와 `Tset` 씬의 두 플레이어 `VisualRoot` 연결도 완료했다. 다음 우선순위는 선택 링의 직접 선택·AP 자동 전환·연출 중 선택 변경 동작을 최종 확인한 뒤 검·해킹·공격 이펙트를 연결하는 것이다. 카메라 연출은 캐릭터 연출이 안정된 뒤 확장한다.
+2026-07-18 기준 공격자·피격자 동시 자세, 사망 자세 유지, 공격 종류별 유지 시간, 좌우 방향 전환을 포함한 통합 전투 애니메이션 기반과 조작 유닛 선택 링 테스트를 완료했다. 검 투척·해킹·회수의 공용 `SwordMove` 연출 통로, 검 소지 근접 공격 자세, 새 검 Visual 연결과 플레이 모드 테스트도 완료했다. 다음 우선순위는 비어 있는 검 이동 경로 VFX와 해킹·공격 이펙트를 연결하는 것이다. 카메라 연출은 캐릭터 연출이 안정된 뒤 확장한다.
 
 ## 씬 구성 기준
 
@@ -483,25 +487,58 @@ AP 수치는 `TacticalUnitContext.UnitData`의 `ControllableUnitData`에서 읽�
 해킹 가능한 대상의 공통 규약이다.
 `HackableObject`가 구현하며 `PlayerHackAction`이 대상 검사, AP 소비, 해킹 적용과 연출 이벤트 생성을 담당한다.
 
+## SwordMove / 검 Visual 연출
+
+`SwordMove`는 검 투척, 검 기반 해킹, 회수로 발생하는 검 Visual 위치 변경을 하나의 연출 이벤트로 표현한다.
+논리 검 위치는 기존 `SwordThrownLogicEvent`, `HackCompletedLogicEvent`, `SwordRecalledLogicEvent`와 `PlayerSwordState`가 관리하고, `SwordActionPresenter`는 화면 표시만 담당한다.
+
+현재 이동 종류:
+
+- `Throw`: 일반·피해 검 투척의 목표 칸으로 이동한다.
+- `Hack`: 해킹 대상 주변에서 계산된 실행 칸으로 이동한다.
+- `Recall`: 플레이어 VisualRoot의 현재 방향 기준 좌우 상단 위치로 복귀한다.
+
+연출 순서:
+
+- 일반 투척: `SwordMove(Throw)`.
+- 피해 투척: `SwordMove(Throw) -> CombatAction`.
+- 검 기반 해킹: `SwordMove(Hack) -> Hack`.
+- 회수: `SwordMove(Recall)`.
+
+`SwordActionPresenter`는 별도 SwordAnchor를 사용하지 않는다.
+회수 상태에서는 검 Visual을 플레이어 `ActorVisualController`의 Transform 자식으로 두고, `IsFacingRight`에 따라 회수 오프셋 X를 반전한다.
+투척과 해킹에서는 검을 월드 공간으로 분리하고 실제 현재 위치에서 목표 위치까지의 방향으로 회전한 뒤 목표 칸에 즉시 배치한다.
+검 소지 근접 공격은 `CombatActionPresenter.CombatPresentationStarted`, `CombatPresentationCompleted` 알림을 받아 공격 방향으로 검을 기울였다가 회수 자세로 복구한다.
+
+현재 `Tset` 씬의 검 능력 유닛 설정:
+
+- `Recalled Offset`: `(1, 1.5, 0)`.
+- `Deployed Position Offset`: `(0, 0.1, 0)`.
+- `Melee Tilt Angle`: `70`.
+- `Path Vfx Id`: `None`.
+- 새 검 Visual과 `PlayerSwordState`, `ActorVisualController`, 씬 단일 `CombatActionPresenter` 참조 연결 완료.
+- 현재 코드와 씬 연결 상태로 Unity 플레이 모드 테스트 완료.
+
 ## 현재 한계
 
 - 플레이어 이동 중 발각 시 이동을 일시 정지하지 않는다.
 - 발각 시 카메라 줌, 경고 UI, 컷인 연출은 없다.
 - 적 상태는 `Normal`, `Alerted` 두 단계이며 애드 전파는 단일 단계다.
 - 플레이어 시야/정보 공개 기준이 없어 보이지 않는 적의 위험 경고 숨김은 아직 없다.
-- 통합 전투 애니메이션은 연결됐지만 발사체, 탄흔, 타격 이펙트, 검 Visual과 이동 경로 이펙트는 아직 없다.
+- 검 Visual 이동과 플레이 모드 확인은 완료했지만 이동 경로 VFX는 `VfxId.None`으로 비어 있다.
+- 현재 검 이동 각도와 즉시 위치 변경 방식은 기능 확인 기준이며, 최종 연출 품질을 위해 방향별 각도·위치·움직임 타이밍을 추가 튜닝해야 한다. 이 작업은 현재 단계에서 더 진행하지 않고 후속 연출 폴리싱 단계에서 다시 다룬다.
+- 총·적 공격의 발사체, 탄흔, 타격 이펙트는 아직 없다.
 - `MovePresentationDataTest`는 현재 `UseMoveAnimation`, `PlayIdleAnimationOnComplete`가 꺼져 있어 이동 애니메이션 상태 전환은 활성화하지 않은 상태다.
 - 발각용 `Alert` 애니메이션은 선택 기능이며 현재 테스트 적에서는 비활성화되어 색상 점멸만 사용한다.
-- 임시 선택 링은 두 플레이어 유닛에 연결됐지만 직접 선택, AP 0 자동 전환, 연출 중 선택 변경에 대한 최종 플레이 모드 확인이 남아 있다.
 - 클리어 UI, 결과 화면, 다음 스테이지 전환, 메뉴/스토리 화면은 아직 구현하지 않았다.
 
 ## 다음 작업
 
-1. 현재 조작 유닛 선택 링의 직접 선택, AP 자동 전환, 연출 중 선택 변경 동작을 플레이 모드에서 최종 확인한다.
-2. 검 Visual의 한 프레임 위치 이동과 이동 경로 이펙트를 연결한다.
-3. 해킹 시작/성공/대상 반응 연출을 연결한다.
-4. 총·근접·적 공격의 발사체/탄흔/타격 이펙트를 통합 전투 연출 위에 추가한다.
-5. 캐릭터 연출이 안정된 뒤 공격자와 피격자 사이를 강조하는 카메라 줌/컷 연출을 추가한다.
+1. 검 이동 경로 이펙트가 준비되면 `VfxManager`에 등록하고 `pathVfxId`를 연결한다.
+2. 해킹 시작/성공/대상 반응 연출을 추가한다.
+3. 총·근접·적 공격의 발사체/탄흔/타격 이펙트를 통합 전투 연출 위에 추가한다.
+4. 캐릭터 연출이 안정된 뒤 공격자와 피격자 사이를 강조하는 카메라 줌/컷 연출을 추가한다.
+5. 핵심 이펙트 연결이 끝난 후 검 이동 각도, 위치, 움직임 타이밍을 최종 연출 기준으로 다시 튜닝한다.
 
 
 ## Stage Goal / 승리 조건
@@ -2055,8 +2092,8 @@ Unity 플레이 모드에서 공격 / 피해 1차 통로를 확인했다.
 - 현재 `Tset` 씬의 두 플레이어 `VisualRoot`에 Presenter가 연결되어 있으며 임시 테스트 값은 `Radius 3`, `Line Width 0.5`, `Sorting Order -1`이다.
 - 2D 표시 앞뒤는 우선 `Sorting Order`로 맞추며, 링은 캐릭터보다 낮은 값을 사용한다.
 
-현재 코드 컴파일과 `Tset` 씬의 두 플레이어 유닛 연결은 완료했다.
-직접 선택과 AP 자동 전환에서 링이 정확히 전환되는지에 대한 최종 플레이 모드 확인은 남아 있다.
+현재 코드 컴파일과 `Tset` 씬의 두 플레이어 유닛 연결을 완료했다.
+2026-07-18 기준 직접 선택, AP 자동 전환, 연출 중 선택 변경에 대한 최종 플레이 모드 확인도 완료했다.
 
 ### 후속 카메라 연출 기준
 

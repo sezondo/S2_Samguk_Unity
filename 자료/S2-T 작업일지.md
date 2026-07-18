@@ -1524,3 +1524,40 @@
 
 ## 다음
 - Unity 플레이 모드에서 이동과 공격 시 오른쪽은 원본 방향, 왼쪽은 수평 반전으로 표시되는지 확인한다.
+
+## 2026-07-18 SwordMove 검 Visual 연출 통로
+
+## 핵심
+- 검 투척·해킹·회수의 화면 이동을 공통 처리하는 `PresentationEventType.SwordMove`와 `SwordMoveKind`를 추가했다.
+- 논리 이벤트인 `SwordThrownLogicEvent`, `SwordRecalledLogicEvent`, `HackCompletedLogicEvent`는 기존 행동 의미를 유지했다.
+- 일반 검 투척과 피해 검 투척 모두 `SwordMove`를 먼저 큐에 넣고, 피해가 있으면 `CombatAction`이 뒤이어 재생되도록 정리했다.
+- 검 능력 유닛의 해킹은 `SwordMove(Hack) -> Hack` 순서로 검을 실행 칸에 옮긴 뒤 해킹 연출을 재생한다.
+- `SwordActionPresenter`가 검 Visual을 직접 제어하도록 구현했다. 별도 SwordAnchor는 만들지 않고 회수 상태에서는 플레이어 `VisualRoot` 자식으로 두며 현재 좌우 방향의 상단 오프셋을 적용한다.
+- 투척과 해킹 시 검 Visual을 월드 공간으로 분리하고 실제 현재 검 위치에서 목표 위치까지의 방향으로 회전한 뒤 목표 칸에 즉시 배치한다.
+- 경로 VFX는 중간점, 방향, 길이, 스케일 계산까지 구현하고 `pathVfxId = VfxId.None`일 때 재생을 생략하도록 준비했다.
+- `CombatActionPresenter`에 전투 연출 시작·종료 알림을 추가했다. 검 소지 근접 공격 시 `SwordActionPresenter`가 플레이어 방향에 따라 검을 기본 70도로 기울이고 전투 종료 뒤 회수 자세로 복구한다.
+- `ActorVisualController`는 시작 시 현재 SpriteRenderer 반전값을 `IsFacingRight`에 반영하도록 보정했다.
+- 선택 링의 직접 선택·AP 자동 전환·연출 중 선택 변경 테스트는 완료된 상태로 갱신했다.
+
+## 검증
+- `dotnet build Assembly-CSharp.csproj --no-restore` 통과.
+- 경고 0개, 오류 0개.
+- 새 검 Visual과 `SwordActionPresenter` 필수 참조를 연결했다.
+- 현재 검 연출 코드와 씬 연결 상태 기준 Unity 플레이 모드 테스트를 완료했다.
+
+## 씬 연결 및 확인
+- 검 능력 유닛의 `SwordActionPresenter`에 `PlayerSwordState`, 새 검 Visual, `ActorVisualController`, 씬 단일 `CombatActionPresenter`를 연결했다.
+- 새 검 아트 기준으로 회수 위치, 배치 위치, 근접 기울기와 화면상 크기를 조정하고 현재 코드로 테스트를 마쳤다.
+- `Tset` 씬의 현재 테스트 값은 `Recalled Offset = (1, 1.5, 0)`, `Deployed Position Offset = (0, 0.1, 0)`, `Melee Tilt Angle = 70`이다.
+- 경로 이펙트는 아직 준비되지 않아 `Path Vfx Id`를 `None`으로 유지한다.
+
+## 검 이동 연출 후속 튜닝 결정
+- 현재 검 이동 각도와 즉시 위치 변경 동작은 기능 확인에는 사용할 수 있지만 최종 연출 품질 기준으로는 추가 튜닝이 필요하다.
+- 방향별 검 각도, 회수·배치 위치, 이동 타이밍과 경로 표현은 실제 플레이 감각을 보며 더 조정해야 한다.
+- 현재 단계에서 이 부분을 계속 다듬으면 작업 범위가 과도하게 늘어나므로 일단 현재 상태로 다음 작업에 진행한다.
+- 검 경로 VFX와 다른 핵심 연출이 연결된 뒤 전체 화면 흐름을 기준으로 검 이동 연출을 다시 폴리싱한다.
+
+## 다음
+- 검 경로 이펙트가 준비되면 `VfxManager` 테이블과 `Path Vfx Id`를 연결한다.
+- 해킹 시작/성공/대상 반응 연출과 공격별 타격 이펙트 작업으로 진행한다.
+- 핵심 이펙트 연결 이후 검 이동 각도와 움직임 타이밍을 다시 튜닝한다.
