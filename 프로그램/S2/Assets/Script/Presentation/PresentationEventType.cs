@@ -10,6 +10,7 @@ public enum PresentationEventType
     EnemyReactionMove,
     Attack,
     Hack,
+    SecurityDoorOpen,
     SwordMove,
     MeleeAttackWithSword,
     MeleeAttackUnarmed,

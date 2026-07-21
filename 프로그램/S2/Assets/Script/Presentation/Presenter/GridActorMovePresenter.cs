@@ -5,7 +5,7 @@ using UnityEngine;
 /// GridActor 이동 연출 이벤트를 받아 VisualRoot를 화면상 목표 위치로 이동시키는 Presenter다.
 /// 큐 이벤트 처리 완료 신호는 이 컴포넌트가 최종 호출한다.
 /// </summary>
-public class GridActorMovePresenter : MonoBehaviour
+public class GridActorMovePresenter : MonoBehaviour, IPresentationEventHandler
 {
     [Header("Target")]
     // 이 Presenter가 이동 연출을 처리할 논리 Actor다.
@@ -33,7 +33,7 @@ public class GridActorMovePresenter : MonoBehaviour
     private PresentationEventHandle activeHandle;
 
     /// <summary>
-    /// 큐 이벤트 구독을 시도한다.
+    /// 연출 큐에 핸들러 등록을 시도한다.
     /// </summary>
     private void OnEnable()
     {
@@ -43,25 +43,25 @@ public class GridActorMovePresenter : MonoBehaviour
             return;
         }
 
-        TrySubscribeQueue(false);
+        TryRegisterQueue(false);
     }
 
     /// <summary>
-    /// 씬 초기화 순서 때문에 OnEnable에서 놓친 큐 구독을 시작 시점에 한 번 더 시도한다.
+    /// 씬 초기화 순서 때문에 OnEnable에서 놓친 큐 등록을 시작 시점에 한 번 더 시도한다.
     /// </summary>
     private void Start()
     {
-        TrySubscribeQueue(true);
+        TryRegisterQueue(true);
     }
 
     /// <summary>
-    /// 큐 이벤트 구독을 해제하고 진행 중인 이벤트가 있으면 큐 정지를 막기 위해 완료 처리한다.
+    /// 큐 등록을 해제하고 진행 중인 이벤트가 있으면 큐 정지를 막기 위해 완료 처리한다.
     /// </summary>
     private void OnDisable()
     {
         if (ActionPresentationQueue.Instance != null)
         {
-            ActionPresentationQueue.Instance.PresentationEventStarted -= HandlePresentationEventStarted;
+            ActionPresentationQueue.Instance.Unregister(this);
         }
 
         if (moveCoroutine != null)
@@ -80,9 +80,9 @@ public class GridActorMovePresenter : MonoBehaviour
 
 
     /// <summary>
-    /// 현재 씬의 연출 큐 이벤트를 구독한다.
+    /// 현재 씬의 연출 큐에 핸들러 등록을 시도한다.
     /// </summary>
-    private void TrySubscribeQueue(bool logMissingQueue)
+    private void TryRegisterQueue(bool logMissingQueue)
     {
         ActionPresentationQueue queue = ActionPresentationQueue.Instance;
         if (queue == null)
@@ -96,41 +96,13 @@ public class GridActorMovePresenter : MonoBehaviour
             return;
         }
 
-        queue.PresentationEventStarted -= HandlePresentationEventStarted;
-        queue.PresentationEventStarted += HandlePresentationEventStarted;
+        queue.Register(this);
     }
 
     /// <summary>
-    /// 이동 연출 이벤트 중 자기 Actor 대상 이벤트만 처리한다.
+    /// 이 Presenter가 지정한 이동 이벤트를 처리할 수 있는지 확인한다.
     /// </summary>
-    private bool HandlePresentationEventStarted(PresentationEvent presentationEvent, PresentationEventHandle handle)
-    {
-        if (!CanHandle(presentationEvent))
-        {
-            return false;
-        }
-
-        if (moveCoroutine != null)
-        {
-            Debug.LogError($"{nameof(GridActorMovePresenter)} on {name}은 이미 이동 연출을 처리 중입니다. 새 이동 이벤트를 자동 완료합니다. 이벤트: {presentationEvent}", this);
-            handle.Complete();
-            return true;
-        }
-
-        if (!HasValidReference() || !HasValidData())
-        {
-            handle.Complete();
-            return true;
-        }
-
-        moveCoroutine = StartCoroutine(PlayMove(presentationEvent, handle));
-        return true;
-    }
-
-    /// <summary>
-    /// 이 Presenter가 지정한 이벤트를 처리할 수 있는지 확인한다.
-    /// </summary>
-    private bool CanHandle(PresentationEvent presentationEvent)
+    public bool CanHandle(PresentationEvent presentationEvent)
     {
         if (presentationEvent.Type == PresentationEventType.MoveActor)
         {
@@ -143,6 +115,27 @@ public class GridActorMovePresenter : MonoBehaviour
         }
 
         return false;
+    }
+
+    /// <summary>
+    /// 자기 Actor의 이동 연출을 시작한다.
+    /// </summary>
+    public void Handle(PresentationEvent presentationEvent, PresentationEventHandle handle)
+    {
+        if (moveCoroutine != null)
+        {
+            Debug.LogError($"{nameof(GridActorMovePresenter)} on {name}은 이미 이동 연출을 처리 중입니다. 새 이동 이벤트를 자동 완료합니다. 이벤트: {presentationEvent}", this);
+            handle.Complete();
+            return;
+        }
+
+        if (!HasValidReference() || !HasValidData())
+        {
+            handle.Complete();
+            return;
+        }
+
+        moveCoroutine = StartCoroutine(PlayMove(presentationEvent, handle));
     }
 
     /// <summary>

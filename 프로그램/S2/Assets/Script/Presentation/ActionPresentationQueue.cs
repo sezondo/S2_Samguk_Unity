@@ -22,14 +22,14 @@ public class ActionPresentationQueue : MonoBehaviour
 
     // 실행 대기 중인 연출 이벤트 목록이다.
     private readonly Queue<PresentationEvent> eventQueue = new();
+    // 현재 씬에서 활성화된 연출 이벤트 핸들러 목록이다.
+    private readonly List<IPresentationEventHandler> handlers = new();
 
     // 현재 큐가 이벤트를 실행 중인지 나타낸다.
     public bool IsPlaying { get; private set; }
     // 현재 큐에 대기 중인 이벤트 수다.
     public int QueuedEventCount => eventQueue.Count;
 
-    // 연출 이벤트가 시작될 때 구독자에게 이벤트와 완료 핸들을 전달한다. 처리할 이벤트면 true를 반환해야 한다.
-    public event Func<PresentationEvent, PresentationEventHandle, bool> PresentationEventStarted;
     // 큐가 완전히 비었을 때 발생한다.
     public event Action QueueEmptied;
 
@@ -79,6 +79,32 @@ public class ActionPresentationQueue : MonoBehaviour
     public static bool TryPlayQueuedEvents()
     {
         return Instance != null && Instance.PlayQueuedEvents();
+    }
+
+    /// <summary>
+    /// 연출 이벤트 핸들러를 중복 없이 등록한다.
+    /// </summary>
+    public void Register(IPresentationEventHandler handler)
+    {
+        if (handler == null || handlers.Contains(handler))
+        {
+            return;
+        }
+
+        handlers.Add(handler);
+    }
+
+    /// <summary>
+    /// 연출 이벤트 핸들러 등록을 해제한다.
+    /// </summary>
+    public void Unregister(IPresentationEventHandler handler)
+    {
+        if (handler == null)
+        {
+            return;
+        }
+
+        handlers.Remove(handler);
     }
 
     /// <summary>
@@ -147,14 +173,14 @@ public class ActionPresentationQueue : MonoBehaviour
             {
                 if (logUnhandledEvents)
                 {
-                    Debug.LogWarning($"{nameof(ActionPresentationQueue)}: {presentationEvent.Type} 이벤트를 처리한 구독자가 없어 자동 완료합니다. 이벤트: {presentationEvent}", this);
+                    Debug.LogWarning($"{nameof(ActionPresentationQueue)}: {presentationEvent.Type} 이벤트를 처리한 핸들러가 없어 자동 완료합니다. 이벤트: {presentationEvent}", this);
                 }
 
                 handle.Complete();
             }
             else if (handledCount > 1)
             {
-                Debug.LogWarning($"{nameof(ActionPresentationQueue)}: {presentationEvent.Type} 이벤트를 처리하겠다고 응답한 구독자가 {handledCount}개입니다. 현재 구조에서는 이벤트별 책임 처리자를 하나로 두는 것을 권장합니다.", this);
+                Debug.LogWarning($"{nameof(ActionPresentationQueue)}: {presentationEvent.Type} 이벤트를 처리한 핸들러가 {handledCount}개입니다. 현재 구조에서는 이벤트별 책임 처리자를 하나로 두는 것을 권장합니다.", this);
             }
 
             if (logQueueFlow)
@@ -180,34 +206,33 @@ public class ActionPresentationQueue : MonoBehaviour
     }
 
     /// <summary>
-    /// 현재 이벤트를 모든 구독자에게 전달하고 처리하겠다고 응답한 수를 반환한다.
+    /// 현재 이벤트를 처리 가능한 모든 핸들러에게 전달하고 실제 처리를 시작한 수를 반환한다.
     /// </summary>
     private int BroadcastPresentationEvent(PresentationEvent presentationEvent, PresentationEventHandle handle)
     {
-        if (PresentationEventStarted == null)
-        {
-            return 0;
-        }
-
         int handledCount = 0;
-        Delegate[] handlers = PresentationEventStarted.GetInvocationList();
-        for (int i = 0; i < handlers.Length; i++)
+        IPresentationEventHandler[] handlerSnapshot = handlers.ToArray();
+        for (int i = 0; i < handlerSnapshot.Length; i++)
         {
-            if (handlers[i] is not Func<PresentationEvent, PresentationEventHandle, bool> handler)
+            IPresentationEventHandler handler = handlerSnapshot[i];
+            if (handler == null)
             {
                 continue;
             }
 
             try
             {
-                if (handler.Invoke(presentationEvent, handle))
+                if (!handler.CanHandle(presentationEvent))
                 {
-                    handledCount++;
+                    continue;
                 }
+
+                handler.Handle(presentationEvent, handle);
+                handledCount++;
             }
             catch (Exception exception)
             {
-                Debug.LogError($"{nameof(ActionPresentationQueue)}: {presentationEvent.Type} 이벤트 구독자 실행 중 예외가 발생했습니다.\n{exception}", this);
+                Debug.LogError($"{nameof(ActionPresentationQueue)}: {presentationEvent.Type} 이벤트 핸들러 실행 중 예외가 발생했습니다.\n{exception}", this);
             }
         }
 

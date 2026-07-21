@@ -4,7 +4,7 @@ using UnityEngine;
 /// 검 이동 연출과 검 소지 근접 공격 자세를 실제 검 Visual에 적용하는 Presenter다.
 /// 논리 검 위치는 변경하지 않고 PresentationEvent와 CombatActionPresenter 알림만 화면에 반영한다.
 /// </summary>
-public class SwordActionPresenter : MonoBehaviour
+public class SwordActionPresenter : MonoBehaviour, IPresentationEventHandler
 {
     [Header("Target")]
     // 이 Presenter가 처리할 플레이어 논리 Actor다.
@@ -50,7 +50,7 @@ public class SwordActionPresenter : MonoBehaviour
     private bool isMeleePoseActive;
 
     /// <summary>
-    /// 필수 참조와 데이터를 검사하고 연출 큐 및 전투 연출 알림을 구독한다.
+    /// 필수 참조와 데이터를 검사하고 연출 큐에 등록한 뒤 전투 연출 알림을 구독한다.
     /// </summary>
     private void OnEnable()
     {
@@ -61,15 +61,15 @@ public class SwordActionPresenter : MonoBehaviour
         }
 
         SubscribeCombatPresentation();
-        TrySubscribeQueue(false);
+        TryRegisterQueue(false);
     }
 
     /// <summary>
-    /// 씬 초기화 순서가 끝난 뒤 큐 구독을 보정하고 논리 검 상태에 Visual을 맞춘다.
+    /// 씬 초기화 순서가 끝난 뒤 큐 등록을 보정하고 논리 검 상태에 Visual을 맞춘다.
     /// </summary>
     private void Start()
     {
-        TrySubscribeQueue(true);
+        TryRegisterQueue(true);
         SynchronizeInitialSwordVisual();
     }
 
@@ -91,13 +91,13 @@ public class SwordActionPresenter : MonoBehaviour
     }
 
     /// <summary>
-    /// 연출 큐와 전투 연출 알림 구독을 해제한다.
+    /// 연출 큐 등록과 전투 연출 알림 구독을 해제한다.
     /// </summary>
     private void OnDisable()
     {
         if (ActionPresentationQueue.Instance != null)
         {
-            ActionPresentationQueue.Instance.PresentationEventStarted -= HandlePresentationEventStarted;
+            ActionPresentationQueue.Instance.Unregister(this);
         }
 
         if (combatActionPresenter != null)
@@ -110,9 +110,9 @@ public class SwordActionPresenter : MonoBehaviour
     }
 
     /// <summary>
-    /// 현재 씬의 연출 큐 이벤트를 구독한다.
+    /// 현재 씬의 연출 큐에 핸들러 등록을 시도한다.
     /// </summary>
-    private void TrySubscribeQueue(bool logMissingQueue)
+    private void TryRegisterQueue(bool logMissingQueue)
     {
         ActionPresentationQueue queue = ActionPresentationQueue.Instance;
         if (queue == null)
@@ -126,8 +126,7 @@ public class SwordActionPresenter : MonoBehaviour
             return;
         }
 
-        queue.PresentationEventStarted -= HandlePresentationEventStarted;
-        queue.PresentationEventStarted += HandlePresentationEventStarted;
+        queue.Register(this);
     }
 
     /// <summary>
@@ -142,24 +141,27 @@ public class SwordActionPresenter : MonoBehaviour
     }
 
     /// <summary>
-    /// 자신이 소유한 검의 SwordMove 이벤트만 처리하고 즉시 큐 완료 신호를 보낸다.
+    /// 자신이 소유한 검의 SwordMove 이벤트인지 확인한다.
     /// </summary>
-    private bool HandlePresentationEventStarted(PresentationEvent presentationEvent, PresentationEventHandle handle)
+    public bool CanHandle(PresentationEvent presentationEvent)
     {
-        if (presentationEvent.Type != PresentationEventType.SwordMove || presentationEvent.Actor != ownerActor)
-        {
-            return false;
-        }
+        return presentationEvent.Type == PresentationEventType.SwordMove &&
+               presentationEvent.Actor == ownerActor;
+    }
 
+    /// <summary>
+    /// 자신이 소유한 검의 이동 연출을 처리하고 즉시 큐 완료 신호를 보낸다.
+    /// </summary>
+    public void Handle(PresentationEvent presentationEvent, PresentationEventHandle handle)
+    {
         if (!HasValidReference() || !HasValidData())
         {
             handle.Complete();
-            return true;
+            return;
         }
 
         PlaySwordMove(presentationEvent);
         handle.Complete();
-        return true;
     }
 
     /// <summary>

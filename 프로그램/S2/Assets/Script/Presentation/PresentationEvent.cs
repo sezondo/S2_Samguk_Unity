@@ -9,6 +9,7 @@ public readonly struct PresentationEvent
     public GridActor TargetActor { get; }
     public EnemyContext Enemy { get; }
     public HackableObject Hackable { get; }
+    public SecurityDoorController SecurityDoor { get; }
     public GridPosition FromPosition { get; }
     public GridPosition ToPosition { get; }
     public GridPosition EventPosition { get; }
@@ -39,13 +40,15 @@ public readonly struct PresentationEvent
         DamageResult damageResult,
         bool hasDamageResult,
         string message,
-        SwordMoveKind swordMoveKind = SwordMoveKind.None)
+        SwordMoveKind swordMoveKind = SwordMoveKind.None,
+        SecurityDoorController securityDoor = null)
     {
         Type = type;
         Actor = actor;
         TargetActor = targetActor;
         Enemy = enemy;
         Hackable = hackable;
+        SecurityDoor = securityDoor;
         FromPosition = fromPosition;
         ToPosition = toPosition;
         EventPosition = eventPosition;
@@ -105,6 +108,14 @@ public readonly struct PresentationEvent
         string message = null)
     {
         return new PresentationEvent(PresentationEventType.Hack, actor, null, null, hackable, default, executionPosition, targetPosition, executionPosition, MovePresentationPhase.None, AttackPresentationKind.None, default, false, message);
+    }
+
+    /// <summary>
+    /// 지정한 보안문의 열림 연출 이벤트를 만든다.
+    /// </summary>
+    public static PresentationEvent SecurityDoorOpened(SecurityDoorController securityDoor, string message = null)
+    {
+        return new PresentationEvent(PresentationEventType.SecurityDoorOpen, null, null, null, null, default, default, default, default, MovePresentationPhase.None, AttackPresentationKind.None, default, false, message, SwordMoveKind.None, securityDoor);
     }
 
     /// <summary>
@@ -172,6 +183,7 @@ public readonly struct PresentationEvent
         string targetActorName = TargetActor != null ? TargetActor.name : "없음";
         string enemyName = Enemy != null ? Enemy.name : "없음";
         string hackableName = Hackable != null ? Hackable.name : "없음";
-        return $"{Type} Actor:{actorName} Target:{targetActorName} Enemy:{enemyName} Hackable:{hackableName} From:{FromPosition} To:{ToPosition} MovePhase:{MovePhase} SwordMove:{SwordMoveKind} Event:{EventPosition} Execution:{ExecutionPosition}";
+        string securityDoorName = SecurityDoor != null ? SecurityDoor.name : "없음";
+        return $"{Type} Actor:{actorName} Target:{targetActorName} Enemy:{enemyName} Hackable:{hackableName} SecurityDoor:{securityDoorName} From:{FromPosition} To:{ToPosition} MovePhase:{MovePhase} SwordMove:{SwordMoveKind} Event:{EventPosition} Execution:{ExecutionPosition}";
     }
 }

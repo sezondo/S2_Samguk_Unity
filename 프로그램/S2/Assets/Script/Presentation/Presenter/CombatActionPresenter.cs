@@ -7,7 +7,7 @@ using UnityEngine;
 /// 통합 전투 연출 이벤트를 받아 공격자와 피격자의 애니메이션을 동시에 지휘하는 씬 단위 Presenter다.
 /// 공격 판정과 피해 적용에는 관여하지 않고, 양쪽 연출이 끝난 뒤 큐 완료 신호를 보낸다.
 /// </summary>
-public class CombatActionPresenter : MonoBehaviour
+public class CombatActionPresenter : MonoBehaviour, IPresentationEventHandler
 {
     [Header("Reference")]
     // 논리 Actor를 화면 표시용 ActorVisualController로 변환할 씬 단위 등록소다.
@@ -42,7 +42,7 @@ public class CombatActionPresenter : MonoBehaviour
     public event Action<PresentationEvent> CombatPresentationCompleted;
 
     /// <summary>
-    /// 필수 참조와 전투 연출 데이터를 검사하고 연출 큐 구독을 시도한다.
+    /// 필수 참조와 전투 연출 데이터를 검사하고 연출 큐 등록을 시도한다.
     /// </summary>
     private void OnEnable()
     {
@@ -52,25 +52,25 @@ public class CombatActionPresenter : MonoBehaviour
             return;
         }
 
-        TrySubscribeQueue(false);
+        TryRegisterQueue(false);
     }
 
     /// <summary>
-    /// 초기화 순서 때문에 OnEnable에서 놓친 큐 구독을 시작 시점에 다시 시도한다.
+    /// 초기화 순서 때문에 OnEnable에서 놓친 큐 등록을 시작 시점에 다시 시도한다.
     /// </summary>
     private void Start()
     {
-        TrySubscribeQueue(true);
+        TryRegisterQueue(true);
     }
 
     /// <summary>
-    /// 큐 구독과 진행 중인 연출을 정리하고 큐 정지를 막기 위해 완료 처리한다.
+    /// 큐 등록과 진행 중인 연출을 정리하고 큐 정지를 막기 위해 완료 처리한다.
     /// </summary>
     private void OnDisable()
     {
         if (ActionPresentationQueue.Instance != null)
         {
-            ActionPresentationQueue.Instance.PresentationEventStarted -= HandlePresentationEventStarted;
+            ActionPresentationQueue.Instance.Unregister(this);
         }
 
         if (combatCoroutine != null)
@@ -91,9 +91,9 @@ public class CombatActionPresenter : MonoBehaviour
     }
 
     /// <summary>
-    /// 현재 씬의 연출 큐 이벤트를 구독한다.
+    /// 현재 씬의 연출 큐에 핸들러 등록을 시도한다.
     /// </summary>
-    private void TrySubscribeQueue(bool logMissingQueue)
+    private void TryRegisterQueue(bool logMissingQueue)
     {
         ActionPresentationQueue queue = ActionPresentationQueue.Instance;
         if (queue == null)
@@ -107,35 +107,36 @@ public class CombatActionPresenter : MonoBehaviour
             return;
         }
 
-        queue.PresentationEventStarted -= HandlePresentationEventStarted;
-        queue.PresentationEventStarted += HandlePresentationEventStarted;
+        queue.Register(this);
     }
 
     /// <summary>
-    /// 통합 전투 연출 이벤트만 받아 공격자와 대상의 동시 연출을 시작한다.
+    /// 통합 전투 연출 이벤트인지 확인한다.
     /// </summary>
-    private bool HandlePresentationEventStarted(PresentationEvent presentationEvent, PresentationEventHandle handle)
+    public bool CanHandle(PresentationEvent presentationEvent)
     {
-        if (presentationEvent.Type != PresentationEventType.CombatAction)
-        {
-            return false;
-        }
+        return presentationEvent.Type == PresentationEventType.CombatAction;
+    }
 
+    /// <summary>
+    /// 공격자와 대상의 통합 전투 연출을 시작한다.
+    /// </summary>
+    public void Handle(PresentationEvent presentationEvent, PresentationEventHandle handle)
+    {
         if (combatCoroutine != null)
         {
             Debug.LogError($"{nameof(CombatActionPresenter)} on {name}은 이미 전투 연출을 처리 중입니다. 새 이벤트를 자동 완료합니다. 이벤트: {presentationEvent}", this);
             handle.Complete();
-            return true;
+            return;
         }
 
         if (!TryPrepareCombat(presentationEvent, out CombatPresentationEntry entry))
         {
             handle.Complete();
-            return true;
+            return;
         }
 
         combatCoroutine = StartCoroutine(PlayCombatAction(presentationEvent, entry, handle));
-        return true;
     }
 
     /// <summary>

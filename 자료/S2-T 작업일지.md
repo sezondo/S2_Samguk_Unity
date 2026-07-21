@@ -1606,3 +1606,70 @@
 ## 다음
 - 이후 스테이지의 고정 장애물은 수동 좌표 목록이 아니라 전용 LogicTilemap에 논리 타일을 칠해 제작한다.
 - LogicTilemap 전환은 현재 검증 상태로 유지하고 튜토리얼 1스테이지 또는 후속 연출 작업으로 진행한다.
+
+## 2026-07-21 GridActor 점유 칸 편집 디버그 표시
+
+## 핵심
+- 씬에 하나만 두는 `GridActorOccupationDebugVisualizer`를 추가했다.
+- 활성 `GridActor`를 찾아 `OccupyCell`이 켜진 액터의 직렬화 `GridPosition`을 Scene 뷰에 반투명 회색 사각형으로 표시한다.
+- 플레이 모드의 실제 점유 등록 전에도 표시하므로 문과 장치의 논리 좌표를 인스펙터에서 조정할 때 사용할 수 있다.
+- 필수 `GridManager` 참조를 직접 연결하며 같은 루트의 핵심 컴포넌트를 `GetComponent<T>()`로 찾지 않는다.
+- 기본 설정은 편집 모드 전용이며 `Draw In Play Mode`를 켜면 플레이 중에도 표시할 수 있다.
+
+## 검증
+- Unity 생성 `Assembly-CSharp.csproj`에 새 스크립트를 임시 포함해 `dotnet build Assembly-CSharp.csproj --no-restore`를 실행했다.
+- 경고 0개, 오류 0개.
+- 임시로 추가한 생성 프로젝트 항목은 검증 후 원상복구했다.
+- Unity 씬 연결과 Scene 뷰 표시 확인은 아직 진행하지 않았다.
+
+## 씬 연결 필요
+- 씬의 `Debug` 오브젝트에 `GridActorOccupationDebugVisualizer`를 하나 추가한다.
+- `Grid Manager`에 씬 단일 `GridManager`를 연결한다.
+- 기본 회색, `Cell Scale Ratio = 0.8`, `Z Offset = -0.1`, `Draw In Play Mode = false` 기준으로 위치 조정에 사용한다.
+
+## 2026-07-21 해킹 연동 보안문 논리/연출 구현
+
+## 핵심
+- `SecurityDoorController`를 추가해 지정된 터미널의 `HackCompletedLogicEvent`만 처리하도록 구현했다.
+- 닫힌 문이 점유하는 모든 `GridActor`를 배열로 받아 2칸 이상의 문도 동일한 구조로 지원한다.
+- 해킹 완료 시 모든 문 Blocker의 `ReleaseCellOccupation()`을 호출하고 중복 개방을 막는 `IsOpen` 상태를 기록한다.
+- Controller는 비주얼을 직접 변경하지 않고 `SecurityDoorOpen` 연출 이벤트를 큐에 추가한다.
+- `SecurityDoorPresenter`를 추가해 담당 문의 연출 이벤트만 받아 `DoorVisual`을 비활성화하고 큐 완료 신호를 보내도록 했다.
+- 현재 `PlayerHackAction`이 검 이동과 해킹 이벤트를 먼저 큐에 넣고 논리 이벤트를 해석하는 구조를 유지해 `SwordMove(Hack) -> Hack -> SecurityDoorOpen` 순서가 보장된다.
+- 필수 터미널, 문 Controller, DoorVisual, Blocker 참조가 누락되거나 Blocker가 중복·점유 비활성 상태면 fallback 없이 한국어 오류를 출력하도록 했다.
+
+## 검증
+- Unity 생성 `Assembly-CSharp.csproj`에 새 스크립트 두 개를 임시 포함해 `dotnet build Assembly-CSharp.csproj --no-restore`를 실행했다.
+- 경고 0개, 오류 0개.
+- 임시로 추가한 생성 프로젝트 항목은 검증 후 원상복구했다.
+- `git diff --check`로 공백 오류가 없음을 확인했다.
+
+## 씬 연결 및 플레이 모드 검증 완료
+- `SecurityDoor01` 아래에 `SecurityDoorController`와 `SecurityDoorPresenter` 전용 자식 오브젝트를 추가했다.
+- Controller의 `Unlock Hackable`에 왼쪽 아래 해킹 터미널의 `HackableObject`를 연결했다.
+- Controller의 `Blocking Actors`에 `(8, 9)` 왼쪽 Blocker와 `(9, 9)` 오른쪽 Blocker의 Logic `GridActor`를 연결했다.
+- Presenter의 `Target Door`와 `Door Visual` 참조를 연결했다.
+- 저장된 씬 직렬화 기준으로 터미널, 두 Blocker, Controller, DoorVisual 참조가 모두 연결된 것을 재확인했다.
+- Unity 플레이 모드에서 해킹 전 두 칸의 이동 차단, 해킹 연출 후 DoorVisual 제거, 두 칸 점유 해제와 실제 통과 가능 상태를 확인했다.
+- 해킹 터미널과 보안문 연결 기능의 현재 테스트를 완료했다.
+
+## 다음
+- 검증을 마친 해킹 터미널과 보안문을 각각 재사용 가능한 프리팹으로 만든다.
+- 테스트 씬의 터미널 해킹과 문 통과 흐름을 기준으로 튜토리얼 진행 순서를 설계한다.
+- 열린 문 아트나 애니메이션이 준비되면 `SecurityDoorPresenter`의 비주얼 처리만 확장한다.
+
+## 2026-07-22 연출 이벤트 핸들러 계약 통일
+
+## 핵심
+- `IPresentationEventHandler`를 추가해 연출 처리자의 공통 계약을 `CanHandle()`과 `Handle()`로 분리했다.
+- `ActionPresentationQueue.PresentationEventStarted` C# 이벤트를 제거하고 큐가 관리하는 핸들러 목록과 명시적인 `Register()` / `Unregister()` 방식으로 교체했다.
+- 큐는 등록된 핸들러 목록의 복사본을 순회해 처리 중 등록 상태 변경에 안전하도록 유지했다.
+- 처리자 없음 자동 완료, 중복 처리자 경고, `PresentationEventHandle.Complete()` 완료 대기 규칙은 기존과 동일하게 유지했다.
+- `AlertDetectedPresenter`, `CombatActionPresenter`, `GridActorMovePresenter`, `HackPresenter`, `SecurityDoorPresenter`, `SwordActionPresenter`, `DebugPresentationEventReceiver`를 새 계약으로 전환했다.
+- 인스펙터 직렬화 필드는 변경하지 않아 기존 씬과 프리팹 연결을 그대로 유지했다.
+- 단순 알림 용도인 `QueueEmptied`, `CombatPresentationStarted`, `CombatPresentationCompleted` C# 이벤트는 유지했다.
+
+## 검증
+- 새 인터페이스를 Unity 생성 프로젝트에 임시 포함해 `dotnet build Assembly-CSharp.csproj --no-restore`를 실행했다.
+- 경고 0개, 오류 0개이며 임시 프로젝트 항목은 검증 후 원상복구했다.
+- Unity 플레이 모드에서 변경된 연출 큐 흐름에 대한 테스트를 완료했다.

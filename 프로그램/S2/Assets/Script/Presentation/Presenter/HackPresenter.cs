@@ -5,7 +5,7 @@ using UnityEngine;
 /// 해킹 연출 이벤트를 받아 임시 대기/로그 연출을 처리하는 Presenter다.
 /// 검 비행과 실제 해킹 이펙트는 후속 아트 작업에서 이 컴포넌트를 확장해 연결한다.
 /// </summary>
-public class HackPresenter : MonoBehaviour
+public class HackPresenter : MonoBehaviour, IPresentationEventHandler
 {
     [Header("Target")]
     // 이 Presenter가 해킹 연출을 처리할 해킹 대상이다.
@@ -25,7 +25,7 @@ public class HackPresenter : MonoBehaviour
     private PresentationEventHandle activeHandle;
 
     /// <summary>
-    /// 필수 참조를 검사하고 연출 큐 구독을 시도한다.
+    /// 필수 참조를 검사하고 연출 큐 등록을 시도한다.
     /// </summary>
     private void OnEnable()
     {
@@ -35,25 +35,25 @@ public class HackPresenter : MonoBehaviour
             return;
         }
 
-        TrySubscribeQueue(false);
+        TryRegisterQueue(false);
     }
 
     /// <summary>
-    /// 씬 초기화 순서 때문에 OnEnable에서 놓친 큐 구독을 시작 시점에 한 번 더 시도한다.
+    /// 씬 초기화 순서 때문에 OnEnable에서 놓친 큐 등록을 시작 시점에 한 번 더 시도한다.
     /// </summary>
     private void Start()
     {
-        TrySubscribeQueue(true);
+        TryRegisterQueue(true);
     }
 
     /// <summary>
-    /// 큐 구독을 해제하고 진행 중인 이벤트가 있으면 큐 정지를 막기 위해 완료 처리한다.
+    /// 큐 등록을 해제하고 진행 중인 이벤트가 있으면 큐 정지를 막기 위해 완료 처리한다.
     /// </summary>
     private void OnDisable()
     {
         if (ActionPresentationQueue.Instance != null)
         {
-            ActionPresentationQueue.Instance.PresentationEventStarted -= HandlePresentationEventStarted;
+            ActionPresentationQueue.Instance.Unregister(this);
         }
 
         if (hackCoroutine != null)
@@ -70,9 +70,9 @@ public class HackPresenter : MonoBehaviour
     }
 
     /// <summary>
-    /// 현재 씬의 연출 큐 이벤트를 구독한다.
+    /// 현재 씬의 연출 큐에 핸들러 등록을 시도한다.
     /// </summary>
-    private void TrySubscribeQueue(bool logMissingQueue)
+    private void TryRegisterQueue(bool logMissingQueue)
     {
         ActionPresentationQueue queue = ActionPresentationQueue.Instance;
         if (queue == null)
@@ -86,35 +86,37 @@ public class HackPresenter : MonoBehaviour
             return;
         }
 
-        queue.PresentationEventStarted -= HandlePresentationEventStarted;
-        queue.PresentationEventStarted += HandlePresentationEventStarted;
+        queue.Register(this);
     }
 
     /// <summary>
-    /// 해킹 연출 이벤트 중 자신이 담당하는 해킹 대상 이벤트만 처리한다.
+    /// 해킹 연출 이벤트 중 자신이 담당하는 해킹 대상 이벤트인지 확인한다.
     /// </summary>
-    private bool HandlePresentationEventStarted(PresentationEvent presentationEvent, PresentationEventHandle handle)
+    public bool CanHandle(PresentationEvent presentationEvent)
     {
-        if (presentationEvent.Type != PresentationEventType.Hack || presentationEvent.Hackable != targetHackable)
-        {
-            return false;
-        }
+        return presentationEvent.Type == PresentationEventType.Hack &&
+               presentationEvent.Hackable == targetHackable;
+    }
 
+    /// <summary>
+    /// 담당 대상의 해킹 연출을 시작한다.
+    /// </summary>
+    public void Handle(PresentationEvent presentationEvent, PresentationEventHandle handle)
+    {
         if (hackCoroutine != null)
         {
             Debug.LogError($"{nameof(HackPresenter)} on {name}은 이미 해킹 연출을 처리 중입니다. 새 이벤트를 자동 완료합니다. 이벤트: {presentationEvent}", this);
             handle.Complete();
-            return true;
+            return;
         }
 
         if (!HasValidReference())
         {
             handle.Complete();
-            return true;
+            return;
         }
 
         hackCoroutine = StartCoroutine(PlayHack(presentationEvent, handle));
-        return true;
     }
 
     /// <summary>

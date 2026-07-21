@@ -5,7 +5,7 @@ using UnityEngine;
 /// 담당 적의 발각 연출 이벤트를 받아 경고색을 점멸하고 큐 완료 신호를 보내는 Presenter다.
 /// 발각 판정과 상태 변경에는 관여하지 않는다.
 /// </summary>
-public class AlertDetectedPresenter : MonoBehaviour
+public class AlertDetectedPresenter : MonoBehaviour, IPresentationEventHandler
 {
     [Header("Target")]
     // 이 Presenter가 발각 연출을 처리할 적 Context다.
@@ -43,7 +43,7 @@ public class AlertDetectedPresenter : MonoBehaviour
     private PresentationEventHandle activeHandle;
 
     /// <summary>
-    /// 필수 참조와 연출 데이터를 검사하고 연출 큐 구독을 시도한다.
+    /// 필수 참조와 연출 데이터를 검사하고 연출 큐 등록을 시도한다.
     /// </summary>
     private void OnEnable()
     {
@@ -54,25 +54,25 @@ public class AlertDetectedPresenter : MonoBehaviour
         }
 
         ApplyCurrentStateColor();
-        TrySubscribeQueue(false);
+        TryRegisterQueue(false);
     }
 
     /// <summary>
-    /// 씬 초기화 순서 때문에 OnEnable에서 놓친 큐 구독을 시작 시점에 한 번 더 시도한다.
+    /// 씬 초기화 순서 때문에 OnEnable에서 놓친 큐 등록을 시작 시점에 한 번 더 시도한다.
     /// </summary>
     private void Start()
     {
-        TrySubscribeQueue(true);
+        TryRegisterQueue(true);
     }
 
     /// <summary>
-    /// 큐 구독을 해제하고 진행 중인 이벤트가 있으면 큐 정지를 막기 위해 완료 처리한다.
+    /// 큐 등록을 해제하고 진행 중인 이벤트가 있으면 큐 정지를 막기 위해 완료 처리한다.
     /// </summary>
     private void OnDisable()
     {
         if (ActionPresentationQueue.Instance != null)
         {
-            ActionPresentationQueue.Instance.PresentationEventStarted -= HandlePresentationEventStarted;
+            ActionPresentationQueue.Instance.Unregister(this);
         }
 
         if (alertCoroutine != null)
@@ -94,9 +94,9 @@ public class AlertDetectedPresenter : MonoBehaviour
     }
 
     /// <summary>
-    /// 현재 씬의 연출 큐 이벤트를 구독한다.
+    /// 현재 씬의 연출 큐에 핸들러 등록을 시도한다.
     /// </summary>
-    private void TrySubscribeQueue(bool logMissingQueue)
+    private void TryRegisterQueue(bool logMissingQueue)
     {
         ActionPresentationQueue queue = ActionPresentationQueue.Instance;
         if (queue == null)
@@ -110,35 +110,37 @@ public class AlertDetectedPresenter : MonoBehaviour
             return;
         }
 
-        queue.PresentationEventStarted -= HandlePresentationEventStarted;
-        queue.PresentationEventStarted += HandlePresentationEventStarted;
+        queue.Register(this);
     }
 
     /// <summary>
-    /// 발각 연출 이벤트 중 자신이 담당하는 적 대상 이벤트만 처리한다.
+    /// 발각 연출 이벤트 중 자신이 담당하는 적 대상 이벤트인지 확인한다.
     /// </summary>
-    private bool HandlePresentationEventStarted(PresentationEvent presentationEvent, PresentationEventHandle handle)
+    public bool CanHandle(PresentationEvent presentationEvent)
     {
-        if (presentationEvent.Type != PresentationEventType.AlertDetected || presentationEvent.Enemy != targetEnemy)
-        {
-            return false;
-        }
+        return presentationEvent.Type == PresentationEventType.AlertDetected &&
+               presentationEvent.Enemy == targetEnemy;
+    }
 
+    /// <summary>
+    /// 담당 적의 발각 연출을 시작한다.
+    /// </summary>
+    public void Handle(PresentationEvent presentationEvent, PresentationEventHandle handle)
+    {
         if (alertCoroutine != null)
         {
             Debug.LogError($"{nameof(AlertDetectedPresenter)} on {name}은 이미 발각 연출을 처리 중입니다. 새 이벤트를 자동 완료합니다. 이벤트: {presentationEvent}", this);
             handle.Complete();
-            return true;
+            return;
         }
 
         if (!HasValidReference() || !HasValidData())
         {
             handle.Complete();
-            return true;
+            return;
         }
 
         alertCoroutine = StartCoroutine(PlayAlertDetected(presentationEvent, handle));
-        return true;
     }
 
     /// <summary>
