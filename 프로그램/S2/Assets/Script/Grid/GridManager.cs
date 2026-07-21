@@ -1,9 +1,10 @@
 using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.Tilemaps;
 
 /// <summary>
-/// 격자 보드의 크기, 좌표 변환, 칸 점유 상태를 관리한다.
-/// 턴제 규칙은 Transform 위치 대신 GridPosition을 기준으로 판단한다.
+/// 격자 보드의 크기, 좌표 변환, 고정 이동불가 상태와 칸 점유 상태를 관리한다.
+/// 고정 이동불가 상태는 LogicTilemap에서 읽고 턴제 규칙은 Transform 대신 GridPosition을 기준으로 판단한다.
 /// </summary>
 public class GridManager : MonoBehaviour
 {
@@ -17,9 +18,9 @@ public class GridManager : MonoBehaviour
     // 그리드 (0, 0) 칸의 기준 월드 위치다.
     [SerializeField] private Vector3 originWorldPosition;
 
-    [Header("Blocked Cells")]
-    // 벽, 장애물, 낭떠러지처럼 어떤 말도 들어갈 수 없는 고정 이동불가 칸 목록이다.
-    [SerializeField] private List<GridPosition> blockedPositions = new();
+    [Header("Logic Tilemap")]
+    // 타일이 칠해진 칸을 고정 이동불가 칸으로 사용하는 필수 논리 타일맵이다.
+    [SerializeField] private Tilemap logicTilemap;
 
     [Header("Gizmos")]
     // Scene 뷰에서 보드 선과 점유 칸을 그릴지 정한다.
@@ -56,16 +57,25 @@ public class GridManager : MonoBehaviour
             return;
         }
 
+        if (!HasValidReference() || !HasValidData())
+        {
+            enabled = false;
+            return;
+        }
+
         Instance = this;
         RebuildCellStates();
     }
 
     /// <summary>
-    /// 인스펙터에서 보드 크기나 이동불가 칸 목록이 바뀌면 런타임 칸 상태를 갱신한다.
+    /// 인스펙터에서 보드 설정이 바뀌면 LogicTilemap 기준으로 런타임 칸 상태를 갱신한다.
     /// </summary>
     private void OnValidate()
     {
-        RebuildCellStates();
+        if (logicTilemap != null && width > 0 && height > 0 && cellSize > 0f)
+        {
+            RebuildCellStates();
+        }
     }
 
     /// <summary>
@@ -120,41 +130,6 @@ public class GridManager : MonoBehaviour
     public bool IsBlocked(GridPosition position)
     {
         return TryGetCellState(position, out GridCellState cellState) && cellState.IsBlocked;
-    }
-
-    /// <summary>
-    /// 지정한 칸을 런타임에 이동불가 칸으로 설정하거나 해제한다.
-    /// </summary>
-    public void SetBlocked(GridPosition position, bool blocked)
-    {
-        if (!IsInside(position))
-        {
-            Debug.LogWarning($"{nameof(GridManager)}: {position} 칸은 보드 범위 밖이라 이동불가 설정을 바꿀 수 없습니다.", this);
-            return;
-        }
-
-        if (!TryGetCellState(position, out GridCellState cellState))
-        {
-            Debug.LogWarning($"{nameof(GridManager)}: {position} 칸 상태를 찾지 못해 이동불가 설정을 바꿀 수 없습니다.", this);
-            return;
-        }
-
-        if (blocked)
-        {
-            if (!cellState.IsBlocked)
-            {
-                cellState.SetBlocked(true);
-                blockedPositions.Add(position);
-            }
-
-            return;
-        }
-
-        if (cellState.IsBlocked)
-        {
-            cellState.SetBlocked(false);
-            blockedPositions.RemoveAll(blockedPosition => blockedPosition == position);
-        }
     }
 
     /// <summary>
@@ -271,7 +246,10 @@ public class GridManager : MonoBehaviour
         {
             return;
         }
-        RebuildCellStates();
+        if (logicTilemap != null && width > 0 && height > 0 && cellSize > 0f)
+        {
+            RebuildCellStates();
+        }
 
         float safeCellSize = Mathf.Max(0.01f, cellSize);
         Gizmos.color = gridColor;
@@ -310,7 +288,7 @@ public class GridManager : MonoBehaviour
     }
 
     /// <summary>
-    /// 보드 범위 안의 모든 칸 상태를 다시 만들고 인스펙터 이동불가 칸 목록을 반영한다.
+    /// 보드 범위 안의 모든 칸 상태를 다시 만들고 LogicTilemap의 타일 유무를 이동불가 상태로 반영한다.
     /// </summary>
     private void RebuildCellStates()
     {
@@ -335,6 +313,11 @@ public class GridManager : MonoBehaviour
                 GridPosition position = new(x, y);
                 GridCellState cellState = new(position);
 
+                if (IsBlockedByLogicTilemap(position))
+                {
+                    cellState.SetBlocked(true);
+                }
+
                 if (previousActorByPosition.TryGetValue(position, out GridActor actor) && actor != null)
                 {
                     cellState.SetOccupiedActor(actor);
@@ -343,13 +326,53 @@ public class GridManager : MonoBehaviour
                 cellByPosition[position] = cellState;
             }
         }
+    }
 
-        for (int i = 0; i < blockedPositions.Count; i++)
+    /// <summary>
+    /// 지정한 논리 그리드 칸의 월드 위치와 겹치는 LogicTilemap 셀에 타일이 있는지 확인한다.
+    /// </summary>
+    private bool IsBlockedByLogicTilemap(GridPosition position)
+    {
+        if (logicTilemap == null)
         {
-            if (cellByPosition.TryGetValue(blockedPositions[i], out GridCellState cellState))
-            {
-                cellState.SetBlocked(true);
-            }
+            return false;
         }
+
+        Vector3Int tilePosition = logicTilemap.WorldToCell(GridToWorld(position));
+        return logicTilemap.HasTile(tilePosition);
+    }
+
+    /// <summary>
+    /// 그리드 고정 이동불가 정보를 제공할 필수 LogicTilemap 참조가 연결되어 있는지 확인한다.
+    /// </summary>
+    public bool HasValidReference()
+    {
+        if (logicTilemap == null)
+        {
+            Debug.LogError($"{nameof(GridManager)} on {name}에는 고정 이동불가 칸을 제공할 {nameof(Tilemap)} 참조가 필요합니다.", this);
+            return false;
+        }
+
+        return true;
+    }
+
+    /// <summary>
+    /// 그리드 보드 크기와 셀 크기가 사용할 수 있는 값인지 확인한다.
+    /// </summary>
+    public bool HasValidData()
+    {
+        if (width <= 0 || height <= 0)
+        {
+            Debug.LogError($"{nameof(GridManager)} on {name}의 보드 가로와 세로 칸 수는 0보다 커야 합니다.", this);
+            return false;
+        }
+
+        if (cellSize <= 0f)
+        {
+            Debug.LogError($"{nameof(GridManager)} on {name}의 셀 크기는 0보다 커야 합니다.", this);
+            return false;
+        }
+
+        return true;
     }
 }

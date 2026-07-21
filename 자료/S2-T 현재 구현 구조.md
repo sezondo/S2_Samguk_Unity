@@ -1,6 +1,6 @@
 # S2-T 현재 구현 구조
 
-최신 기준: 2026-07-19
+최신 기준: 2026-07-21
 브랜치: `main`
 프로젝트 명칭: `S2-T`
 
@@ -16,6 +16,7 @@
 - 플레이어 진영은 여러 조작 유닛으로 구성되며, 각 유닛이 AP와 능력 구성을 가지고 이동/해킹/검 행동/공격을 실행한다.
 - 이동은 목표 칸을 선택하면 BFS 경로를 따라 한 칸씩 처리하는 구조다.
 - 이동 가능 범위는 현재 AP와 AP당 이동 거리 기준으로 계산한다.
+- 고정 이동불가 칸은 수동 `blockedPositions` 목록이 아니라 필수 `LogicTilemap`에서 읽는다. 논리 그리드 칸의 월드 위치와 겹치는 LogicTilemap 셀에 타일이 있으면 해당 칸을 이동불가로 초기화하며, `Tset` 씬 연결과 플레이 모드 검증을 완료했다.
 - 적 시야는 `EnemyGridSight`가 그리드 칸 단위로 계산한다.
 - 플레이어 이동 경로가 적 시야에 들어가면 `GridMoveRiskEvaluator`가 `AlertTriggeredLogicEvent`를 발행한다.
 - 애드 전파는 `EnemyAlertCoordinator`가 담당한다.
@@ -40,7 +41,7 @@
 ## 현재 목표
 
 S2-T의 현재 구현 목표는 완성된 다중 유닛/행동 판정/적 AI 통로를 실제 스테이지 제작과 반복 테스트에 사용할 수 있는 상태로 정리하는 것이다.
-2026-07-19 기준 전투 애니메이션 기반, 조작 유닛 선택 링, 검 투척·해킹·회수 Visual 연결을 완료했다. 테스트 편의를 위한 키보드 카메라 이동도 추가했으며 현재 이동 속도와 제한 범위 설정으로 플레이 모드 테스트를 완료했다. 후속 주요 작업 후보는 전투 카메라 연출과 튜토리얼 1스테이지 완성이다.
+2026-07-21 기준 전투 애니메이션 기반, 조작 유닛 선택 링, 검 투척·해킹·회수 Visual, 키보드 카메라 이동과 LogicTilemap 기반 고정 장애물 제작 흐름을 연결하고 플레이 모드 검증을 완료했다. 후속 주요 작업 후보는 전투 카메라 연출과 튜토리얼 1스테이지 완성이다.
 
 ## 씬 구성 기준
 
@@ -48,7 +49,8 @@ S2-T의 현재 구현 목표는 완성된 다중 유닛/행동 판정/적 AI 통
 
 씬에는 다음 계열 오브젝트가 필요하다.
 
-- `GridManager`: 보드 크기, 좌표 변환, 칸 상태, 점유 상태를 관리한다.
+- `GridManager`: 보드 크기, 좌표 변환, LogicTilemap 기반 고정 이동불가 상태와 점유 상태를 관리한다.
+- `LogicTilemap`: 타일이 칠해진 셀을 고정 이동불가 칸으로 제공하는 필수 논리 타일맵이다. 화면용 `FloorTilemap`, `ObjectTilemap`과 분리한다.
 - `TurnManager`: 플레이어/적 턴 전환 이벤트를 관리한다.
 - 플레이어 진영 유닛: `TacticalUnitContext`, `GridActor`, `ActionPoint`, `PlayerUnitSelectionPresenter`와 `ControllableUnitData.RequiredAbilities`에 맞는 행동 컴포넌트를 가진다.
 - 적 유닛: `EnemyContext`, `GridActor`, `EnemyGridSight`, `EnemyAlertState`, `EnemyActionPoint`, `EnemyTurnAgent`, `EnemyAttackAction`을 가진다.
@@ -117,7 +119,8 @@ Unity 월드 좌표와 분리해서 턴제 규칙은 `GridPosition` 기준으로
 
 - 보드 크기와 칸 크기 관리.
 - `GridToWorld()`, `WorldToGrid()` 좌표 변환.
-- `blockedPositions` 기준 이동불가 칸 반영.
+- 필수 `LogicTilemap`의 타일 유무를 기준으로 고정 이동불가 칸 반영.
+- 논리 그리드 칸을 `GridToWorld()`로 변환한 뒤 `LogicTilemap.WorldToCell()`로 대응 셀을 찾아, Tilemap Transform이나 Grid 원점 차이를 좌표 변환에 반영.
 - `Dictionary<GridPosition, GridCellState>`로 칸 상태 관리.
 - `RegisterActor()`, `UnregisterActor()`, `TryMoveActor()`로 점유 상태 변경.
 - Scene 뷰 Gizmo로 보드, 이동불가 칸, 점유 칸 표시.
@@ -126,6 +129,7 @@ Unity 월드 좌표와 분리해서 턴제 규칙은 `GridPosition` 기준으로
 
 - `GridManager`는 플레이어/적/장치 구분을 알지 않는다.
 - 적 검색, 애드 전파, AI 판단은 `GridManager` 책임이 아니다.
+- `LogicTilemap`은 고정 장애물의 단일 원본이며, 런타임에서 별도 목록이나 `SetBlocked()`로 상태를 이중 관리하지 않는다.
 
 ### GridActor
 

@@ -1584,3 +1584,25 @@
 ## 다음
 - 키보드 카메라 이동은 현재 설정을 기준으로 유지한다.
 - 후속 작업에서 전투 카메라 연출 또는 튜토리얼 1스테이지 완성 작업으로 진행한다.
+
+## 2026-07-21 LogicTilemap 기반 고정 장애물 전환
+
+## 핵심
+- `GridManager`의 수동 `blockedPositions` 직렬화 목록을 제거하고 필수 `LogicTilemap` 참조로 교체했다.
+- 논리 그리드 각 칸을 `GridToWorld()`로 월드 위치로 바꾼 뒤 `LogicTilemap.WorldToCell()`로 대응 셀을 구하고, 해당 셀에 타일이 있으면 고정 이동불가 칸으로 초기화한다.
+- 화면용 `FloorTilemap`, `ObjectTilemap`과 고정 장애물 판정용 `LogicTilemap`을 분리하는 기준으로 정리했다.
+- 프로젝트 전체에서 `blockedPositions`를 직접 사용한 곳은 `GridManager`뿐이며, 경로 탐색·적 시야·엄폐 점수는 기존 `IsBlocked()`와 `CanEnter()`를 통해 새 데이터를 그대로 사용한다.
+- 호출처가 없고 LogicTilemap과 상태를 이중 관리하게 되는 `GridManager.SetBlocked()`를 제거했다.
+- `GridManager.HasValidReference()`와 `HasValidData()`를 추가했다. 필수 LogicTilemap이 없거나 보드 크기·셀 크기가 잘못되면 오류를 남기고 컴포넌트를 비활성화한다.
+
+## 검증
+- `dotnet build Assembly-CSharp.csproj --no-restore` 통과.
+- 경고 0개, 오류 0개.
+- `Tset` 씬의 `MapVisualGrid` 아래에 전용 `LogicTilemap`을 생성하고 `GridManager.logicTilemap` 참조를 연결했다.
+- 전용 반투명 `logic_block_tile_96` 타일과 `S2_LogicTilemap` 팔레트를 추가해 고정 장애물 제작용 타일을 화면용 타일과 분리했다.
+- 기존 이동불가 좌표를 LogicTilemap 타일로 이전했고, 저장된 씬 기준 기존 39개 장애물 칸이 모두 포함된 것을 확인했다.
+- Unity 플레이 모드에서 LogicTilemap 기반 이동불가 판정과 관련 동작 검증을 완료했다.
+
+## 다음
+- 이후 스테이지의 고정 장애물은 수동 좌표 목록이 아니라 전용 LogicTilemap에 논리 타일을 칠해 제작한다.
+- LogicTilemap 전환은 현재 검증 상태로 유지하고 튜토리얼 1스테이지 또는 후속 연출 작업으로 진행한다.
