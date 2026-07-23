@@ -14,6 +14,10 @@ public enum TurnSide
 /// </summary>
 public class TurnManager : MonoBehaviour
 {
+    [Header("Reference")]
+    // 턴을 시작하고 전환할 수 있는 스테이지 진행 상태를 제공한다.
+    [SerializeField] private StageStateManager stageStateManager;
+
     [Header("Turn")]
     // 게임 시작 시 첫 턴을 잡을 진영이다.
     [SerializeField] private TurnSide startingSide = TurnSide.Player;
@@ -56,6 +60,13 @@ public class TurnManager : MonoBehaviour
         }
 
         Instance = this;
+
+        if (!HasValidReference())
+        {
+            enabled = false;
+            return;
+        }
+
         CurrentSide = startingSide;
     }
 
@@ -64,7 +75,7 @@ public class TurnManager : MonoBehaviour
     /// </summary>
     private void Start()
     {
-        if (beginTurnOnStart)
+        if (beginTurnOnStart && stageStateManager.IsPlaying)
         {
             StartTurn(CurrentSide);
         }
@@ -86,7 +97,10 @@ public class TurnManager : MonoBehaviour
     /// </summary>
     private void Update()
     {
-        if (!allowKeyboardDebugEndTurn || debugEndTurnKey == Key.None || Keyboard.current == null)
+        if (!stageStateManager.IsPlaying ||
+            !allowKeyboardDebugEndTurn ||
+            debugEndTurnKey == Key.None ||
+            Keyboard.current == null)
         {
             return;
         }
@@ -103,6 +117,11 @@ public class TurnManager : MonoBehaviour
     /// </summary>
     public void EndCurrentTurn()
     {
+        if (!CanProgressTurn("현재 턴을 종료"))
+        {
+            return;
+        }
+
         TurnSide endedSide = CurrentSide;
         TurnEnded?.Invoke(endedSide);
 
@@ -131,6 +150,11 @@ public class TurnManager : MonoBehaviour
     /// </summary>
     private void StartTurn(TurnSide side)
     {
+        if (!CanProgressTurn($"{side} 턴을 시작"))
+        {
+            return;
+        }
+
         CurrentSide = side;
 
         if (logTurnChanges)
@@ -139,5 +163,42 @@ public class TurnManager : MonoBehaviour
         }
 
         TurnStarted?.Invoke(CurrentSide);
+    }
+
+    /// <summary>
+    /// 현재 스테이지 상태에서 턴 시작 또는 전환을 진행할 수 있는지 확인한다.
+    /// </summary>
+    private bool CanProgressTurn(string requestDescription)
+    {
+        if (!HasValidReference())
+        {
+            return false;
+        }
+
+        if (stageStateManager.IsPlaying)
+        {
+            return true;
+        }
+
+        if (logTurnChanges)
+        {
+            Debug.Log($"{nameof(TurnManager)}: 스테이지가 {stageStateManager.CurrentState} 상태라 {requestDescription}할 수 없습니다.", this);
+        }
+
+        return false;
+    }
+
+    /// <summary>
+    /// 턴 진행 상태를 제공할 필수 StageStateManager 참조가 연결되어 있는지 확인한다.
+    /// </summary>
+    public bool HasValidReference()
+    {
+        if (stageStateManager == null)
+        {
+            Debug.LogError($"{nameof(TurnManager)} on {name}에는 진행 상태를 제공할 {nameof(StageStateManager)} 참조가 필요합니다.", this);
+            return false;
+        }
+
+        return true;
     }
 }

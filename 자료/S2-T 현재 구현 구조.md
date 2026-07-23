@@ -1,6 +1,6 @@
 # S2-T 현재 구현 구조
 
-- 최신 기준: 2026-07-21
+- 최신 기준: 2026-07-23
 - 기준 브랜치: `main`
 - Unity 버전: `6000.0.64f1`
 - 기준 테스트 씬: `Assets/Scenes/Tset.unity`
@@ -22,7 +22,7 @@ S2-T는 사이버 조선 세계관을 사용하는 보드게임식 턴제 잠입
 6. 목표 칸에 살아 있는 플레이어 조작 유닛이 도착하면 스테이지가 클리어된다.
 
 현재 작업 방향은 `Tset` 테스트 씬에서 튜토리얼 1스테이지의 핵심 진행을 먼저 완성한 뒤 실제 튜토리얼 씬으로 옮기는 것이다.
-다음 제작 단위는 검증을 마친 해킹 터미널과 보안문의 프리팹화다.
+해킹 터미널과 보안문의 프리팹화를 마쳤으며, 다음 제작 단위는 이 오브젝트를 사용하는 튜토리얼 진행 순서와 안내 구조 설계다.
 
 ## 2. 핵심 구조 원칙
 
@@ -185,6 +185,7 @@ MapVisualGrid
 - `TurnManager`는 `Player`, `Enemy` 턴을 전환하고 시작·종료 이벤트를 발행한다.
 - 플레이어 `ActionPoint`는 플레이어 턴 시작 시 `ControllableUnitData.StartTurnActionPoint`로 보충된다.
 - 적 `EnemyActionPoint`는 적 턴에 `EnemyData.TurnActionPoint`로 보충된다.
+- `TurnManager`는 `StageStateManager`가 `Playing`일 때만 새 턴 시작과 현재 턴 종료를 허용한다.
 - 현재 `Tset`에서는 Space 키로 턴 종료를 시험할 수 있다.
 
 ### 공통 전술 유닛
@@ -253,6 +254,8 @@ PlayerInputReader
 - 우클릭 / Escape: 행동 선택 취소.
 
 연출 큐가 재생 중이면 새 행동을 실행할 수 없다.
+스테이지가 `Cleared` 또는 `Failed`로 바뀌면 `PlayerUnitInputController`가 현재 행동 선택과 경로 표시를 정리하고 이후 플레이어 입력을 처리하지 않는다.
+입력 계층을 거치지 않은 직접 행동 요청도 `PlayerUnitActionFlowController`가 `StageStateManager.IsPlaying`을 다시 확인해 차단한다.
 
 ## 7. 플레이어 행동
 
@@ -383,6 +386,7 @@ PlayerInputReader
 ### 적 턴
 
 `EnemyTurnCoordinator`는 적 턴에 등록된 적을 순서대로 실행하고 각 적의 연출 완료를 기다린다.
+적 턴 시작 전과 각 적 행동 사이에 스테이지 상태를 확인하며, 종료 상태가 되면 현재 논리와 연출까지만 마치고 남은 적 행동과 다음 턴 전환을 중단한다.
 
 `EnemyTurnAgent`의 현재 우선순위:
 
@@ -453,6 +457,7 @@ PlayerInputReader
 - `SwordActionPresenter`: 검 투척·해킹·회수 위치와 근접 기울기.
 - `HackPresenter`: 현재 해킹 시간 대기와 로그.
 - `SecurityDoorPresenter`: 열린 문의 `DoorVisual` 비활성화.
+- `StageResultPresenter`: 클리어·실패 연출 이벤트 처리. 현재는 한국어 로그 출력 후 즉시 완료.
 - `PlayerUnitSelectionPresenter`: 현재 조작 유닛의 임시 LineRenderer 선택 링.
 
 `MovePresentationData`는 이동 시간·커브·이동/Idle 애니메이션 옵션을 보관한다.
@@ -474,6 +479,8 @@ HackTerminal
 - 현재 터미널 논리 좌표는 `(7, 8)`이다.
 - `HackableDataTest.HackDuration`은 `2초`다.
 - 터미널은 해킹 대상 위치 제공을 위해 `GridActor`를 사용한다.
+- 재사용 프리팹은 `Assets/Prefab/Map/HackingObject/HackTerminal.prefab`이다.
+- 스테이지마다 달라지는 `GridActor.GridPosition`은 배치한 프리팹 인스턴스에서 설정한다.
 
 ### SecurityDoor01
 
@@ -494,6 +501,8 @@ SecurityDoor01
 - `SecurityDoorController.UnlockHackable`은 터미널의 `HackableObject`를 참조한다.
 - `BlockingActors`에는 좌우 Logic의 `GridActor` 두 개가 연결되어 있다.
 - `SecurityDoorPresenter`는 같은 문의 Controller와 `DoorVisual`을 참조한다.
+- 재사용 프리팹은 `Assets/Prefab/Map/HackingObject/SecurityDoor.prefab`이다.
+- 문과 좌우 Blocker의 스테이지별 `GridPosition`은 배치한 프리팹 인스턴스에서 설정한다.
 
 문 개방 흐름:
 
@@ -508,10 +517,16 @@ SecurityDoor01
 
 ## 13. 스테이지 목표와 상태
 
-- `StageGoal`은 목표 `GridPosition`과 Scene 뷰 표시를 제공한다.
+- `StageGoal`은 목표 `GridPosition`과 씬의 `GridManager` 참조를 가진다.
+- 편집 모드에는 목표 좌표를 Scene 뷰 녹색 디버그 칸으로 표시한다.
+- 플레이 모드에는 Game 뷰의 Gizmos가 켜진 경우 같은 좌표에 프리팹 비주얼 교체 전 임시 목표 표시를 그린다.
+- 두 표시는 실제 빌드용 비주얼이 아니며 최종 목표 표시는 이후 프리팹으로 교체한다.
 - `StageGoalManager`는 `MoveCompletedLogicEvent`를 받아 살아 있는 플레이어 조작 유닛의 목표 도착을 검사한다.
 - 목표 달성 시 `StageClearedLogicEvent`와 `StageCleared` 연출을 만든다.
 - `StageStateManager`는 `Playing`, `Cleared`, `Failed` 상태를 보관한다.
+- `StageResultPresenter`는 `StageCleared`와 `StageFailed` 연출을 전담하며 현재는 결과 로그를 출력하고 큐를 즉시 완료한다.
+- `Cleared` 또는 `Failed` 상태에서는 플레이어 입력, 새 행동 실행, 턴 전환과 남은 적 행동이 차단된다.
+- 상태가 바뀌기 전에 시작된 논리 처리와 이미 큐에 들어간 연출은 끝까지 완료한다.
 - 현재 자동 실패 조건은 아직 연결되지 않았으며 `RequestFail()` 진입점만 있다.
 - `ControllableUnitData.DefeatOnDeath`도 현재 기록용이며 실패 판정에 사용되지 않는다.
 
@@ -592,11 +607,16 @@ SecurityDoor01
 - WASD·방향키 카메라 이동과 범위 제한.
 - 해킹 터미널과 2칸 보안문의 차단·개방 전체 흐름.
 - `IPresentationEventHandler` 기반 연출 처리자 등록, 필터링, 실행과 완료 대기 흐름.
+- 편집 모드 Scene 뷰와 플레이 모드 Game 뷰의 `StageGoal` 위치 표시.
+- `StageResultPresenter`의 클리어 로그 처리와 검 투척·회수 반복 Visual 유지.
+- 스테이지 클리어 후 플레이어 입력, 새 행동, 턴 전환과 남은 적 행동 차단.
+- 프리팹으로 배치한 해킹 터미널과 보안문의 기존 해킹·개방 흐름 유지.
 
 ## 17. 현재 한계
 
 - 입력은 임시 키·마우스 매핑이며 정식 UI와 Input Action Map은 아직 없다.
 - 플레이어 이동은 논리적으로 즉시 확정되며 발각 시 중간 정지나 카메라 컷은 없다.
+- 현재 적 시야는 장애물 가림을 반영하지 않아 벽이나 상자 뒤 칸에서도 발각과 애드 경고가 발생할 수 있다.
 - 적 애드는 단일 단계 전파이며 연쇄 전파는 없다.
 - 엄폐 평가는 벽 인접과 노출·거리 중심의 1차 점수 구조다.
 - 해킹 연출은 시간 대기와 로그, 문 열림은 비주얼 비활성화 수준이다.
@@ -604,16 +624,16 @@ SecurityDoor01
 - 선택 표시는 런타임 LineRenderer 임시 링이다.
 - 스테이지 실패 조건과 최종 클리어·실패 UI가 없다.
 - `HeavyGun`은 데이터 타입만 있고 행동 구현이 없다.
-- 테스트 터미널과 보안문은 아직 재사용 프리팹으로 저장하지 않았다.
 
 ## 18. 다음 작업
 
-1. 검증된 `HackTerminal`과 `SecurityDoor01`을 각각 프리팹으로 만든다.
-2. 테스트 씬의 터미널 해킹과 문 통과 흐름을 기준으로 튜토리얼 진행 순서를 설계한다.
-3. 튜토리얼 트리거, 안내 대사·UI, 행동 제한 규칙을 정한다.
-4. 테스트 씬에서 검증한 구성을 실제 튜토리얼 씬으로 옮긴다.
-5. 열린 문 아트·애니메이션과 검 경로·공격 VFX는 Presenter 계층에 추가한다.
-6. 캐릭터·이펙트 흐름이 안정된 뒤 카메라 줌·컷 연출을 추가한다.
+1. 적 시야에 장애물 가림 판정을 추가해 실제로 보이는 칸만 시야 표시, 이동 위험, 발각과 애드 판정에 사용한다.
+2. 구현 전에 고정·동적 장애물, 장애물 칸 자체, 대각선 모서리와 열린 문의 시야 차단 규칙을 확정한다.
+3. 테스트 씬의 터미널 해킹과 문 통과 흐름을 기준으로 튜토리얼 진행 순서를 설계한다.
+4. 튜토리얼 트리거, 안내 대사·UI, 행동 제한 규칙을 정한다.
+5. 테스트 씬에서 검증한 구성을 실제 튜토리얼 씬으로 옮긴다.
+6. 열린 문 아트·애니메이션과 검 경로·공격 VFX는 Presenter 계층에 추가한다.
+7. 캐릭터·이펙트 흐름이 안정된 뒤 카메라 줌·컷 연출을 추가한다.
 
 ## 19. 문서 유지 규칙
 

@@ -6,6 +6,10 @@ using UnityEngine;
 /// </summary>
 public class PlayerUnitInputController : MonoBehaviour
 {
+    [Header("Reference")]
+    // 플레이어 입력을 처리할 수 있는 스테이지 진행 상태를 제공한다.
+    [SerializeField] private StageStateManager stageStateManager;
+
     [Header("Log")]
     // true면 현재 유닛이 지원하지 않는 행동을 선택했을 때 안내 로그를 출력한다.
     [SerializeField] private bool logUnavailableAbility = true;
@@ -18,6 +22,26 @@ public class PlayerUnitInputController : MonoBehaviour
         if (!HasValidReference())
         {
             enabled = false;
+            return;
+        }
+
+        stageStateManager.StageStateChanged -= HandleStageStateChanged;
+        stageStateManager.StageStateChanged += HandleStageStateChanged;
+
+        if (!stageStateManager.IsPlaying)
+        {
+            CancelCurrentActionSelections();
+        }
+    }
+
+    /// <summary>
+    /// 스테이지 상태 이벤트 구독을 해제한다.
+    /// </summary>
+    private void OnDisable()
+    {
+        if (stageStateManager != null)
+        {
+            stageStateManager.StageStateChanged -= HandleStageStateChanged;
         }
     }
 
@@ -27,6 +51,11 @@ public class PlayerUnitInputController : MonoBehaviour
     private void Update()
     {
         if (!HasValidReference())
+        {
+            return;
+        }
+
+        if (!stageStateManager.IsPlaying)
         {
             return;
         }
@@ -188,6 +217,28 @@ public class PlayerUnitInputController : MonoBehaviour
     }
 
     /// <summary>
+    /// 스테이지가 클리어 또는 실패 상태로 바뀌면 현재 행동 선택과 경로 표시를 정리한다.
+    /// </summary>
+    private void HandleStageStateChanged(StageState _, StageState nextState)
+    {
+        if (nextState != StageState.Playing)
+        {
+            CancelCurrentActionSelections();
+        }
+    }
+
+    /// <summary>
+    /// 현재 조작 유닛에 남아 있는 모든 행동 선택 상태를 취소한다.
+    /// </summary>
+    private static void CancelCurrentActionSelections()
+    {
+        TacticalUnitContext activeUnit = PlayerUnitControlManager.Instance != null
+            ? PlayerUnitControlManager.Instance.ActiveUnit
+            : null;
+        activeUnit?.CancelAllActionSelections();
+    }
+
+    /// <summary>
     /// 현재 유닛이 지원하지 않는 행동을 선택했다는 안내를 출력한다.
     /// </summary>
     private void LogUnavailableAbility(TacticalUnitContext unit, UnitAbilityType ability)
@@ -203,6 +254,12 @@ public class PlayerUnitInputController : MonoBehaviour
     /// </summary>
     private bool HasValidReference()
     {
+        if (stageStateManager == null)
+        {
+            Debug.LogError($"{nameof(PlayerUnitInputController)} on {name}에는 진행 상태를 제공할 {nameof(StageStateManager)} 참조가 필요합니다.", this);
+            return false;
+        }
+
         if (PlayerInputReader.Instance == null)
         {
             Debug.LogError($"{nameof(PlayerUnitInputController)} on {name}에는 씬의 {nameof(PlayerInputReader)}가 필요합니다.", this);

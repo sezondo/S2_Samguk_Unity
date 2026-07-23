@@ -222,7 +222,7 @@ public class SwordActionPresenter : MonoBehaviour, IPresentationEventHandler
     {
         isRecalledVisual = true;
         isMeleePoseActive = false;
-        swordVisual.SetParent(ownerVisualController.transform, false);
+        swordVisual.SetParent(ownerVisualController.transform, true);
         ApplyRecalledPosition();
         swordVisual.localRotation = Quaternion.Euler(0f, 0f, recalledRotation);
     }

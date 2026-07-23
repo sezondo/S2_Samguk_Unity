@@ -9,6 +9,8 @@ public class PlayerUnitActionFlowController : MonoBehaviour
     [Header("Reference")]
     // 논리 결과 연출을 재생할 씬 단위 연출 큐다.
     [SerializeField] private ActionPresentationQueue presentationQueue;
+    // 새 플레이어 행동을 시작할 수 있는 스테이지 진행 상태를 제공한다.
+    [SerializeField] private StageStateManager stageStateManager;
 
     [Header("Log")]
     // true면 행동 실행 차단 사유를 Unity 콘솔에 출력한다.
@@ -35,9 +37,18 @@ public class PlayerUnitActionFlowController : MonoBehaviour
 
         Instance = this;
 
-        if (presentationQueue == null)
+        if (presentationQueue == null || stageStateManager == null)
         {
-            Debug.LogError($"{nameof(PlayerUnitActionFlowController)} on {name}에는 {nameof(ActionPresentationQueue)} 참조가 필요합니다.", this);
+            if (presentationQueue == null)
+            {
+                Debug.LogError($"{nameof(PlayerUnitActionFlowController)} on {name}에는 {nameof(ActionPresentationQueue)} 참조가 필요합니다.", this);
+            }
+
+            if (stageStateManager == null)
+            {
+                Debug.LogError($"{nameof(PlayerUnitActionFlowController)} on {name}에는 진행 상태를 제공할 {nameof(StageStateManager)} 참조가 필요합니다.", this);
+            }
+
             enabled = false;
         }
     }
@@ -219,6 +230,16 @@ public class PlayerUnitActionFlowController : MonoBehaviour
             return false;
         }
 
+        if (!stageStateManager.IsPlaying)
+        {
+            if (logBlockedAction)
+            {
+                Debug.Log($"{nameof(PlayerUnitActionFlowController)}: 스테이지가 {stageStateManager.CurrentState} 상태라 새 행동을 시작할 수 없습니다.", this);
+            }
+
+            return false;
+        }
+
         if (ActiveUnit == null)
         {
             if (logBlockedAction)
@@ -261,6 +282,12 @@ public class PlayerUnitActionFlowController : MonoBehaviour
         if (presentationQueue == null)
         {
             Debug.LogError($"{nameof(PlayerUnitActionFlowController)} on {name}에는 {nameof(ActionPresentationQueue)} 참조가 필요합니다.", this);
+            return false;
+        }
+
+        if (stageStateManager == null)
+        {
+            Debug.LogError($"{nameof(PlayerUnitActionFlowController)} on {name}에는 진행 상태를 제공할 {nameof(StageStateManager)} 참조가 필요합니다.", this);
             return false;
         }
 

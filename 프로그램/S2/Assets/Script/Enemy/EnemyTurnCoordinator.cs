@@ -13,6 +13,8 @@ public class EnemyTurnCoordinator : MonoBehaviour
     [SerializeField] private TurnManager turnManager;
     // 적 행동 연출 이벤트를 재생할 연출 큐다.
     [SerializeField] private ActionPresentationQueue presentationQueue;
+    // 적 턴을 계속 실행할 수 있는 스테이지 진행 상태를 제공한다.
+    [SerializeField] private StageStateManager stageStateManager;
 
     [Header("Log")]
     // true면 적 턴 시작, 적별 실행, 적 턴 종료 흐름을 Unity 콘솔에 출력한다.
@@ -69,7 +71,10 @@ public class EnemyTurnCoordinator : MonoBehaviour
     /// </summary>
     private void HandleTurnStarted(TurnSide side)
     {
-        if (side != TurnSide.Enemy || enemyTurnCoroutine != null)
+        if (side != TurnSide.Enemy ||
+            enemyTurnCoroutine != null ||
+            stageStateManager == null ||
+            !stageStateManager.IsPlaying)
         {
             return;
         }
@@ -88,16 +93,32 @@ public class EnemyTurnCoordinator : MonoBehaviour
             yield break;
         }
 
+        if (!stageStateManager.IsPlaying)
+        {
+            enemyTurnCoroutine = null;
+            yield break;
+        }
+
         if (logEnemyTurn)
         {
             Debug.Log($"{nameof(EnemyTurnCoordinator)}: 적 턴 행동을 시작합니다.", this);
         }
 
         yield return WaitForPresentationQueue();
+        if (!stageStateManager.IsPlaying)
+        {
+            enemyTurnCoroutine = null;
+            yield break;
+        }
 
         IReadOnlyList<EnemyContext> enemies = EnemyRegistry.Instance.Enemies;
         for (int i = 0; i < enemies.Count; i++)
         {
+            if (!stageStateManager.IsPlaying)
+            {
+                break;
+            }
+
             EnemyContext enemy = enemies[i];
             if (enemy == null || !enemy.enabled)
             {
@@ -140,11 +161,14 @@ public class EnemyTurnCoordinator : MonoBehaviour
 
         if (logEnemyTurn)
         {
-            Debug.Log($"{nameof(EnemyTurnCoordinator)}: 적 턴 행동을 끝냅니다.", this);
+            string endReason = stageStateManager.IsPlaying
+                ? "모든 적 행동을 처리했습니다."
+                : $"스테이지가 {stageStateManager.CurrentState} 상태가 되어 남은 적 행동을 중단했습니다.";
+            Debug.Log($"{nameof(EnemyTurnCoordinator)}: {endReason}", this);
         }
 
         enemyTurnCoroutine = null;
-        if (turnManager.IsEnemyTurn)
+        if (stageStateManager.IsPlaying && turnManager.IsEnemyTurn)
         {
             turnManager.EndCurrentTurn();
         }
@@ -215,6 +239,12 @@ public class EnemyTurnCoordinator : MonoBehaviour
         if (presentationQueue == null)
         {
             Debug.LogError($"{nameof(EnemyTurnCoordinator)} on {name}에는 {nameof(ActionPresentationQueue)} 참조가 필요합니다.", this);
+            return false;
+        }
+
+        if (stageStateManager == null)
+        {
+            Debug.LogError($"{nameof(EnemyTurnCoordinator)} on {name}에는 진행 상태를 제공할 {nameof(StageStateManager)} 참조가 필요합니다.", this);
             return false;
         }
 

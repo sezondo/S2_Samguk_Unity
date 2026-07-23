@@ -1673,3 +1673,89 @@
 - 새 인터페이스를 Unity 생성 프로젝트에 임시 포함해 `dotnet build Assembly-CSharp.csproj --no-restore`를 실행했다.
 - 경고 0개, 오류 0개이며 임시 프로젝트 항목은 검증 후 원상복구했다.
 - Unity 플레이 모드에서 변경된 연출 큐 흐름에 대한 테스트를 완료했다.
+
+## 2026-07-23 StageGoal 편집/플레이 모드 Gizmos 표시 분리
+
+## 핵심
+- `StageGoal`이 런타임에만 설정되는 `GridManager.Instance` 대신 씬의 `GridManager` 직렬화 참조를 사용하도록 변경했다.
+- 플레이하지 않는 편집 모드에서는 목표 `GridPosition`을 Scene 뷰의 녹색 디버그 칸으로 표시한다.
+- 플레이 모드에서는 Game 뷰의 Gizmos가 켜진 경우 같은 목표 좌표에 프리팹 비주얼 교체 전 임시 목표 칸을 표시한다.
+- 편집 모드와 플레이 모드 표시의 활성 여부, 색상, 크기를 각각 조정할 수 있게 분리했다.
+- 목표 좌표가 그리드 범위 밖이거나 필수 `GridManager` 참조와 표시 크기가 잘못되면 한국어 오류를 남기고 컴포넌트를 비활성화하도록 검증을 추가했다.
+- `Tset` 씬의 `StageGoal.gridManager`에 씬 단일 `GridManager`를 연결했다.
+
+## 검증
+- `dotnet build S2.slnx --no-restore` 통과.
+- 경고 0개, 오류 0개.
+- 저장된 `Tset` 씬에서 `StageGoal.gridManager`와 편집·플레이 모드 표시 설정이 직렬화된 것을 확인했다.
+- Unity 편집 모드 Scene 뷰에서 목표 `GridPosition`의 녹색 디버그 표시를 확인했다.
+- Unity 플레이 모드 Game 뷰에서 Gizmos를 켰을 때 임시 목표 위치가 표시되는 것을 확인했다.
+
+## 2026-07-23 스테이지 결과 Presenter와 검 회수 스케일 수정
+
+## 핵심
+- `StageResultPresenter`를 추가해 `StageCleared`, `StageFailed` 연출 이벤트만 처리하도록 했다.
+- 현재 결과 연출은 한국어 로그를 출력하고 `PresentationEventHandle.Complete()`를 즉시 호출하는 1차 형태다.
+- `Tset` 씬의 `StageGoal` 오브젝트에 `StageResultPresenter`를 연결하고 결과 로그를 활성화했다.
+- `SwordActionPresenter`가 검 Visual을 플레이어 `VisualRoot`에 다시 연결할 때 월드 스케일을 유지하도록 부모 변경 방식을 수정했다.
+- 플레이어 `VisualRoot`의 `0.25` 스케일이 회수할 때마다 검에 중복 적용되어 `0.2`, `0.05`로 작아지던 원인을 제거했다.
+
+## 검증
+- 새 스크립트를 Unity 생성 프로젝트에 임시 포함해 `dotnet build S2.slnx --no-restore`를 실행했다.
+- 경고 0개, 오류 0개이며 임시 프로젝트 항목은 검증 후 원상복구했다.
+- 저장된 `Tset` 씬에서 `StageResultPresenter` 컴포넌트와 스크립트 GUID 연결을 확인했다.
+- Unity 플레이 모드에서 `StageCleared` 이벤트가 미처리 경고 없이 `StageResultPresenter`의 한국어 로그로 처리되는 것을 확인했다.
+- 검 투척·회수 후 다시 투척해도 검 Visual이 사라지거나 축소되지 않는 것을 확인했다.
+
+## 2026-07-23 스테이지 종료 후 진행 차단
+
+## 핵심
+- `PlayerUnitInputController`에 `StageStateManager` 참조를 추가해 `Playing` 상태에서만 유닛 선택과 행동 입력을 처리하도록 했다.
+- 스테이지 상태가 `Cleared` 또는 `Failed`로 바뀌면 현재 조작 유닛의 행동 선택과 이동 경로 표시를 즉시 정리한다.
+- `PlayerUnitActionFlowController.CanStartAction()`이 스테이지 상태를 다시 확인해 입력 외부에서 들어오는 직접 행동 요청도 차단한다.
+- `TurnManager`가 `Playing` 상태에서만 턴 시작과 종료를 허용해 클리어 후 Space 입력과 강제 턴 시작 요청이 새 턴을 만들지 않게 했다.
+- `EnemyTurnCoordinator`는 적 턴 시작 전과 각 적 행동 사이에 스테이지 상태를 확인한다.
+- 적 턴 도중 종료 상태가 되면 현재 적의 논리와 큐 연출은 마치고, 남은 적 행동과 다음 플레이어 턴 전환은 중단한다.
+- `StageResultPresenter`는 상태 차단 책임을 갖지 않고 기존처럼 결과 로그 출력과 연출 완료만 담당한다.
+- `Tset` 씬의 네 제어 컴포넌트에 동일한 `StageStateManager` 참조를 연결했다.
+
+## 검증
+- `dotnet build S2.slnx --no-restore` 통과.
+- 경고 0개, 오류 0개.
+- 저장된 `Tset` 씬에서 `PlayerUnitInputController`, `PlayerUnitActionFlowController`, `TurnManager`, `EnemyTurnCoordinator`의 `StageStateManager` 참조를 확인했다.
+- Unity 플레이 모드에서 스테이지 클리어 후 행동 키, 클릭, 검 회수와 Space 턴 종료가 차단되는 것을 확인했다.
+- 클리어 전까지는 기존 스테이지 진행과 행동 흐름이 정상 동작하는 것을 함께 확인했다.
+
+## 2026-07-23 해킹 오브젝트 프리팹 정리
+
+## 핵심
+- 검증한 해킹 터미널을 `Assets/Prefab/Map/HackingObject/HackTerminal.prefab`으로 저장했다.
+- 검증한 2칸 보안문을 `Assets/Prefab/Map/HackingObject/SecurityDoor.prefab`으로 저장했다.
+- 터미널은 `GridActor`, `HackableObject`, `HackPresenter`와 Visual 계층을 함께 보관한다.
+- 보안문은 `SecurityDoorController`, `SecurityDoorPresenter`, 좌우 Blocker와 `DoorVisual` 계층을 함께 보관한다.
+- 배치 위치에 따라 달라지는 `GridPosition`은 각 프리팹 인스턴스에서 스테이지 좌표에 맞춰 설정하는 방식으로 유지한다.
+- 이전 구조에서 사용하던 중복·구버전 테스트 프리팹은 정리했다.
+
+## 검증
+- 두 프리팹의 YAML에서 필수 논리·연출 컴포넌트와 자식 계층이 함께 저장된 것을 확인했다.
+- 현재 `Tset` 씬에서 프리팹으로 전환한 뒤 기존 해킹, 문 개방과 통과 흐름이 정상 동작하는 것을 확인했다.
+
+## 2026-07-23 장애물 시야 차단 후속 작업 기록
+
+## 현재 문제
+- 현재 적 시야 범위는 장애물에 의한 가림을 반영하지 않아 벽이나 상자 뒤 칸까지 이어진다.
+- 이 때문에 화면상 적과 플레이어 사이가 장애물로 막혀 있어도 해당 칸에서 발각과 애드 경고가 발생할 수 있다.
+
+## 원하는 동작
+- 적의 시야는 단순 거리 범위 전체가 아니라 적 위치에서 실제로 가려지지 않은 칸만 포함해야 한다.
+- 장애물이 시선을 막으면 그 뒤쪽 칸은 시야 표시, 이동 위험 판정, 발각과 애드 경고 대상에서 모두 제외한다.
+- 첨부 화면에서 빨간색으로 표시한 것처럼 장애물 사이로 실제 바라볼 수 있는 칸만 시야로 인정하는 방향으로 수정한다.
+
+## 구현 전 결정할 기준
+- `LogicTilemap` 고정 장애물과 점유 중인 `GridActor`를 각각 시야 차단물로 취급할지 정한다.
+- 장애물 자체가 있는 칸까지 보이는 것으로 처리할지 정한다.
+- 두 장애물 사이의 대각선 모서리를 통과해 시야가 이어지는 것을 허용할지 정한다.
+- 열린 보안문처럼 런타임에 점유가 해제되는 오브젝트의 시야 갱신 시점을 정한다.
+
+## 상태
+- 이번에는 코드와 씬을 수정하지 않고 후속 엔진 작업으로만 기록했다.
