@@ -3,8 +3,8 @@ using System.Collections.Generic;
 using UnityEngine;
 
 /// <summary>
-/// 적의 4방향 부채꼴 시야와 인접 근접 감지 칸을 계산한다.
-/// 장애물 칸은 정면 시야에 포함하지 않고, 같은 레인에서 그 뒤 칸을 차단한다.
+/// 적의 4방향 부채꼴 시야와 장애물을 무시하는 인접 청각 감지 칸을 계산한다.
+/// 정면 시야는 각 후보 칸까지의 시선을 검사해 고정·동적 구조물 뒤쪽을 제외한다.
 /// </summary>
 [RequireComponent(typeof(GridActor))]
 public class EnemyGridSight : MonoBehaviour
@@ -24,6 +24,8 @@ public class EnemyGridSight : MonoBehaviour
 
     // 같은 오브젝트의 적 말 컴포넌트다.
     private GridActor actor;
+    // 동적 시야 차단 변경 이벤트를 구독한 그리드 매니저다.
+    private GridManager subscribedGridManager;
 
     public GridDirection FacingDirection => facingDirection;
     public IReadOnlyList<GridPosition> DetectedPositions => detectedPositions;
@@ -43,7 +45,16 @@ public class EnemyGridSight : MonoBehaviour
         }
 
         actor = enemyContext.GridActor;
+        TrySubscribeSightBlockingChanged();
         RefreshSight();
+    }
+
+    /// <summary>
+    /// 컴포넌트가 다시 활성화될 때 동적 시야 차단 변경 이벤트 구독을 복원한다.
+    /// </summary>
+    private void OnEnable()
+    {
+        TrySubscribeSightBlockingChanged();
     }
 
     /// <summary>
@@ -51,7 +62,20 @@ public class EnemyGridSight : MonoBehaviour
     /// </summary>
     private void Start()
     {
+        TrySubscribeSightBlockingChanged();
         RefreshSight();
+    }
+
+    /// <summary>
+    /// 컴포넌트가 비활성화될 때 동적 시야 차단 변경 이벤트 구독을 해제한다.
+    /// </summary>
+    private void OnDisable()
+    {
+        if (subscribedGridManager != null)
+        {
+            subscribedGridManager.SightBlockingChanged -= HandleSightBlockingChanged;
+            subscribedGridManager = null;
+        }
     }
 
     /// <summary>
@@ -75,6 +99,7 @@ public class EnemyGridSight : MonoBehaviour
     {
         detectedPositions.Clear();
         detectedPositionSet.Clear();
+        TrySubscribeSightBlockingChanged();
 
         GridManager gridManager = GridManager.Instance;
         if (gridManager == null || actor == null)
@@ -116,44 +141,88 @@ public class EnemyGridSight : MonoBehaviour
         GridPosition forward = GridDirectionUtility.ToForwardOffset(facingDirection);
         GridPosition right = GridDirectionUtility.ToRightOffset(facingDirection);
 
-        for (int lateralOffset = -(data.SightRange - 1); lateralOffset <= data.SightRange - 1; lateralOffset++)
+        for (int forwardDistance = 1; forwardDistance <= data.SightRange; forwardDistance++)
         {
-            AddForwardSightLane(gridManager, origin, forward, right, lateralOffset, data.SightRange);
+            int maximumLateralOffset = forwardDistance - 1;
+            for (int lateralOffset = -maximumLateralOffset; lateralOffset <= maximumLateralOffset; lateralOffset++)
+            {
+                GridPosition position =
+                    origin +
+                    Multiply(forward, forwardDistance) +
+                    Multiply(right, lateralOffset);
+
+                if (gridManager.IsInside(position) &&
+                    HasForwardLineOfSight(gridManager, origin, position))
+                {
+                    AddDetectedPosition(position);
+                }
+            }
         }
     }
 
     /// <summary>
-    /// 부채꼴 시야의 한 레인을 가까운 칸부터 검사하고 장애물을 만나면 뒤를 차단한다.
+    /// 시작 칸에서 목표 칸까지 그리드 선을 따라가며 구조물에 가리지 않는지 확인한다.
+    /// 정확히 대각선 모서리를 지날 때는 양쪽 칸이 모두 막힌 경우에만 시야를 차단한다.
     /// </summary>
-    private void AddForwardSightLane(
+    private static bool HasForwardLineOfSight(
         GridManager gridManager,
         GridPosition origin,
-        GridPosition forward,
-        GridPosition right,
-        int lateralOffset,
-        int sightRange)
+        GridPosition target)
     {
-        int absoluteOffset = Mathf.Abs(lateralOffset);
+        int deltaX = target.x - origin.x;
+        int deltaY = target.y - origin.y;
+        int absoluteDeltaX = Mathf.Abs(deltaX);
+        int absoluteDeltaY = Mathf.Abs(deltaY);
+        int stepX = Math.Sign(deltaX);
+        int stepY = Math.Sign(deltaY);
 
-        for (int forwardDistance = Mathf.Max(1, absoluteOffset + 1); forwardDistance <= sightRange; forwardDistance++)
+        int currentX = origin.x;
+        int currentY = origin.y;
+        int horizontalSteps = 0;
+        int verticalSteps = 0;
+
+        while (horizontalSteps < absoluteDeltaX || verticalSteps < absoluteDeltaY)
         {
-            GridPosition position = origin + Multiply(forward, forwardDistance) + Multiply(right, lateralOffset);
-            if (!gridManager.IsInside(position))
+            int horizontalDecision = (1 + 2 * horizontalSteps) * absoluteDeltaY;
+            int verticalDecision = (1 + 2 * verticalSteps) * absoluteDeltaX;
+
+            if (horizontalDecision == verticalDecision)
             {
-                break;
+                GridPosition horizontalSide = new(currentX + stepX, currentY);
+                GridPosition verticalSide = new(currentX, currentY + stepY);
+                if (gridManager.IsSightBlocked(horizontalSide) &&
+                    gridManager.IsSightBlocked(verticalSide))
+                {
+                    return false;
+                }
+
+                currentX += stepX;
+                currentY += stepY;
+                horizontalSteps++;
+                verticalSteps++;
+            }
+            else if (horizontalDecision < verticalDecision)
+            {
+                currentX += stepX;
+                horizontalSteps++;
+            }
+            else
+            {
+                currentY += stepY;
+                verticalSteps++;
             }
 
-            if (gridManager.IsBlocked(position))
+            if (gridManager.IsSightBlocked(new GridPosition(currentX, currentY)))
             {
-                break;
+                return false;
             }
-
-            AddDetectedPosition(position);
         }
+
+        return true;
     }
 
     /// <summary>
-    /// 바라보는 방향과 무관한 주변 근접 감지 칸을 추가한다.
+    /// 바라보는 방향과 장애물에 무관하게 주변 8방향의 청각 근접 감지 칸을 추가한다.
     /// </summary>
     private void AddAdjacentDetection(GridManager gridManager)
     {
@@ -201,6 +270,35 @@ public class EnemyGridSight : MonoBehaviour
     private static GridPosition Multiply(GridPosition position, int multiplier)
     {
         return new GridPosition(position.x * multiplier, position.y * multiplier);
+    }
+
+    /// <summary>
+    /// 현재 씬의 동적 시야 차단 변경 이벤트를 구독한다.
+    /// </summary>
+    private void TrySubscribeSightBlockingChanged()
+    {
+        if (subscribedGridManager != null)
+        {
+            return;
+        }
+
+        GridManager gridManager = GridManager.Instance;
+        if (gridManager == null)
+        {
+            return;
+        }
+
+        gridManager.SightBlockingChanged -= HandleSightBlockingChanged;
+        gridManager.SightBlockingChanged += HandleSightBlockingChanged;
+        subscribedGridManager = gridManager;
+    }
+
+    /// <summary>
+    /// 문 개방처럼 동적 시야 차단 상태가 바뀌면 현재 시야 칸을 다시 계산한다.
+    /// </summary>
+    private void HandleSightBlockingChanged()
+    {
+        RefreshSight();
     }
 
     /// <summary>

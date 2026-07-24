@@ -1,9 +1,10 @@
+using System;
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.Tilemaps;
 
 /// <summary>
-/// 격자 보드의 크기, 좌표 변환, 고정 이동불가 상태와 칸 점유 상태를 관리한다.
+/// 격자 보드의 크기, 좌표 변환, 고정 이동불가 상태, 칸 점유와 동적 시야 차단 상태를 관리한다.
 /// 고정 이동불가 상태는 LogicTilemap에서 읽고 턴제 규칙은 Transform 대신 GridPosition을 기준으로 판단한다.
 /// </summary>
 public class GridManager : MonoBehaviour
@@ -34,6 +35,8 @@ public class GridManager : MonoBehaviour
 
     // 보드 좌표별 칸 상태를 저장하는 런타임 상태 DB다.
     private readonly Dictionary<GridPosition, GridCellState> cellByPosition = new();
+    // 닫힌 문처럼 런타임에 시야를 막는 GridActor 목록이다. 일반 캐릭터 점유자는 등록하지 않는다.
+    private readonly HashSet<GridActor> dynamicSightBlockers = new();
 
     // 씬에서 사용하는 단일 그리드 매니저 인스턴스다.
     public static GridManager Instance { get; private set; }
@@ -44,6 +47,9 @@ public class GridManager : MonoBehaviour
     public int Height => height;
     // 외부에서 읽는 한 칸의 월드 크기다.
     public float CellSize => cellSize;
+
+    // 동적 시야 차단물이 등록되거나 해제될 때 발생한다.
+    public event Action SightBlockingChanged;
 
     /// <summary>
     /// 씬의 단일 GridManager 인스턴스를 등록한다.
@@ -138,6 +144,75 @@ public class GridManager : MonoBehaviour
     public bool IsOccupied(GridPosition position)
     {
         return TryGetCellState(position, out GridCellState cellState) && cellState.IsOccupied;
+    }
+
+    /// <summary>
+    /// 지정한 칸이 고정 LogicTilemap 또는 등록된 동적 구조물에 의해 시야가 막힌 칸인지 확인한다.
+    /// </summary>
+    public bool IsSightBlocked(GridPosition position)
+    {
+        if (IsBlocked(position))
+        {
+            return true;
+        }
+
+        foreach (GridActor sightBlocker in dynamicSightBlockers)
+        {
+            if (sightBlocker != null &&
+                sightBlocker.isActiveAndEnabled &&
+                sightBlocker.OccupyCell &&
+                sightBlocker.GridPosition == position)
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /// <summary>
+    /// 닫힌 문처럼 현재 시야를 막는 동적 구조물을 등록한다.
+    /// </summary>
+    public bool RegisterSightBlocker(GridActor sightBlocker)
+    {
+        if (sightBlocker == null)
+        {
+            Debug.LogError($"{nameof(GridManager)}에 비어 있는 동적 시야 차단물을 등록할 수 없습니다.", this);
+            return false;
+        }
+
+        if (!sightBlocker.OccupyCell)
+        {
+            Debug.LogError($"{nameof(GridManager)}: 동적 시야 차단물 {sightBlocker.name}은 현재 칸 점유가 활성화되어 있어야 합니다.", sightBlocker);
+            return false;
+        }
+
+        if (!IsInside(sightBlocker.GridPosition))
+        {
+            Debug.LogError($"{nameof(GridManager)}: 동적 시야 차단물 {sightBlocker.name}의 좌표 {sightBlocker.GridPosition}은 보드 범위 밖입니다.", sightBlocker);
+            return false;
+        }
+
+        if (!dynamicSightBlockers.Add(sightBlocker))
+        {
+            return true;
+        }
+
+        SightBlockingChanged?.Invoke();
+        return true;
+    }
+
+    /// <summary>
+    /// 열린 문처럼 더 이상 시야를 막지 않는 동적 구조물의 등록을 해제한다.
+    /// </summary>
+    public void UnregisterSightBlocker(GridActor sightBlocker)
+    {
+        if (sightBlocker == null || !dynamicSightBlockers.Remove(sightBlocker))
+        {
+            return;
+        }
+
+        SightBlockingChanged?.Invoke();
     }
 
     /// <summary>
