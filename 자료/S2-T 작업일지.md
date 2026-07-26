@@ -1798,3 +1798,292 @@
 - 장애물 그림자 기반 적 시야의 코드·알고리즘·플레이 모드 검증을 완료했다.
 - 다음 작업은 테스트 씬의 터미널 해킹과 문 통과 흐름을 기준으로 튜토리얼 진행 순서를 설계하는 것이다.
 - 이번 테스트 완료 기록에서는 코드와 씬을 수정하지 않았다.
+
+## 2026-07-26 선형 캠페인·스토리 전개 방향 확정
+
+## 현재 판단
+- 이동, AP, 잠입, 발각, 적 턴, 전투, 해킹, 목표 달성으로 이어지는 인게임 플레이는 현재 핵심 뼈대가 완성된 상태로 본다.
+- 남아 있는 전투 관련 작업은 새 규칙의 대규모 추가보다 캐릭터, VFX, 카메라, 타격감과 같은 연출 보강의 비중이 크다.
+- 다음 메인 개발 단계는 전투 외부의 로비, 스토리 전개, 씬 전환과 저장·불러오기 구조다.
+
+## 선형 진행 구조
+- 게임은 선형 챕터·스테이지 방식으로 진행한다.
+- 스테이지 표기는 `1-1`, `1-2` 형식을 사용하며 앞 숫자는 챕터, 뒤 숫자는 챕터 안의 스테이지를 뜻한다.
+- 로비에서 개방된 스테이지를 선택한다.
+- 기본 흐름은 `로비 → 전투 전 스토리 → 전투 → 선택적 전투 후 스토리 → 진행 저장 → 로비 복귀`다.
+- 완료한 스테이지의 재실행과 이미 본 스토리 다시 보기·스킵을 지원하는 방향으로 설계한다.
+- 복잡한 분기나 장비 성장 시스템은 현재 범위에 넣지 않는다.
+
+## 스토리 연출 방향
+- 기존 `DialogueManager`, `DialogueBubblePresenter`, `SpeechBubbleView` 기반 말풍선은 전투 씬 안의 짧은 인게임 대사용으로 유지한다.
+- 메인 스토리는 별도 `Story` 씬에서 배경, 캐릭터 스탠딩, 하단 대화창을 사용하는 비주얼 노벨 방식으로 전개한다.
+- 유진과 금두꺼비의 대화를 중심축으로 삼아 두 인물의 관계와 금두꺼비가 인간의 모순을 배우는 과정을 보여준다.
+- 필요한 에피소드에서는 다른 해결사, 한양 경비대, 의원 측 인물, 사병과 용병의 시점으로 전환해 한양이라는 도시의 계층과 일상을 보여준다.
+- 중요한 등장, 회상, 반전과 챕터 결말은 젠레스 존 제로의 컷씬처럼 만화 패널 형태의 일러스트 연출을 선택적으로 사용한다.
+- 만화 컷은 모든 대사를 대체하지 않고 스탠딩 대화만으로 부족한 핵심 장면을 강조하는 용도로 제한한다.
+
+## 스테이지 차별화 방향
+- 별도 장비 시스템은 현재 계획하지 않는다.
+- 각 스테이지의 맵 배치와 상호작용 오브젝트로 전술 차이를 만든다.
+- 예시는 총격 시 폭발하는 화염병, 해킹 시 아군이 되는 로봇, 보안문, 감시 장치와 경보 장치다.
+- 스테이지에 따라 동료 NPC가 아군으로 참여하며, 현재 다중 전술 유닛과 진영 구조를 이 용도로 활용한다.
+- 새 오브젝트와 NPC는 단순 기믹뿐 아니라 해당 스테이지의 인물과 사건을 보여주는 서사 장치로도 사용한다.
+
+## 저장 기준 초안
+- 최소 진행 상태는 `Locked`, `Available`, `BattleCleared`, `Completed` 단계로 나누는 방향을 우선 검토한다.
+- 전투 승리 직후 `BattleCleared`를 저장해 전투 후 스토리 도중 종료해도 전투를 다시 요구하지 않게 한다.
+- 전투 후 스토리가 끝나면 `Completed`로 바꾸고 다음 스테이지를 개방한다.
+- 전투 후 스토리가 없는 스테이지는 승리 직후 `Completed`로 처리할 수 있다.
+
+## 첫 수직 슬라이스 목표
+- 첫 연결 목표는 `1-1 선택 → 전투 전 스토리 → 기존 전투 씬 → 전투 후 스토리 → 1-2 해금 → 로비 복귀`다.
+- 이를 위해 스테이지 정의 데이터, 캠페인 진행 저장, 공통 Story 씬과 씬 전환 책임을 먼저 논의한다.
+- 금두꺼비 첫 각성 장면, 유진과의 계약, 첫 임무와 첫 단서의 구체적인 내용은 구현 전에 별도로 확정한다.
+
+## 상태
+- 이번 기록에서는 개발 방향만 확정했으며 코드, 씬과 인스펙터는 수정하지 않았다.
+
+## 2026-07-26 캠페인·Bootstrap·비동기 로딩 기반 구현
+
+## 핵심
+- `CampaignBootstrap`과 영속 `AppRoot`를 추가해 게임 실행 중 Bootstrap 초기화가 한 번만 일어나도록 했다.
+- 별도 Loading 씬은 만들지 않고 AppRoot 자식 `LoadingCanvas`를 `DontDestroyOnLoad`로 유지하는 구조를 채택했다.
+- `SceneTransitionController`가 `LoadSceneAsync` 진행률을 표시하고 페이드 인·아웃 사이에 대상 씬을 활성화하도록 구현했다.
+- `CampaignContext`는 `CampaignData`, 흐름, 저장, 씬 전환 컴포넌트 참조만 보관하며 정책과 계산은 넣지 않았다.
+- `CampaignFlowController`가 저장 초기화 뒤 `BootstrapTest → LobbyTest` 최초 진입과 캠페인 흐름 단계를 관리한다.
+- `StageDefinitionData`와 `CampaignData`를 추가하고 테스트용 `1-1`, `1-2` 데이터를 선형 순서로 연결했다.
+- 진행 상태를 `Locked`, `Available`, `BattleCleared`, `Completed`로 구현했다.
+- 최초 저장은 `1-1`만 개방하며, 최종 완료 시 다음 스테이지를 개방한다.
+- 전투 후 스토리가 있는 스테이지는 `BattleCleared`를 거쳐야 최종 완료할 수 있고, 후일담이 없는 스테이지는 승리 직후 완료할 수 있다.
+- 기존 저장 뒤에 새 스테이지가 추가된 경우 기존 진행을 보존하며 새 레코드를 이어 붙이도록 했다.
+- 저장 파일은 `Application.persistentDataPath/campaign-save.json`에 JSON으로 기록한다.
+
+## BootstrapTest 인스펙터 연결
+- 루트 `AppRoot`에 `CampaignBootstrap`, `CampaignContext`, `CampaignSaveManager`, `CampaignFlowController`, `SceneTransitionController`를 연결했다.
+- `CampaignContext`의 필수 참조를 같은 AppRoot의 책임 컴포넌트와 `Assets/Data/Campaign/CampaignData.asset`에 명시적으로 연결했다.
+- 자식 `LoadingCanvas`에 `CanvasGroup`, `CanvasScaler`, `GraphicRaycaster`, `LoadingScreenPresenter`를 배치했다.
+- 전체 화면 배경과 하단 진행 바를 구성하고 `LoadingScreenPresenter`의 `CanvasGroup`, `Progress Bar` 참조를 연결했다.
+- Build Settings의 첫 활성 씬은 `BootstrapTest`, 다음 씬은 `LobbyTest`, `StoryTest`, `BattleTest` 순서다.
+
+## 검증
+- 새 캠페인 스크립트를 Unity 생성 프로젝트에 임시 포함해 `dotnet build S2.slnx --no-restore`를 실행했다.
+- 경고 0개, 오류 0개이며 임시 프로젝트 항목은 검증 후 제거했다.
+- `BootstrapTest` 씬 YAML에서 새 로컬 fileID 참조 누락과 선언 중복이 없음을 확인했다.
+- `git diff --check`로 공백 오류가 없음을 확인했다.
+- 사용자가 Unity 실행 후 `Application.persistentDataPath` 아래에 `campaign-save.json`이 실제 생성되는 것을 확인했다.
+- 로딩 페이드의 해상도별 표시와 `BootstrapTest → LobbyTest` 전환 중 콘솔 오류·중복 AppRoot 여부는 별도 최종 확인이 필요하다.
+
+## 다음
+- 2단계로 기존 인게임 말풍선과 분리된 비주얼 노벨식 `StoryTest` 시스템을 구현한다.
+- Story 데이터가 준비되면 `CampaignFlowController`에 전투 전·후 Story 진입과 복귀 목적지를 연결한다.
+
+## 2026-07-26 캠페인 1~4단계 인수인계 문서화
+
+## 확인
+
+- 사용자가 현재 캠페인 1단계 실행에서 JSON 저장 파일 생성을 확인했다.
+- 1단계는 영속 AppRoot, 캠페인 데이터, JSON 저장, 비동기 로딩 기반까지 구현된 상태다.
+- 다음 실제 구현 대상은 2단계 비주얼 노벨식 Story 시스템이다.
+
+## 전체 작업 원칙
+
+- 작업 순서는 `1단계 기반 → 2단계 Story → 3단계 Lobby → 4단계 전투 연동 수직 슬라이스`로 유지한다.
+- 장비 시스템, 복잡한 분기 스토리, 기존 인게임 말풍선 교체는 이 4단계 범위에 넣지 않는다.
+- Context는 참조만 보관하고 저장, 화면 연출, 흐름 정책은 각 책임 컴포넌트에 둔다.
+- Lobby, Story와 Battle은 씬 이름을 직접 판단해 서로 호출하지 않고 `CampaignFlowController`에 전환을 요청한다.
+- 저장 상태는 외부에서 직접 수정하지 않고 `CampaignSaveManager` 요청 메서드를 통해서만 바꾼다.
+
+## 1단계: 캠페인·Bootstrap·저장·로딩 기반
+
+### 상태
+
+- 구현 완료.
+- JSON 저장 파일 생성 플레이 확인 완료.
+
+### 목적
+
+- 게임 실행 시 한 번만 초기화되는 영속 AppRoot를 만든다.
+- 별도 Loading 씬 없이 모든 캠페인 씬 전환에서 공통 로딩 화면을 재사용한다.
+- `1-1`, `1-2` 형식의 선형 스테이지 정의와 최소 진행 상태를 저장한다.
+- Story, Lobby와 Battle이 공통으로 사용할 Context와 흐름 진입점을 제공한다.
+
+### 현재 구현 책임
+
+- `CampaignBootstrap`: 중복 AppRoot 제거, `DontDestroyOnLoad`, 저장과 흐름 초기화 순서 관리.
+- `CampaignContext`: `CampaignData`, `CampaignFlowController`, `CampaignSaveManager`, `SceneTransitionController` 참조 주머니.
+- `CampaignData`: 로비 씬 이름과 선형 스테이지 배열.
+- `StageDefinitionData`: 스테이지 ID, 챕터·스테이지 번호, 표시 이름, 전투 씬, 전투 후 스토리 유무.
+- `CampaignSaveManager`: JSON 생성·불러오기, 진행 상태 조회, 전투 클리어와 최종 완료 저장, 다음 스테이지 해금.
+- `CampaignFlowController`: 현재 캠페인 단계와 최초 Lobby 진입 관리.
+- `SceneTransitionController`: 영속 로딩 UI를 사용한 `LoadSceneAsync` 단일 씬 전환.
+- `LoadingScreenPresenter`: `CanvasGroup` 페이드, UI 입력 차단과 진행 바 갱신.
+- `BootstrapTest`: AppRoot와 LoadingCanvas의 실제 인스펙터 연결.
+- 테스트 캠페인 데이터: `1-1`, `1-2`; 현재 두 스테이지 모두 임시 전투 씬은 `BattleTest`.
+
+### 저장 규칙
+
+- 최초 저장은 첫 스테이지만 `Available`, 나머지는 `Locked`.
+- 전투 승리 직후 `BattleCleared`를 저장한다.
+- 전투 후 스토리 완료 또는 후일담 없는 전투 승리 시 `Completed`로 저장하고 다음 스테이지를 `Available`로 바꾼다.
+- 완료 스테이지 재실행은 저장 상태를 낮추지 않는다.
+- 기존 저장 뒤에 새 선형 스테이지가 추가되면 기존 진행을 유지하고 새 레코드만 붙인다.
+- 파일은 `Application.persistentDataPath/campaign-save.json`에 생성된다.
+
+### 확인된 것
+
+- 코드 빌드 경고 0개, 오류 0개.
+- Bootstrap 씬 직렬화 필수 참조와 fileID 정적 검사 통과.
+- 사용자가 Unity 실행 후 `campaign-save.json` 실제 생성을 확인했다.
+
+### 남은 1단계 플레이 확인
+
+- 로딩 페이드가 해상도별로 정상 표시되는지 확인한다.
+- `BootstrapTest → LobbyTest` 전환 중 중복 AppRoot나 콘솔 오류가 없는지 최종 확인한다.
+
+## 2단계: 비주얼 노벨식 Story 시스템
+
+### 상태
+
+- 다음 구현 대상.
+
+### 목적
+
+- 기존 `DialogueManager` 기반 인게임 말풍선과 완전히 분리된 메인 스토리 재생기를 만든다.
+- 유진과 금두꺼비의 대화, 다른 해결사 시점과 한양의 도시 묘사를 하나의 `StoryTest` 씬에서 데이터 기반으로 재생한다.
+- 일반 대화는 배경·스탠딩·하단 대화창으로, 핵심 장면은 선택적 만화 패널 일러스트로 보여준다.
+- 같은 Story 씬을 전투 전 스토리와 선택적 전투 후 스토리 양쪽에서 재사용한다.
+
+### 예정 데이터 책임
+
+- `StorySequenceData`: 스토리 ID, 표시 이름과 순서가 있는 Story 명령 목록.
+- Story 명령 또는 Step 데이터: 화자, 대사, 배경 변경, 스탠딩 등장·퇴장·표정, 만화 패널, 페이드와 대기 같은 재생 단위.
+- 캐릭터·배경·만화 일러스트는 씬에 직접 박지 않고 데이터에서 참조한다.
+- 처음에는 선형 명령만 지원하며 선택지와 분기 그래프는 만들지 않는다.
+
+### 예정 런타임 책임
+
+- `StoryContext`: Story 씬의 재생기, 화면 Presenter와 입력 참조만 모은다.
+- Story 재생기: 명령 인덱스, 현재 재생 상태, 다음 진행, 즉시 표시와 종료 통지를 관리한다.
+- 대화 Presenter: 화자명, 본문, 타이핑과 현재 줄 즉시 완성을 담당한다.
+- 스탠딩 Presenter: 좌·중앙·우 슬롯의 캐릭터, 표정, 강조와 등장·퇴장 연출을 담당한다.
+- 배경 Presenter: 배경 교체와 기본 페이드를 담당한다.
+- 만화 패널 Presenter: 소수의 레이아웃 프리셋과 패널별 이미지·등장 순서를 담당한다.
+- Story 입력: 클릭·확정으로 다음 진행, 타이핑 중이면 현재 줄 즉시 완성, 이미 본 Story 스킵 진입점을 제공한다.
+- Story 종료 시 직접 다음 씬 이름을 판단하지 않고 `CampaignFlowController`에 완료 결과를 돌려준다.
+
+### 1차 구현 범위
+
+- 화자명, 대사 본문, 타이핑과 클릭 진행.
+- 배경 한 장 교체.
+- 좌·중앙·우 스탠딩 배치, 표정 교체, 등장과 퇴장.
+- 화면 페이드와 짧은 대기.
+- 만화 패널 레이아웃 2~3종.
+- 전투 전/후 Story 요청 구분과 종료 콜백.
+
+### 후순위
+
+- 자동 진행, 대사 로그, 음성 재생과 세밀한 카메라 흔들림.
+- 복잡한 분기, 선택지와 다중 세이브 슬롯.
+
+### 완료 기준
+
+- `StoryTest`에서 샘플 대사 시퀀스가 처음부터 끝까지 재생된다.
+- 배경, 스탠딩, 대사창과 만화 패널이 데이터 명령으로 바뀐다.
+- 스킵 또는 정상 종료가 중복 호출 없이 캠페인 흐름에 완료를 알린다.
+- 기존 인게임 말풍선 코드와 데이터에는 영향을 주지 않는다.
+
+## 3단계: 선형 챕터·스테이지 Lobby
+
+### 상태
+
+- 2단계 이후 구현.
+
+### 목적
+
+- `LobbyTest`에서 `CampaignData`와 실제 저장 상태를 읽어 `1-1`, `1-2`를 표시한다.
+- 플레이어가 개방된 스테이지를 선택하고 해당 Story·Battle 흐름을 시작하게 한다.
+- 장비, 인벤토리와 파티 편성은 만들지 않고 스테이지 선택과 진행 확인에 집중한다.
+
+### 예정 책임
+
+- Lobby Context: Lobby 화면 Controller와 필수 View 참조 주머니.
+- Lobby Controller: 캠페인 데이터 순회, 챕터 분류, 저장 상태 조회, 현재 선택과 시작 요청 관리.
+- Stage Button View: 스테이지 번호·이름·상태 표시, 잠금 입력 차단과 선택 강조.
+- Stage Detail View: 선택한 스테이지의 제목과 시작 버튼 표시.
+- Lobby는 저장 상태를 직접 수정하지 않고 `CampaignSaveManager` 조회 API만 사용한다.
+- 스테이지 시작은 씬을 직접 부르지 않고 `CampaignFlowController`에 요청한다.
+
+### 상태별 동작
+
+- `Locked`: 잠금 표시, 선택과 시작 불가.
+- `Available`: 선택 가능, 전투 전 Story부터 시작.
+- `BattleCleared`: 전투를 다시 요구하지 않고 남아 있는 전투 후 Story를 이어서 시작.
+- `Completed`: 완료 표시와 재실행 허용. 재실행해도 저장 상태는 낮추지 않는다.
+
+### 완료 기준
+
+- `CampaignData`에 스테이지를 추가하면 하드코딩 없이 Lobby 목록에 나타난다.
+- 최초 저장에서는 `1-1`만 선택 가능하고 `1-2`는 잠겨 있다.
+- 저장 상태가 바뀌면 Lobby 복귀 시 표시와 입력 가능 여부가 갱신된다.
+- 선택한 스테이지 ID가 캠페인 흐름에 정확히 전달된다.
+
+## 4단계: Battle 연동과 1-1 수직 슬라이스
+
+### 상태
+
+- 2·3단계 이후 구현.
+
+### 목적
+
+- Lobby, Story, Battle, 저장과 다시 Lobby로 돌아오는 실제 게임 루프를 연결한다.
+- 기존 `BattleTest`의 전투 뼈대를 캠페인 진행에 연결하되 전투 내부 규칙은 대규모로 바꾸지 않는다.
+- 첫 목표는 `1-1 선택 → 전투 전 Story → BattleTest → 전투 후 Story → 1-2 해금 → Lobby`다.
+
+### 예정 전체 흐름
+
+1. Lobby에서 `Available`인 `1-1`을 선택한다.
+2. Campaign 흐름이 활성 스테이지와 전투 전 Story 요청을 보관한다.
+3. `StoryTest`가 전투 전 Story를 재생하고 완료를 알린다.
+4. Campaign 흐름이 `StageDefinitionData.BattleSceneName`의 전투 씬을 연다.
+5. `StageStateManager`가 `Cleared`가 되면 전투 결과 Bridge가 캠페인에 승리를 알린다.
+6. 기존 `ActionPresentationQueue`의 결과 연출이 끝난 뒤 씬 전환을 시작한다.
+7. `CampaignSaveManager.TryMarkBattleCleared()`로 전투 승리를 즉시 저장한다.
+8. 후일담이 있으면 `StoryTest`에서 전투 후 Story를 재생한다.
+9. 후일담 완료 시 `TryCompleteStage()`로 `1-1`을 완료하고 `1-2`를 개방한다.
+10. 후일담이 없으면 전투 승리 직후 바로 최종 완료한다.
+11. Lobby로 돌아와 새 저장 상태를 다시 표시한다.
+
+### 예정 연결 책임
+
+- `CampaignFlowController`에 활성 스테이지, Story 종류, Story 종료 후 목적지와 전투 진입 API를 추가한다.
+- 전투 씬에 캠페인 결과 Bridge를 두어 `StageStateManager`와 캠페인 흐름만 연결한다.
+- 결과 Bridge는 저장 파일을 직접 수정하지 않고 `CampaignSaveManager` 요청 메서드를 사용한다.
+- 전투 결과 연출이 끝나기 전에 씬을 바꾸지 않도록 `ActionPresentationQueue` 완료 시점과 조율한다.
+- 전투 실패 시 저장 상태를 올리지 않고 재도전 또는 Lobby 복귀 진입점을 제공한다.
+
+### 반드시 확인할 예외
+
+- 전투 후 Story 도중 종료해도 `BattleCleared`가 남아 전투를 다시 요구하지 않는다.
+- 후일담 없는 스테이지는 승리 직후 `Completed`와 다음 해금이 함께 저장된다.
+- 완료 스테이지 재실행이 다음 스테이지 잠금을 되돌리거나 진행 상태를 낮추지 않는다.
+- 로딩 중 중복 버튼 입력과 중복 씬 전환을 차단한다.
+- Bootstrap 없이 `LobbyTest`, `StoryTest`, `BattleTest`를 직접 실행했을 때 필수 Campaign Context 누락을 명확한 한국어 오류로 알린다.
+
+### 완료 기준
+
+- 새 저장 기준으로 `1-1` 전체 루프가 한 번에 정상 동작한다.
+- `1-1` 완료 뒤 JSON에 `1-1 = Completed`, `1-2 = Available`이 기록된다.
+- 게임을 종료하고 다시 실행해도 Lobby가 같은 진행 상태를 복원한다.
+- 전투 후 Story 유무 양쪽 경로를 모두 확인한다.
+
+## 다음 세션의 정확한 시작 지점
+
+1. `Assets/Script/Campaign`의 현재 1단계 코드를 다시 읽고 책임 경계를 유지한다.
+2. `StoryTest` 현재 씬 구성과 기존 `Assets/Script/Dialogue` 말풍선 코드를 읽되 서로 결합하지 않는다.
+3. 2단계 Story 명령 종류와 `StorySequenceData` 구조를 먼저 확정한다.
+4. 데이터와 Runner를 구현한 뒤 `StoryTest` UI와 인스펙터를 연결한다.
+5. 2단계 완료 전에는 Lobby나 Battle 연동을 섞어 구현하지 않는다.
+
+## 상태
+
+- 이번 기록은 진행상황 확인과 후속 계획 문서화이며 게임 코드와 인스펙터는 수정하지 않았다.

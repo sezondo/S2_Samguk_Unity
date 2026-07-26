@@ -1,16 +1,16 @@
 # S2-T 현재 구현 구조
 
-- 최신 기준: 2026-07-24
+- 최신 기준: 2026-07-26
 - 기준 브랜치: `main`
 - Unity 버전: `6000.0.64f1`
-- 기준 테스트 씬: `Assets/Scenes/Tset.unity`
+- 기준 테스트 씬: `Assets/Scenes/Test/BootstrapTest.unity`, `Assets/Scenes/Test/BattleTest.unity`
 
 이 문서는 S2-T의 **현재 실제 코드와 씬 구조만** 설명하는 최신 스냅샷이다.
 날짜별 작업 과정, 이전 설계, 제거된 구조와 테스트 이력은 `S2-T 작업일지.md`에서 관리한다.
 
 ## 1. 프로젝트 현재 방향
 
-S2-T는 사이버 조선 세계관을 사용하는 보드게임식 턴제 잠입 퍼즐·소규모 전술 게임이다.
+S2-T는 사이버 한국 삼국시대 세계관을 사용하는 보드게임식 턴제 잠입 퍼즐·소규모 전술 게임이다.
 
 현재 플레이 가능한 핵심 루프는 다음과 같다.
 
@@ -21,8 +21,12 @@ S2-T는 사이버 조선 세계관을 사용하는 보드게임식 턴제 잠입
 5. 적 턴에는 경계 상태의 적이 플레이어를 공격하거나 유리한 엄폐 위치로 이동한다.
 6. 목표 칸에 살아 있는 플레이어 조작 유닛이 도착하면 스테이지가 클리어된다.
 
-현재 작업 방향은 `Tset` 테스트 씬에서 튜토리얼 1스테이지의 핵심 진행을 먼저 완성한 뒤 실제 튜토리얼 씬으로 옮기는 것이다.
-해킹 터미널과 보안문의 프리팹화를 마쳤으며, 다음 제작 단위는 이 오브젝트를 사용하는 튜토리얼 진행 순서와 안내 구조 설계다.
+현재 전투 플레이는 이동, AP, 잠입, 발각, 적 턴, 전투, 해킹, 목표 달성까지 핵심 뼈대가 연결된 상태로 판단한다.
+다음 개발 단계는 전투 행동을 추가하기보다 선형 챕터·스테이지 선택 로비와 비주얼 노벨식 스토리 전개, 저장·불러오기 흐름을 만드는 것이다.
+
+기본 캠페인 흐름은 `로비의 스테이지 선택 → 전투 전 스토리 → 전투 씬 → 선택적 전투 후 스토리 → 진행 저장 → 로비 복귀`다.
+챕터와 스테이지는 `1-1`, `1-2` 형식으로 구분하며, 앞 숫자는 챕터를 뜻한다.
+장비 시스템은 현재 범위에 넣지 않고, 폭발 가능한 화염병, 해킹 시 아군이 되는 로봇, 동료 NPC처럼 스테이지마다 배치되는 오브젝트와 참여 유닛으로 전술 차이를 만든다.
 
 ## 2. 핵심 구조 원칙
 
@@ -70,12 +74,45 @@ S2-T는 사이버 조선 세계관을 사용하는 보드게임식 턴제 잠입
 - `Assets/Script/Common`: 공용 VFX 풀.
 - `Assets/Script/Camera`: 테스트 카메라 이동.
 - `Assets/Script/Debug`: 런타임 정보와 편집용 점유 칸 표시.
+- `Assets/Script/Campaign`: 영속 AppRoot, 캠페인 데이터·저장 상태, 흐름 단계와 비동기 씬 전환.
 
-## 4. Tset 씬 구성
+## 4. 테스트 씬과 캠페인 기반
 
-### 씬 단위 시스템
+### BootstrapTest
 
-`Manager` 오브젝트에는 다음 씬 단위 컴포넌트가 연결되어 있다.
+`BootstrapTest`는 Build Settings에서 첫 번째로 실행되는 초기화 씬이다.
+
+```text
+AppRoot
+└─ LoadingCanvas
+   └─ LoadingBackground
+      └─ LoadingProgress
+         └─ FillArea
+            └─ Fill
+```
+
+- `CampaignBootstrap`은 중복 AppRoot를 제거하고 현재 AppRoot를 `DontDestroyOnLoad`로 영속화한다.
+- `CampaignContext`는 `CampaignData`, `CampaignFlowController`, `CampaignSaveManager`, `SceneTransitionController` 참조만 모은다.
+- `CampaignSaveManager`가 저장 파일을 불러오거나 최초 저장 데이터를 만든 뒤 `CampaignFlowController`가 `LobbyTest` 진입을 요청한다.
+- `SceneTransitionController`는 별도 Loading 씬 없이 영속 `LoadingCanvas`를 페이드 인하고 `LoadSceneAsync`로 대상 씬을 준비한 뒤 활성화한다.
+- `LoadingScreenPresenter`는 `CanvasGroup` 입력 차단과 진행 바 표시만 담당한다.
+- `BootstrapTest`의 카메라와 조명은 로비 진입 때 제거되며 AppRoot와 LoadingCanvas만 다음 씬에 남는다.
+
+현재 캠페인 데이터는 `Assets/Data/Campaign`에 있다.
+
+- `CampaignData`: 로비 씬 이름과 선형 스테이지 순서.
+- `Stage_1-1`, `Stage_1-2`: 스테이지 ID, 챕터·스테이지 번호, 표시 이름, 전투 씬과 전투 후 스토리 유무.
+- 두 테스트 스테이지의 임시 전투 씬은 모두 `BattleTest`다.
+
+진행 상태는 `Locked`, `Available`, `BattleCleared`, `Completed` 네 단계다.
+최초 저장은 `1-1`만 `Available`로 만들고 나머지는 잠근다.
+전투 승리는 `BattleCleared`, 후일담 완료 또는 후일담이 없는 전투 승리는 `Completed`로 저장하며 다음 스테이지를 `Available`로 개방한다.
+기존 저장 뒤에 새 선형 스테이지가 추가되면 기존 진행을 유지하면서 새 레코드만 이어 붙인다.
+저장 파일은 `Application.persistentDataPath/campaign-save.json`에 기록한다.
+
+### BattleTest 씬 단위 시스템
+
+`BattleTest`의 `Manager` 오브젝트에는 다음 씬 단위 컴포넌트가 연결되어 있다.
 
 - `GridManager`
 - `TurnManager`
@@ -155,7 +192,7 @@ MapVisualGrid
 - `RegisterSightBlocker()`와 `UnregisterSightBlocker()`는 닫힌 문처럼 런타임에 바뀌는 시야 차단물을 관리하고 변경 이벤트를 발생시킨다.
 - 플레이어·NPC·적을 포함한 일반 점유 Actor는 동적 시야 차단물로 등록하지 않는다.
 
-현재 `Tset` 설정은 `16 x 16`, 셀 크기 `1`, 원점 `(0, 0, 0)`이다.
+현재 `BattleTest` 설정은 `16 x 16`, 셀 크기 `1`, 원점 `(0, 0, 0)`이다.
 
 ### GridActor
 
@@ -189,7 +226,7 @@ MapVisualGrid
 - 플레이어 `ActionPoint`는 플레이어 턴 시작 시 `ControllableUnitData.StartTurnActionPoint`로 보충된다.
 - 적 `EnemyActionPoint`는 적 턴에 `EnemyData.TurnActionPoint`로 보충된다.
 - `TurnManager`는 `StageStateManager`가 `Playing`일 때만 새 턴 시작과 현재 턴 종료를 허용한다.
-- 현재 `Tset`에서는 Space 키로 턴 종료를 시험할 수 있다.
+- 현재 `BattleTest`에서는 Space 키로 턴 종료를 시험할 수 있다.
 
 ### 공통 전술 유닛
 
@@ -548,7 +585,7 @@ SecurityDoor01
 - Z 위치는 유지한다.
 - 연출 큐 재생 중에는 이동을 막을 수 있다.
 
-현재 `Tset` 값은 이동 속도 `8`, 최대 이동 거리 `(10, 10)`, 연출 중 잠금 활성화다.
+현재 `BattleTest` 값은 이동 속도 `8`, 최대 이동 거리 `(10, 10)`, 연출 중 잠금 활성화다.
 
 ### 대사
 
@@ -559,6 +596,11 @@ SecurityDoor01
 - `DialogueSpeaker`, `DialogueBubblePresenter`, `SpeechBubbleView`: 화자와 말풍선 표시.
 
 현재 전술 행동 흐름과 튜토리얼 진행을 묶는 전용 대사 트리거는 아직 없다.
+
+현재 말풍선 대사 시스템은 전투 씬 안의 인게임 대사용으로 유지한다.
+메인 스토리는 별도 `Story` 씬에서 배경, 캐릭터 스탠딩, 하단 대화창을 사용하는 비주얼 노벨 방식으로 제작할 예정이다.
+유진과 금두꺼비의 대화를 중심으로 진행하되 다른 해결사, 의원 측 인물, 경비대와 용병 시점을 통해 한양의 삶과 세력을 보여준다.
+중요 장면은 젠레스 존 제로의 컷씬처럼 만화 패널 형태의 일러스트 연출을 선택적으로 사용한다.
 
 ### VFX
 
@@ -602,9 +644,13 @@ SecurityDoor01
 
 ## 16. 현재 검증 상태
 
-현재 코드와 `Tset` 씬에서 다음 항목을 확인했다.
+현재 코드와 테스트 씬에서 다음 항목을 확인했다.
 
-- `dotnet build Assembly-CSharp.csproj --no-restore`: 경고 0개, 오류 0개.
+- `dotnet build S2.slnx --no-restore`: 경고 0개, 오류 0개.
+- `BootstrapTest`의 AppRoot, 캠페인 데이터, 저장·흐름·씬 전환 컴포넌트와 LoadingCanvas 필수 참조 연결.
+- `BootstrapTest` 씬 YAML의 로컬 fileID 누락·중복 없음.
+- `BootstrapTest → LobbyTest` 비동기 진입 코드와 Build Settings 활성 씬 이름의 정적 검증.
+- 사용자가 Unity 실행 후 `Application.persistentDataPath` 아래에 `campaign-save.json`이 실제 생성되는 것을 확인했다.
 - 다중 플레이어 유닛 직접 선택과 AP 소진 자동 전환.
 - 플레이어 이동, 범위·경로 표시, 적 시야 발각과 경계 반응.
 - 적 턴 공격·엄폐 이동.
@@ -632,19 +678,25 @@ SecurityDoor01
 - 선택 표시는 런타임 LineRenderer 임시 링이다.
 - 스테이지 실패 조건과 최종 클리어·실패 UI가 없다.
 - `HeavyGun`은 데이터 타입만 있고 행동 구현이 없다.
+- 캠페인 데이터와 저장·불러오기 기반은 있으나 `LobbyTest`에는 아직 스테이지 선택 UI가 없다.
+- 비주얼 노벨식 메인 스토리 씬과 전투 전·후 스토리 연결 구조가 없다.
+- 만화 패널 컷씬 연출 구조가 없다.
 
 ## 18. 다음 작업
 
-1. 테스트 씬의 터미널 해킹과 문 통과 흐름을 기준으로 튜토리얼 진행 순서를 설계한다.
-2. 튜토리얼 트리거, 안내 대사·UI, 행동 제한 규칙을 정한다.
-3. 테스트 씬에서 검증한 구성을 실제 튜토리얼 씬으로 옮긴다.
-4. 열린 문 아트·애니메이션과 검 경로·공격 VFX는 Presenter 계층에 추가한다.
-5. 캐릭터·이펙트 흐름이 안정된 뒤 카메라 줌·컷 연출을 추가한다.
+캠페인 1~4단계의 상세 목적, 예정 책임, 상태별 흐름, 예외 처리와 완료 기준은 `S2-T 작업일지.md`의 `2026-07-26 캠페인 1~4단계 인수인계 문서화` 항목을 기준으로 한다.
+
+1. 기존 말풍선과 분리된 비주얼 노벨식 `StoryTest` 대사 진행·스탠딩·배경 연출 구조를 구현한다.
+2. 만화 패널 컷씬에 사용할 소수의 레이아웃 프리셋과 재생 명령을 설계한다.
+3. `LobbyTest`에 `CampaignData`와 저장 상태를 읽는 챕터·스테이지 선택 UI를 구현한다.
+4. `BattleTest`의 클리어 상태를 캠페인 저장과 연결한다.
+5. `1-1 선택 → 전투 전 스토리 → 전투 → 전투 후 스토리 → 1-2 해금` 수직 슬라이스를 완성한다.
+6. 전투 연출과 VFX 보강은 캠페인 기본 흐름이 연결된 뒤 스테이지 제작과 함께 진행한다.
 
 ## 19. 문서 유지 규칙
 
 - 이 문서에는 현재 실제로 존재하는 구조만 기록한다.
 - 날짜별 구현 과정, 실패한 시도, 제거한 구조는 `S2-T 작업일지.md`에만 남긴다.
 - 클래스가 제거되거나 책임이 바뀌면 과거 설명을 덧붙이지 않고 해당 현재 항목을 직접 갱신한다.
-- 씬 설정을 바꾸면 코드 설명뿐 아니라 `Tset 씬 구성`, `현재 테스트 데이터`, `현재 검증 상태`도 함께 갱신한다.
+- 씬 설정을 바꾸면 코드 설명뿐 아니라 `테스트 씬과 캠페인 기반`, `현재 테스트 데이터`, `현재 검증 상태`도 함께 갱신한다.
 - 다음 작업을 완료하면 `현재 한계`와 `다음 작업`에서 완료 항목을 제거하거나 새 상태로 교체한다.
