@@ -1918,7 +1918,7 @@
 - `SceneTransitionController`: 영속 로딩 UI를 사용한 `LoadSceneAsync` 단일 씬 전환.
 - `LoadingScreenPresenter`: `CanvasGroup` 페이드, UI 입력 차단과 진행 바 갱신.
 - `BootstrapTest`: AppRoot와 LoadingCanvas의 실제 인스펙터 연결.
-- 테스트 캠페인 데이터: `1-1`, `1-2`; 현재 두 스테이지 모두 임시 전투 씬은 `BattleTest`.
+- 테스트 캠페인 데이터: `1-1 → BattleTest01`, `1-2 → BattleTest02`.
 
 ### 저장 규칙
 
@@ -2036,8 +2036,8 @@
 ### 목적
 
 - Lobby, Story, Battle, 저장과 다시 Lobby로 돌아오는 실제 게임 루프를 연결한다.
-- 기존 `BattleTest`의 전투 뼈대를 캠페인 진행에 연결하되 전투 내부 규칙은 대규모로 바꾸지 않는다.
-- 첫 목표는 `1-1 선택 → 전투 전 Story → BattleTest → 전투 후 Story → 1-2 해금 → Lobby`다.
+- 기존 `BattleTest01`, `BattleTest02`의 전투 뼈대를 캠페인 진행에 연결하되 전투 내부 규칙은 대규모로 바꾸지 않는다.
+- 첫 목표는 `1-1 선택 → 전투 전 Story → BattleTest01 → 전투 후 Story → 1-2 해금 → Lobby`다.
 
 ### 예정 전체 흐름
 
@@ -2067,7 +2067,7 @@
 - 후일담 없는 스테이지는 승리 직후 `Completed`와 다음 해금이 함께 저장된다.
 - 완료 스테이지 재실행이 다음 스테이지 잠금을 되돌리거나 진행 상태를 낮추지 않는다.
 - 로딩 중 중복 버튼 입력과 중복 씬 전환을 차단한다.
-- Bootstrap 없이 `LobbyTest`, `StoryTest`, `BattleTest`를 직접 실행했을 때 필수 Campaign Context 누락을 명확한 한국어 오류로 알린다.
+- Bootstrap 없이 `LobbyTest`, `StoryTest`, `BattleTest01`, `BattleTest02`를 직접 실행했을 때 필수 Campaign Context 누락을 명확한 한국어 오류로 알린다.
 
 ### 완료 기준
 
@@ -2079,7 +2079,7 @@
 ## 다음 세션의 정확한 시작 지점
 
 1. `Assets/Script/Campaign`의 현재 1단계 코드를 다시 읽고 책임 경계를 유지한다.
-2. `StoryTest` 현재 씬 구성과 기존 `Assets/Script/Dialogue` 말풍선 코드를 읽되 서로 결합하지 않는다.
+2. `StoryTest` 현재 씬 구성과 기존 `Assets/Script/Battle/Dialogue` 말풍선 코드를 읽되 서로 결합하지 않는다.
 3. 2단계 Story 명령 종류와 `StorySequenceData` 구조를 먼저 확정한다.
 4. 데이터와 Runner를 구현한 뒤 `StoryTest` UI와 인스펙터를 연결한다.
 5. 2단계 완료 전에는 Lobby나 Battle 연동을 섞어 구현하지 않는다.
@@ -2087,3 +2087,51 @@
 ## 상태
 
 - 이번 기록은 진행상황 확인과 후속 계획 문서화이며 게임 코드와 인스펙터는 수정하지 않았다.
+
+## 2026-07-26 기능 기준 Script 폴더 재구성
+
+## 목적
+
+- 기능과 책임이 섞여 있던 `Assets/Script` 최상위 폴더를 큰 기능 영역 기준으로 정리한다.
+- 전투 코드는 `Battle`, 전역 캠페인 흐름은 `Campaign` 아래에 모은다.
+- 데이터, 논리, 연출, UI, 디버그와 인터페이스의 소유 위치를 폴더만 보고 파악할 수 있게 한다.
+- 인터페이스는 전역 한 폴더에 섞지 않고 해당 책임 영역 내부의 `Interfaces`에 둔다.
+
+## 변경
+
+- `Assets/Script` 최상위 폴더를 `Battle`, `Campaign` 두 영역으로 정리했다.
+- Campaign을 `Data`, `Flow`, `Save`, `Loading`으로 분리했다.
+- 기존 Grid, Turn, Unit, Player, Enemy, Combat, Stage와 TurnAction을 `Battle/Logic` 아래로 이동했다.
+- 기존 Presentation을 `Battle/Presentation` 아래로 이동하고 `Events`, `Interfaces`, `Presenter`, `Visual`, `Data`, `Vfx`, `Debug`로 분류했다.
+- 기존 인게임 말풍선 시스템을 `Battle/Dialogue` 아래 `Data`, `Runtime`, `UI`로 분리했다.
+- 전투 카메라와 디버그 코드를 `Battle/Camera`, `Battle/Debug`로 이동했다.
+- 중복 의미였던 `DataScript/Data` 폴더를 제거하고 각 데이터를 Unit, Enemy, Combat, Dialogue 소유 폴더로 이동했다.
+- `GridPlayerDebugMover`를 실제 Grid 논리 폴더에서 Battle Debug 폴더로 이동했다.
+
+## 인터페이스 위치
+
+- `ITacticalUnit` → `Battle/Logic/Unit/Interfaces`.
+- `IDamageable`, `IHackable` → `Battle/Logic/Combat/Interfaces`.
+- `IActionLogicEvent`, `IActionLogicEventHandler` → `Battle/Logic/Actions/Interfaces`.
+- `IPresentationEventHandler` → `Battle/Presentation/Interfaces`.
+
+## 보존 원칙
+
+- 코드 내용과 클래스 책임은 변경하지 않았다.
+- namespace도 이번 이동에서는 추가하지 않았다.
+- 모든 `.cs`와 대응 `.meta`를 함께 이동해 기존 Script GUID와 씬·프리팹 연결을 보존했다.
+- 작업 중 확인된 사용자의 `BattleTest01`, `BattleTest02`, Stage 데이터와 Build Settings 변경은 수정하지 않고 유지했다.
+
+## 검증
+
+- 이동 전후 C# 파일 수가 108개로 동일하다.
+- 108개 C# 파일 모두 대응 `.meta`가 있으며 Script GUID 중복이 없다.
+- HEAD 기준 C# 108개의 정규화된 코드 내용과 Script GUID가 모두 동일함을 확인했다.
+- 새 경로를 임시 반영한 Unity 생성 프로젝트로 `dotnet build S2.slnx --no-restore`를 실행했다.
+- 빌드 결과 경고 0개, 오류 0개.
+- 활성 Build Settings 씬 `BootstrapTest`, `LobbyTest`, `StoryTest`, `BattleTest01`, `BattleTest02`의 스크립트 GUID 참조가 모두 해결되는 것을 확인했다.
+
+## 다음
+
+- Unity Editor가 새 폴더를 import한 뒤 Console의 Missing Script와 컴파일 오류가 없는지 확인한다.
+- 이후 Story 시스템은 전투 말풍선과 분리된 새 최상위 `Assets/Script/Story` 기능 폴더에서 시작한다.
