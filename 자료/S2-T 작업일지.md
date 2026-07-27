@@ -2135,3 +2135,99 @@
 
 - Unity Editor가 새 폴더를 import한 뒤 Console의 Missing Script와 컴파일 오류가 없는지 확인한다.
 - 이후 Story 시스템은 전투 말풍선과 분리된 새 최상위 `Assets/Script/Story` 기능 폴더에서 시작한다.
+
+## 2026-07-27 캠페인 2단계 선형 Story 시스템 구현
+
+## 목적
+
+- 전투 말풍선과 분리된 비주얼 노벨식 메인 Story 재생 기반을 만든다.
+- 선택지나 분기 없이 `StorySequenceData`에 기록된 명령을 배열 순서대로 실행한다.
+- 캠페인 3·4단계와 섞지 않고 독립 `StoryTest`에서 대사와 화면 연출을 먼저 검증할 수 있게 한다.
+
+## 구현
+
+- `Assets/Script/Story`를 `Data`, `Runtime`, `Input`, `Presentation`, `Debug` 책임으로 구성했다.
+- `StorySequenceData`와 `StoryCommandData`에 대사, 배경 변경, 스탠딩 표시·숨김·표정·초점, 만화 패널 표시·숨김, 페이드와 시간 대기 명령을 정의했다.
+- `StoryRunner`가 명령을 순서대로 실행하고 대사·만화 패널 입력 대기와 시간 기반 명령 대기를 구분하도록 구현했다.
+- 재생 완료 이벤트는 정상 완료와 건너뛰기 완료를 구분하며 한 재생당 한 번만 발생한다.
+- `StoryContext`는 Runner, 입력과 Presenter의 명시적 참조만 보관하며 런타임 `GetComponent<T>()` 보정은 사용하지 않는다.
+- 필수 참조나 명령 데이터가 누락되면 한국어 `Debug.LogError`를 남기고 재생 진입을 중단한다.
+- 대사 Presenter는 프로젝트의 한국어 TMP 원본 폰트를 명시적으로 받아 동적 폰트를 만들고, 시간 배율에 영향받지 않는 타이핑을 제공한다.
+- 좌클릭·Enter·Space는 대사 완성 또는 다음 진행, Escape는 호출자가 허용한 경우에만 건너뛰기로 동작한다.
+- 만화 패널은 전체 화면, 세로 2분할, 왼쪽 큰 패널과 오른쪽 2패널의 세 고정 레이아웃을 제공한다.
+
+## StoryTest 연결
+
+- `Assets/Scenes/Test/StoryTest.unity`에 `StoryRoot`와 `StoryCanvas`를 구성했다.
+- 배경, 좌·중앙·우 스탠딩, 하단 대화창, 만화 패널 3종과 전체 화면 페이드 오버레이를 명시적으로 연결했다.
+- `Assets/Data/Story/Test/StorySequenceDataTest.asset`에 전체 명령 종류와 만화 패널 세 레이아웃을 통과하는 27개 선형 샘플 명령을 구성했다.
+- `StoryTestLauncher`는 독립 실행 시 샘플을 자동 재생하고 완료 사유를 한국어 로그로 알린다.
+- 현재 샘플 이미지는 기존 테스트 리소스를 재사용한 임시 시각 자료이며 최종 시나리오 아트가 아니다.
+
+## 검증
+
+- Story 런타임과 Editor 씬 생성·검증 도구를 포함한 C# 컴파일 결과 경고 0개, 오류 0개.
+- Unity 배치 검증에서 `StoryTest`의 Missing Script, 필수 컴포넌트 참조, 샘플 시퀀스 참조와 명령 데이터가 모두 유효함을 확인했다.
+- Story 런타임 코드에 같은 루트 참조를 보정하는 `GetComponent<T>()`, 오브젝트 전역 탐색과 씬 전환 의존성이 없음을 확인했다.
+- 선택지·분기용 명령이나 상태를 추가하지 않았으며 선형 재생 구조를 유지했다.
+
+## 현재 경계
+
+- 이번 단계에서는 `LobbyTest`, `CampaignFlowController`, `StageDefinitionData`, Battle 결과와 연결하지 않았다.
+- 이미 본 Story 기록과 건너뛰기 정책은 저장 데이터에 아직 추가하지 않았다. 현재 건너뛰기 허용 여부는 `StoryRunner.Play()` 호출자가 전달한다.
+- 원본 프로젝트 Unity Editor에서 실제 화면 비율, 입력 감각과 연출 속도를 확인하는 최종 플레이 모드 점검은 남아 있다.
+
+## 다음
+
+- 캠페인 3단계에서 `CampaignData`와 저장 상태를 표시하는 선형 Lobby UI를 구현한다.
+- 캠페인 4단계에서 Stage의 전투 전·후 Story 요청, Battle 결과 저장과 Lobby 복귀를 연결한다.
+
+## 2026-07-27 사용자 테스트 후 Story 만화 표시 단순화
+
+## 확인
+
+- 사용자가 현재 `StoryTest` 코드의 Unity 플레이 모드 테스트를 완료했다.
+- Story에서 만화 컷 위치와 분할 레이아웃을 조립할 필요가 없으며, 외부에서 완성한 만화 이미지 한 장을 그대로 표시하는 방향으로 확정했다.
+
+## 변경
+
+- `StoryComicLayoutType`과 세 가지 고정 만화 레이아웃 분기 코드를 제거했다.
+- `ShowComicPanel` 명령은 기존 직렬화 연결을 보존하면서 이미지 목록의 0번 Sprite 한 장만 사용한다.
+- `StoryComicPanelPresenter`는 기존 전체 화면 루트와 Image만 사용해 완성 만화 이미지를 표시하고 입력을 기다린다.
+- 자동 씬·샘플 데이터 생성과 Inspector 참조 연결을 수행하던 `StoryTestSceneBuilder`를 제거했다.
+- `StoryTestLauncher.ConfigureForTest()`를 제거했다.
+- `StoryTest` 씬의 Hierarchy, Inspector 연결과 샘플 `StorySequenceDataTest` 직렬화 값은 수정하지 않았다.
+- 수정 후 `dotnet build S2.slnx --no-restore` 결과 경고 0개, 오류 0개를 확인했다.
+
+## 규칙 보강
+
+- 사용자가 해당 작업을 명시적으로 허가했을 때만 Codex가 Unity Inspector 직렬화 값·컴포넌트 연결과 Hierarchy 구성을 직접 수정하도록 `AGENTS.md`에 명시했다.
+- 씬·프리팹·ScriptableObject 자동 생성과 참조 자동 연결 Editor 도구도 사용자에게 명시적 허가를 받은 경우에만 만들거나 실행한다.
+
+## 2026-07-27 개발 세션 마감
+
+## 오늘 완료 범위
+
+- 캠페인 1단계인 Campaign 데이터, 진행 저장, Bootstrap과 비동기 로딩 기반을 완료 상태로 유지했다.
+- 캠페인 2단계인 분기 없는 선형 Story 시스템 구현을 완료했다.
+- 대사, 배경, 스탠딩, 표정·초점, 페이드, 대기, 완성 만화 이미지 표시와 건너뛰기 완료 흐름을 연결했다.
+- 사용자가 Unity 플레이 모드에서 `StoryTest` 재생 테스트를 완료했다.
+- 만화 연출은 외부에서 컷 배치까지 완성한 이미지 한 장을 전체 화면에 표시하는 구조로 최종 정리했다.
+- `StoryTestSceneBuilder`, `ConfigureForTest()`와 코드 내부의 만화 분할 레이아웃 구조를 제거했다.
+- 수정 후 C# 빌드 결과 경고 0개, 오류 0개를 확인했다.
+- Inspector와 Hierarchy는 사용자에게 명시적 허가를 받은 경우에만 수정한다는 작업 규칙을 확정했다.
+
+## 현재 캠페인 진행 상태
+
+- 1단계 Campaign 기반: 완료.
+- 2단계 선형 Story: 완료 및 사용자 테스트 완료.
+- 3단계 Lobby: 다음 개발 세션 작업.
+- 4단계 Story·Battle·저장 연동과 `1-1` 수직 슬라이스: 3단계 이후 대기.
+
+## 다음 개발 세션 시작 지점
+
+1. `Assets/Script/Campaign/Data`, `Flow`, `Save`의 현재 API와 `LobbyTest` 구성을 다시 읽는다.
+2. Inspector와 Hierarchy는 읽기만 하며, 수정이 필요하면 작업 전에 사용자에게 명시적으로 허가를 받는다.
+3. `CampaignData`의 선형 스테이지 순서와 저장 상태 `Locked`, `Available`, `BattleCleared`, `Completed`를 Lobby 표시 모델로 연결한다.
+4. 잠긴 스테이지는 선택할 수 없고, 선택 가능한 스테이지만 캠페인 흐름에 전달하는 Lobby 코드 책임을 먼저 구현한다.
+5. 3단계에서는 Story·Battle 씬 전환과 결과 저장 Bridge를 섞지 않고 Lobby 자체 완료 기준까지만 작업한다.

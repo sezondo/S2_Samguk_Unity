@@ -1,0 +1,370 @@
+S2-T 캠페인 시스템 인수인계
+
+1. 현재 게임 방향
+
+S2-T는 사이버 한양을 배경으로 하는 선형 턴제 잠입 퍼즐/소규모 전술 게임이다.
+
+현재 인게임 전투는 다음 기능까지 뼈대가 완성된 상태로 본다.
+
+- 격자 이동과 AP
+- 잠입 및 적 탐지
+- 적 턴
+- 전투와 해킹
+- NPC 아군
+- 스테이지 목표와 클리어 처리
+
+앞으로의 핵심 작업은 전투 기능 추가보다 다음 요소를 연결하는 것이다.
+
+로비 → 스토리 → 전투 → 후일담 → 진행도 저장 → 로비 복귀
+
+장비나 파밍 시스템은 당분간 만들지 않는다. 스테이지별 차별화는 맵 구조, 폭발 오브젝트, 해킹 가능한 로봇, 동료 NPC 같은 전술 요소로 만든다.
+
+
+2. 스토리 연출 방향
+
+기존 Battle/Dialogue는 전투 중 말풍선 시스템이다. 메인 스토리에는 재사용하지 않는다.
+
+메인 스토리는 별도의 비주얼 노벨 시스템으로 만든다.
+
+- 엔젤라와 롤랑처럼 두 인물 중심의 대화
+- 다른 해결사 시점을 통한 한양의 모습 전달
+- 좌우 혹은 중앙의 캐릭터 스탠딩
+- 표정과 포커스 변경
+- 배경 전환
+- 중요한 장면은 젠레스 존 제로처럼 만화 컷 일러스트 사용
+- 선택지나 분기 없이 선형 진행
+
+기존 전투 말풍선과 메인 스토리를 분리하는 이유는 두 시스템의 목적과 수명이 다르기 때문이다. 전투 말풍선은 짧은 인게임 반응용이고, 메인 스토리는 장면 전환·스탠딩·컷 일러스트·스킵·타이핑 등을 관리해야 한다.
+
+
+3. 캠페인 구조
+
+스테이지 ID는 1-1, 1-2 형식이며 앞 숫자는 챕터다.
+
+기본 진행은 다음과 같다.
+
+1) 로비에서 스테이지 선택
+2) 전투 전 스토리 재생
+3) 전투 씬으로 이동
+4) 승리 결과 저장
+5) 후일담이 있으면 스토리 재생
+6) 스테이지 완료 및 다음 스테이지 해금
+7) 로비로 복귀
+
+선형 구조를 택한 이유는 저장 구조와 재진입 처리를 단순하게 유지하면서 이야기의 연출 밀도를 높이기 위해서다.
+
+
+4. 현재 완료된 작업: 캠페인 1단계
+
+경로:
+Assets/Script/Campaign
+
+[Data]
+
+- CampaignData
+  - 로비 씬 이름
+  - 선형 스테이지 목록과 순서 관리
+
+- StageDefinitionData
+  - 변경하지 않는 스테이지 설계 데이터
+  - stageId
+  - 챕터와 스테이지 번호
+  - 표시 이름
+  - 전투 씬 이름
+  - 전투 후 스토리 존재 여부
+
+[Flow]
+
+- CampaignBootstrap
+  - 최초 실행 시 캠페인 시스템 초기화
+  - 중복 AppRoot 제거
+  - DontDestroyOnLoad 처리
+
+- CampaignContext
+  - 캠페인 관련 참조만 모아 두는 참조 주머니
+
+- CampaignFlowController
+  - 현재 캠페인 진행 단계 관리
+
+- CampaignFlowPhase
+  - 캠페인 단계 열거형
+
+[Save]
+
+- CampaignSaveManager
+  - JSON 생성 및 불러오기
+  - 전투 클리어와 스테이지 완료 처리
+  - 다음 스테이지 해금
+
+- CampaignSaveData
+- StageProgressRecord
+- StageProgressState
+
+저장 상태는 다음 네 가지다.
+
+- Locked: 잠김
+- Available: 진행 가능
+- BattleCleared: 전투는 승리했지만 후일담이 남음
+- Completed: 완전히 완료
+
+BattleCleared를 별도로 둔 이유는 전투 승리 후 후일담 도중 종료하더라도 전투를 다시 시키지 않기 위해서다.
+
+[Loading]
+
+- SceneTransitionController
+  - 비동기 씬 전환
+
+- LoadingScreenPresenter
+  - 페이드
+  - 입력 차단
+  - 진행도 표시
+
+별도의 Loading 씬은 만들지 않는다. 최초 실행에서만 Bootstrap 씬을 거치고, 이후에는 유지되는 AppRoot와 로딩 UI가 모든 씬 전환을 담당한다.
+
+매번 Bootstrap 씬을 불러오지 않는 이유는 불필요한 씬 이동과 중복 초기화를 피하기 위해서다.
+
+
+5. 저장 방식
+
+저장 파일:
+Application.persistentDataPath/campaign-save.json
+
+Unity 실행을 통해 실제 JSON 생성까지 확인했다.
+
+저장 원칙은 다음과 같다.
+
+- 스테이지의 고정 설정은 StageDefinitionData에 둔다.
+- 플레이어 진행 상태만 JSON에 저장한다.
+- JSON은 stageId를 기준으로 진행도를 찾는다.
+- 기존 세이브가 있어도 CampaignData에 새 스테이지가 추가되면 진행도 레코드를 보충한다.
+
+따라서 JSON 생성 후 battleSceneName을 변경해도 문제가 없다. 반면 stageId는 저장 키이므로 출시 이후 함부로 변경하면 안 된다.
+
+현재 데이터:
+
+- Stage_1-1
+  - 전투 씬: BattleTest01
+  - 후일담 있음
+
+- Stage_1-2
+  - 전투 씬: BattleTest02
+  - 후일담 없음
+
+
+6. 테스트 씬
+
+현재 Build Settings에 다음 씬이 등록되어 있다.
+
+- BootstrapTest
+- LobbyTest
+- StoryTest
+- BattleTest01
+- BattleTest02
+
+BootstrapTest에는 AppRoot와 영구 로딩 Canvas가 연결되어 있다.
+
+현재 사용자가 수정한 테스트 씬, Stage 데이터와 Build Settings를 임의로 되돌리거나 덮어쓰면 안 된다.
+
+
+7. 코드 정리 결과
+
+Assets/Script의 최상위는 현재 다음처럼 정리했다.
+
+Assets/Script
+├─ Battle
+└─ Campaign
+
+향후 다음 폴더를 별도 최상위 기능으로 추가한다.
+
+Assets/Script
+├─ Battle
+├─ Campaign
+├─ Story
+└─ Lobby
+
+Battle 내부는 대략 다음 책임으로 분리되어 있다.
+
+Battle
+├─ Logic
+├─ Presentation
+├─ Dialogue
+├─ Camera
+└─ Debug
+
+인터페이스는 전역 폴더 하나에 몰지 않고 소유 도메인의 Interfaces 폴더에 둔다.
+
+예:
+
+- Unit/Interfaces/ITacticalUnit
+- Combat/Interfaces/IDamageable
+- Combat/Interfaces/IHackable
+- Actions/Interfaces/IActionLogicEvent
+- Presentation/Interfaces/IPresentationEventHandler
+
+이번 폴더 정리는 경로만 변경했다. 코드 내용과 namespace는 건드리지 않았고 .cs와 .meta를 함께 이동해 Unity GUID와 인스펙터 연결을 보존했다.
+
+검증 결과:
+
+- C# 파일 수 이동 전후 동일
+- 스크립트 GUID 보존
+- 중복 GUID 없음
+- dotnet build S2.slnx 성공
+- 경고 및 오류 0건
+
+Unity 에디터에서 전체 임포트 후 Missing Script 여부는 한 번 더 확인하면 된다.
+
+
+8. 앞으로의 4단계 중 남은 작업
+
+[2단계: 비주얼 노벨 Story 시스템]
+
+다음 작업은 이것부터 시작한다.
+
+예상 경로:
+Assets/Script/Story
+
+필요한 데이터:
+
+- StorySequenceData
+- 화자와 대사
+- 배경 변경
+- 스탠딩 등장 및 퇴장
+- 표정 변경
+- 캐릭터 포커스
+- 만화 컷 표시
+- 페이드
+- 대기
+
+초기 버전은 분기형 그래프를 만들지 않고 명령 목록을 순서대로 실행한다.
+
+필요한 런타임 책임:
+
+- StoryContext
+  - 참조만 보관
+
+- Story Runner
+  - 현재 명령 인덱스
+  - 진행 상태
+  - 다음 명령 실행
+  - 전체 완료 통보
+
+- Dialogue Presenter
+  - 화자명
+  - 본문
+  - 타이핑
+  - 현재 대사 즉시 완성
+
+- Standing Presenter
+  - 좌·중앙·우측 배치
+  - 표정
+  - 포커스
+  - 등장 및 퇴장
+
+- Background Presenter
+- Comic Panel Presenter
+  - 초기에는 2~3개의 고정 레이아웃
+
+- Story Input
+  - 클릭/확인
+  - 타이핑 즉시 완성
+  - 이미 본 스토리 스킵
+
+중요한 원칙:
+
+Story 시스템은 완료 사실만 CampaignFlowController에 알리고, 다음 씬을 직접 결정하지 않는다.
+
+그래야 Story가 로비, 전투 전, 전투 후 어디에서 실행되더라도 재사용할 수 있다.
+
+완료 기준은 StoryTest에서 샘플 데이터 하나가 처음부터 끝까지 재생되고, 완료 콜백이 정확히 한 번 발생하는 것이다.
+
+
+[3단계: Lobby 시스템]
+
+예상 경로:
+Assets/Script/Lobby
+
+책임:
+
+- CampaignData에서 스테이지 목록 읽기
+- SaveManager에서 진행 상태 읽기
+- 챕터별 표시
+- 스테이지 선택
+- 상세 정보 표시
+- CampaignFlowController에 시작 요청
+
+상태별 동작:
+
+- Locked: 선택 불가
+- Available: 전투 전 스토리부터 시작
+- BattleCleared: 전투를 건너뛰고 후일담부터 재개
+- Completed: 재플레이 가능, 진행 상태는 하락시키지 않음
+
+Lobby는 저장 데이터를 직접 수정하지 않는다.
+
+
+[4단계: 전투 결과 연동]
+
+최종 연결 흐름:
+
+1) 로비에서 1-1 선택
+2) 전투 전 스토리 재생
+3) BattleTest01 로드
+4) 전투 승리
+5) 전투 결과 연출 완료까지 대기
+6) TryMarkBattleCleared
+7) 후일담이 있으면 Story 실행
+8) TryCompleteStage
+9) 1-2 해금
+10) 로비 복귀 및 UI 갱신
+
+전투 쪽에서는 JSON을 직접 수정하지 않는다. StageStateManager의 클리어 결과를 Campaign으로 전달하는 얇은 Bridge만 둔다.
+
+실패나 중도 이탈 시에는 진행도를 올리지 않는다. 중복 승리 보고와 씬 중복 로딩도 방지해야 한다.
+
+
+9. 이 순서로 작업하는 이유
+
+Story → Lobby → Battle 연동 순서로 진행한다.
+
+Story가 먼저 완성되어야 다음 두 가지 계약이 확정된다.
+
+- 어떤 Story 데이터를 Campaign이 요청할 것인가
+- Story 완료를 Campaign에 어떤 방식으로 반환할 것인가
+
+Story가 없는 상태에서 Lobby와 Battle 연결부터 만들면 임시 분기와 임시 씬 이동 코드가 생기고, 나중에 Story를 넣으면서 다시 뜯어야 한다.
+
+따라서 다음 작업자는 우선 StoryTest 안에서 Story 시스템을 독립적으로 완성해야 한다. Story가 단독으로 작동하기 전에는 Lobby와 Battle 연동을 섞지 않는 것이 좋다.
+
+
+10. 반드시 지켜야 할 구현 규칙
+
+- Context에는 참조만 둔다.
+- Context에 튜닝값, 계산, 상태 정책을 넣지 않는다.
+- 같은 루트 컴포넌트를 GetComponent<T>()로 찾아 보정하지 않는다.
+- 필수 참조나 데이터가 없으면 fallback으로 숨기지 않는다.
+- HasValidReference() 또는 HasValidData()로 검사한다.
+- 오류 원인을 한국어 Debug.LogError로 남기고 흐름을 중단한다.
+- 새 인터페이스는 인터페이스 이름과 같은 별도 .cs 파일로 만든다.
+- 로직은 결과를 확정하고 Presenter는 연출만 담당한다.
+- Presenter가 AP, HP, 좌표, 저장 상태를 변경하면 안 된다.
+- 런타임 로그와 필요한 주석은 한국어로 작성한다.
+- 새 멤버 변수와 주요 함수에는 한국어 주석/XML 주석을 작성한다.
+- 기존 Battle/Dialogue를 Story 시스템으로 개조하지 않는다.
+- 사용자가 요청하지 않은 인스펙터 연결 변경이나 대규모 리팩터링은 하지 않는다.
+
+
+11. 다음 작업자에게 전달할 첫 지시
+
+먼저 Assets/Script/Campaign 전체와 StoryTest 씬, Assets/Script/Battle/Dialogue 구조를 읽어라.
+
+Battle/Dialogue는 참고만 하고 결합하지 마라.
+
+이후 StorySequenceData와 Story 명령 종류를 확정하고 데이터 기반 Story Runner부터 구현하라. Runner 단독 동작을 확인한 뒤 대사·스탠딩·배경·만화 컷 Presenter를 연결하라.
+
+Story 완료 시에는 씬을 직접 변경하지 말고 CampaignFlowController가 받을 완료 이벤트만 전달하라.
+
+
+12. 상세 기록 문서
+
+C:\Users\psdd2\Desktop\project\S2_Samguk\자료\S2-T 현재 구현 구조.md
+C:\Users\psdd2\Desktop\project\S2_Samguk\자료\S2-T 작업일지.md

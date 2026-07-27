@@ -1,9 +1,9 @@
 # S2-T 현재 구현 구조
 
-- 최신 기준: 2026-07-26
+- 최신 기준: 2026-07-27
 - 기준 브랜치: `main`
 - Unity 버전: `6000.0.64f1`
-- 기준 테스트 씬: `Assets/Scenes/Test/BootstrapTest.unity`, `Assets/Scenes/Test/BattleTest01.unity`, `Assets/Scenes/Test/BattleTest02.unity`
+- 기준 테스트 씬: `Assets/Scenes/Test/BootstrapTest.unity`, `Assets/Scenes/Test/StoryTest.unity`, `Assets/Scenes/Test/BattleTest01.unity`, `Assets/Scenes/Test/BattleTest02.unity`
 
 이 문서는 S2-T의 **현재 실제 코드와 씬 구조만** 설명하는 최신 스냅샷이다.
 날짜별 작업 과정, 이전 설계, 제거된 구조와 테스트 이력은 `S2-T 작업일지.md`에서 관리한다.
@@ -22,7 +22,8 @@ S2-T는 사이버 한국 삼국시대 세계관을 사용하는 보드게임식 
 6. 목표 칸에 살아 있는 플레이어 조작 유닛이 도착하면 스테이지가 클리어된다.
 
 현재 전투 플레이는 이동, AP, 잠입, 발각, 적 턴, 전투, 해킹, 목표 달성까지 핵심 뼈대가 연결된 상태로 판단한다.
-다음 개발 단계는 전투 행동을 추가하기보다 선형 챕터·스테이지 선택 로비와 비주얼 노벨식 스토리 전개, 저장·불러오기 흐름을 만드는 것이다.
+캠페인 1단계의 데이터·저장·로딩 기반과 2단계의 분기 없는 선형 비주얼 노벨 Story 재생 기반까지 구현했다.
+다음 개발 단계는 `CampaignData`와 저장 상태를 표시하는 선형 챕터·스테이지 선택 로비를 만드는 것이다.
 
 기본 캠페인 흐름은 `로비의 스테이지 선택 → 전투 전 스토리 → 전투 씬 → 선택적 전투 후 스토리 → 진행 저장 → 로비 복귀`다.
 챕터와 스테이지는 `1-1`, `1-2` 형식으로 구분하며, 앞 숫자는 챕터를 뜻한다.
@@ -54,8 +55,8 @@ S2-T는 사이버 한국 삼국시대 세계관을 사용하는 보드게임식 
 
 ## 3. 코드 폴더 책임
 
-`Assets/Script`의 최상위 폴더는 현재 `Campaign`, `Battle` 두 기능 영역으로 정리되어 있다.
-새 메인 Story와 Lobby 코드는 이후 각각 별도 최상위 기능 폴더를 만드는 방향을 따른다.
+`Assets/Script`의 최상위 기능 영역은 현재 `Campaign`, `Battle`, `Story`로 정리되어 있다.
+새 Lobby 코드는 이후 별도 최상위 기능 폴더를 만드는 방향을 따른다.
 
 ### Campaign
 
@@ -104,6 +105,14 @@ S2-T는 사이버 한국 삼국시대 세계관을 사용하는 보드게임식 
 - `Assets/Script/Battle/Camera`: 전투 테스트 카메라 이동.
 - `Assets/Script/Battle/Debug`: 전투 런타임 정보와 그리드 점유 디버그 도구.
 
+### Story
+
+- `Assets/Script/Story/Data`: 선형 명령, 시퀀스, 스탠딩 위치와 페이드 종류.
+- `Assets/Script/Story/Runtime`: 명령을 배열 순서대로 실행하는 `StoryRunner`, 재생 상태·완료 사유와 명시적 참조 주머니 `StoryContext`.
+- `Assets/Script/Story/Input`: 좌클릭·Enter·Space 진행과 Escape 건너뛰기 입력 전달.
+- `Assets/Script/Story/Presentation`: 대사 타이핑, 배경, 스탠딩, 만화 패널과 페이드 표시.
+- `Assets/Script/Story/Debug`: 독립 `StoryTest` 샘플 재생 진입점.
+
 인터페이스는 전역 폴더 하나에 모으지 않고 해당 책임 영역의 `Interfaces` 폴더에 둔다.
 폴더 이동과 namespace 변경을 한 번에 섞지 않기 위해 현재 클래스 이름과 namespace 없는 코드 구조는 그대로 유지한다.
 
@@ -140,6 +149,30 @@ AppRoot
 전투 승리는 `BattleCleared`, 후일담 완료 또는 후일담이 없는 전투 승리는 `Completed`로 저장하며 다음 스테이지를 `Available`로 개방한다.
 기존 저장 뒤에 새 선형 스테이지가 추가되면 기존 진행을 유지하면서 새 레코드만 이어 붙인다.
 저장 파일은 `Application.persistentDataPath/campaign-save.json`에 기록한다.
+
+### StoryTest
+
+`StoryTest`는 Campaign·Lobby·Battle 흐름과 분리해서 Story 재생만 검증하는 독립 테스트 씬이다.
+
+```text
+StoryRoot
+└─ StoryCanvas
+   ├─ Background
+   ├─ StandingRoot
+   │  ├─ LeftStanding
+   │  ├─ CenterStanding
+   │  └─ RightStanding
+   ├─ DialoguePanel
+   ├─ ComicPanelRoot
+   └─ FadeOverlay
+```
+
+- `StoryRoot`에는 `StoryContext`, `StoryRunner`, `StoryInputReader`, 각 Presenter와 `StoryTestLauncher`가 연결되어 있다.
+- 샘플 `StorySequenceDataTest`는 대사, 배경 변경, 스탠딩 표시·숨김·표정·초점, 완성 만화 이미지 표시, 페이드와 시간 대기를 포함한 27개 명령을 분기 없이 순서대로 실행한다.
+- 대사 타이핑 중 진행 입력은 현재 문장을 즉시 완성하고, 완성 뒤 입력은 다음 명령으로 이동한다.
+- 만화 연출은 외부에서 컷 배치까지 완성한 Sprite 한 장을 전체 화면 Image에 그대로 표시한다. Story 코드는 컷 위치와 분할 레이아웃을 계산하지 않는다.
+- `StoryRunner.Play()` 호출자가 건너뛰기 허용 여부를 전달하고, 정상 완료와 건너뛰기 완료를 구분해 한 번만 알린다.
+- 현재 테스트 이미지는 기존 프로젝트 리소스를 사용한 임시 시각 자료이며 최종 Story 아트가 아니다.
 
 ### BattleTest01·BattleTest02 씬 단위 시스템
 
@@ -629,9 +662,10 @@ SecurityDoor01
 현재 전술 행동 흐름과 튜토리얼 진행을 묶는 전용 대사 트리거는 아직 없다.
 
 현재 말풍선 대사 시스템은 전투 씬 안의 인게임 대사용으로 유지한다.
-메인 스토리는 별도 `Story` 씬에서 배경, 캐릭터 스탠딩, 하단 대화창을 사용하는 비주얼 노벨 방식으로 제작할 예정이다.
-유진과 금두꺼비의 대화를 중심으로 진행하되 다른 해결사, 의원 측 인물, 경비대와 용병 시점을 통해 한양의 삶과 세력을 보여준다.
-중요 장면은 젠레스 존 제로의 컷씬처럼 만화 패널 형태의 일러스트 연출을 선택적으로 사용한다.
+메인 Story는 별도 `StoryTest` 씬에서 배경, 캐릭터 스탠딩, 하단 대화창을 사용하는 비주얼 노벨 방식으로 분리했다.
+`StorySequenceData`의 명령 배열만 순서대로 소비하며 선택지나 분기 명령은 없다.
+중요 장면의 만화는 외부에서 한 장의 완성 이미지로 제작하고 `ShowComicPanel` 명령으로 전체 화면에 표시한다.
+시나리오 원문과 최종 일러스트는 Story 데이터 에셋과 이미지 참조를 교체해 적용한다.
 
 ### VFX
 
@@ -697,6 +731,9 @@ SecurityDoor01
 - `StageResultPresenter`의 클리어 로그 처리와 검 투척·회수 반복 Visual 유지.
 - 스테이지 클리어 후 플레이어 입력, 새 행동, 턴 전환과 남은 적 행동 차단.
 - 프리팹으로 배치한 해킹 터미널과 보안문의 기존 해킹·개방 흐름 유지.
+- Story 런타임 C# 컴파일 경고 0개, 오류 0개.
+- 사용자가 Unity 플레이 모드에서 `StoryTest` 재생을 완료했다.
+- `StorySequenceDataTest`의 대사·배경·스탠딩·완성 만화 이미지·페이드·시간 대기 명령 종류 구성 확인.
 
 ## 17. 현재 한계
 
@@ -710,18 +747,22 @@ SecurityDoor01
 - 스테이지 실패 조건과 최종 클리어·실패 UI가 없다.
 - `HeavyGun`은 데이터 타입만 있고 행동 구현이 없다.
 - 캠페인 데이터와 저장·불러오기 기반은 있으나 `LobbyTest`에는 아직 스테이지 선택 UI가 없다.
-- 비주얼 노벨식 메인 스토리 씬과 전투 전·후 스토리 연결 구조가 없다.
-- 만화 패널 컷씬 연출 구조가 없다.
+- Story 재생은 독립 테스트 단계이며 `StageDefinitionData`, `CampaignFlowController`, 전투 전·후 흐름과 아직 연결하지 않았다.
+- 이미 본 Story 기록과 그에 따른 건너뛰기 정책은 아직 저장 데이터에 없다. 현재는 `StoryRunner.Play()` 호출자가 건너뛰기 허용 여부를 전달한다.
+- `StoryTest`의 배경·스탠딩·만화 이미지는 기존 테스트 이미지를 사용하며 최종 시나리오 데이터와 전용 아트가 아니다.
 
 ## 18. 다음 작업
 
 캠페인 1~4단계의 상세 목적, 예정 책임, 상태별 흐름, 예외 처리와 완료 기준은 `S2-T 작업일지.md`의 `2026-07-26 캠페인 1~4단계 인수인계 문서화` 항목을 기준으로 한다.
 
-1. 기존 말풍선과 분리된 비주얼 노벨식 `StoryTest` 대사 진행·스탠딩·배경 연출 구조를 구현한다.
-2. 만화 패널 컷씬에 사용할 소수의 레이아웃 프리셋과 재생 명령을 설계한다.
-3. `LobbyTest`에 `CampaignData`와 저장 상태를 읽는 챕터·스테이지 선택 UI를 구현한다.
-4. `BattleTest01`, `BattleTest02`의 클리어 상태를 캠페인 저장과 연결한다.
-5. `1-1 선택 → 전투 전 스토리 → 전투 → 전투 후 스토리 → 1-2 해금` 수직 슬라이스를 완성한다.
+현재 캠페인 진행 상태는 **1단계 완료, 2단계 완료, 3단계 다음 작업, 4단계 대기**다.
+2단계 Story는 사용자 Unity 플레이 모드 테스트까지 완료했으며, 다음 개발 세션은 캠페인 3단계 Lobby 구현부터 시작한다.
+
+1. 캠페인 3단계로 `LobbyTest`에 `CampaignData`와 저장 상태를 읽는 챕터·스테이지 선택 UI를 구현한다.
+2. 캠페인 4단계에서 `StageDefinitionData`의 전투 전·후 Story 요청을 `StoryRunner`에 전달하는 Bridge를 만든다.
+3. `BattleTest01`, `BattleTest02`의 클리어 상태를 캠페인 저장과 연결한다.
+4. `1-1 선택 → 전투 전 Story → 전투 → 전투 후 Story → 1-2 해금` 수직 슬라이스를 완성한다.
+5. 실제 시나리오와 최종 아트가 준비되면 Story 데이터·이미지 에셋을 교체하고 화면 연출을 조정한다.
 6. 전투 연출과 VFX 보강은 캠페인 기본 흐름이 연결된 뒤 스테이지 제작과 함께 진행한다.
 
 ## 19. 문서 유지 규칙
