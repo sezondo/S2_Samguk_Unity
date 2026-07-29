@@ -17,12 +17,17 @@ public class CampaignFlowController : MonoBehaviour
 
     // 캠페인 흐름 초기화가 정상적으로 끝났는지 나타낸다.
     private bool isInitialized;
+    // 로비에서 선택되어 이후 Story·Battle 흐름이 사용할 현재 스테이지다.
+    private StageDefinitionData activeStage;
 
     public CampaignFlowPhase CurrentPhase => currentPhase;
     public bool IsInitialized => isInitialized;
+    public StageDefinitionData ActiveStage => activeStage;
 
     // 캠페인 흐름 단계가 바뀔 때 이전 단계와 새 단계를 전달한다.
     public event Action<CampaignFlowPhase, CampaignFlowPhase> PhaseChanged;
+    // 로비에서 선택한 활성 스테이지가 바뀔 때 이전 값과 새 값을 전달한다.
+    public event Action<StageDefinitionData, StageDefinitionData> ActiveStageChanged;
 
     /// <summary>
     /// 저장 시스템 상태를 확인하고 최초 로비 진입을 시작한다.
@@ -79,6 +84,59 @@ public class CampaignFlowController : MonoBehaviour
 
         SetPhase(CampaignFlowPhase.Bootstrapping);
         return false;
+    }
+
+    /// <summary>
+    /// 로비에서 선택 가능한 스테이지를 이후 캠페인 흐름의 활성 스테이지로 지정한다.
+    /// </summary>
+    public bool TrySelectStage(string stageId)
+    {
+        if (!isInitialized)
+        {
+            Debug.LogError($"{nameof(CampaignFlowController)}가 초기화되지 않아 스테이지를 선택할 수 없습니다.", this);
+            return false;
+        }
+
+        if (currentPhase != CampaignFlowPhase.Lobby)
+        {
+            Debug.LogWarning(
+                $"{nameof(CampaignFlowController)}: 현재 단계가 {currentPhase}라 로비 스테이지를 선택할 수 없습니다.",
+                this);
+            return false;
+        }
+
+        if (string.IsNullOrWhiteSpace(stageId))
+        {
+            Debug.LogError($"{nameof(CampaignFlowController)}가 비어 있는 스테이지 ID를 받았습니다.", this);
+            return false;
+        }
+
+        if (!context.CampaignData.TryGetStage(stageId, out StageDefinitionData stage))
+        {
+            Debug.LogError($"{nameof(CampaignFlowController)}: 캠페인 데이터에 스테이지 ID '{stageId}'가 없습니다.", this);
+            return false;
+        }
+
+        if (!context.SaveManager.TryGetStageProgress(stageId, out StageProgressState progressState))
+        {
+            return false;
+        }
+
+        if (progressState == StageProgressState.Locked)
+        {
+            Debug.LogWarning($"{nameof(CampaignFlowController)}: 잠긴 스테이지 '{stage.DisplayName}'은 선택할 수 없습니다.", this);
+            return false;
+        }
+
+        if (activeStage == stage)
+        {
+            return true;
+        }
+
+        StageDefinitionData previousStage = activeStage;
+        activeStage = stage;
+        ActiveStageChanged?.Invoke(previousStage, activeStage);
+        return true;
     }
 
     /// <summary>

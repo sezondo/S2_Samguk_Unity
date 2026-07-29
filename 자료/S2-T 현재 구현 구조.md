@@ -1,9 +1,9 @@
 # S2-T 현재 구현 구조
 
-- 최신 기준: 2026-07-27
+- 최신 기준: 2026-07-29
 - 기준 브랜치: `main`
 - Unity 버전: `6000.0.64f1`
-- 기준 테스트 씬: `Assets/Scenes/Test/BootstrapTest.unity`, `Assets/Scenes/Test/StoryTest.unity`, `Assets/Scenes/Test/BattleTest01.unity`, `Assets/Scenes/Test/BattleTest02.unity`
+- 기준 테스트 씬: `Assets/Scenes/Test/BootstrapTest.unity`, `Assets/Scenes/Test/LobbyTest.unity`, `Assets/Scenes/Test/StoryTest.unity`, `Assets/Scenes/Test/BattleTest01.unity`, `Assets/Scenes/Test/BattleTest02.unity`
 
 이 문서는 S2-T의 **현재 실제 코드와 씬 구조만** 설명하는 최신 스냅샷이다.
 날짜별 작업 과정, 이전 설계, 제거된 구조와 테스트 이력은 `S2-T 작업일지.md`에서 관리한다.
@@ -22,8 +22,8 @@ S2-T는 사이버 한국 삼국시대 세계관을 사용하는 보드게임식 
 6. 목표 칸에 살아 있는 플레이어 조작 유닛이 도착하면 스테이지가 클리어된다.
 
 현재 전투 플레이는 이동, AP, 잠입, 발각, 적 턴, 전투, 해킹, 목표 달성까지 핵심 뼈대가 연결된 상태로 판단한다.
-캠페인 1단계의 데이터·저장·로딩 기반과 2단계의 분기 없는 선형 비주얼 노벨 Story 재생 기반까지 구현했다.
-다음 개발 단계는 `CampaignData`와 저장 상태를 표시하는 선형 챕터·스테이지 선택 로비를 만드는 것이다.
+캠페인 1단계의 데이터·저장·로딩 기반, 2단계의 분기 없는 선형 비주얼 노벨 Story 재생 기반과 3단계의 저장 상태 기반 선형 Lobby UI까지 구현했다.
+다음 개발 단계는 Story·Battle·저장 흐름을 연결하는 4단계 수직 슬라이스다.
 
 기본 캠페인 흐름은 `로비의 스테이지 선택 → 전투 전 스토리 → 전투 씬 → 선택적 전투 후 스토리 → 진행 저장 → 로비 복귀`다.
 챕터와 스테이지는 `1-1`, `1-2` 형식으로 구분하며, 앞 숫자는 챕터를 뜻한다.
@@ -55,8 +55,7 @@ S2-T는 사이버 한국 삼국시대 세계관을 사용하는 보드게임식 
 
 ## 3. 코드 폴더 책임
 
-`Assets/Script`의 최상위 기능 영역은 현재 `Campaign`, `Battle`, `Story`로 정리되어 있다.
-새 Lobby 코드는 이후 별도 최상위 기능 폴더를 만드는 방향을 따른다.
+`Assets/Script`의 최상위 기능 영역은 현재 `Campaign`, `Battle`, `Story`, `Lobby`로 정리되어 있다.
 
 ### Campaign
 
@@ -113,6 +112,13 @@ S2-T는 사이버 한국 삼국시대 세계관을 사용하는 보드게임식 
 - `Assets/Script/Story/Presentation`: 대사 타이핑, 배경, 스탠딩, 만화 패널과 페이드 표시.
 - `Assets/Script/Story/Debug`: 독립 `StoryTest` 샘플 재생 진입점.
 
+### Lobby
+
+- `Assets/Script/Lobby/Runtime`: `CampaignData`와 저장 상태를 읽는 `LobbyController`, 화면 참조 주머니 `LobbyContext`와 표시 항목 `LobbyStageEntry`.
+- `Assets/Script/Lobby/UI`: 동적 스테이지 버튼 목록, 개별 버튼과 선택 스테이지 상세 화면.
+- Lobby는 저장 값을 직접 수정하지 않고 `CampaignSaveManager.TryGetStageProgress()`로 상태만 조회한다.
+- 선택 확정 시 `CampaignFlowController.TrySelectStage()`에 스테이지 ID를 전달하며 Story·Battle 씬 전환은 아직 실행하지 않는다.
+
 인터페이스는 전역 폴더 하나에 모으지 않고 해당 책임 영역의 `Interfaces` 폴더에 둔다.
 폴더 이동과 namespace 변경을 한 번에 섞지 않기 위해 현재 클래스 이름과 namespace 없는 코드 구조는 그대로 유지한다.
 
@@ -149,6 +155,37 @@ AppRoot
 전투 승리는 `BattleCleared`, 후일담 완료 또는 후일담이 없는 전투 승리는 `Completed`로 저장하며 다음 스테이지를 `Available`로 개방한다.
 기존 저장 뒤에 새 선형 스테이지가 추가되면 기존 진행을 유지하면서 새 레코드만 이어 붙인다.
 저장 파일은 `Application.persistentDataPath/campaign-save.json`에 기록한다.
+
+### LobbyTest
+
+`LobbyTest`는 캠페인 데이터와 저장 상태를 실제 선택 화면으로 보여 주는 3단계 Lobby 씬이다.
+
+```text
+LobbyRoot
+└─ LobbyCanvas
+   └─ Background
+      ├─ Title / Subtitle
+      ├─ StageListPanel
+      │  └─ Viewport
+      │     └─ Content
+      └─ StageDetailPanel
+         └─ StartButton
+
+EventSystem
+Main Camera
+```
+
+- `LobbyRoot`에는 `LobbyContext`와 `LobbyController`가 연결되어 있다.
+- `LobbyController`는 `CampaignBootstrap.Instance.Context`를 명시적 영속 진입점으로 사용하며 같은 루트 컴포넌트를 임의 검색하지 않는다.
+- `CampaignData.Stages` 순서대로 `LobbyStageButton.prefab`을 동적 생성하므로 새 스테이지를 코드에 하드코딩하지 않는다.
+- 최초 저장 기준 `1-1`은 `Available`, `1-2`는 `Locked`로 표시한다.
+- `Locked`는 선택할 수 없고, `Available`, `BattleCleared`, `Completed`는 각각 진행 가능, 후일담 대기, 완료 상태와 다음 흐름 설명을 표시한다.
+- 목록 선택은 Lobby 상세 화면만 바꾸며, 상세 화면의 확정 버튼이 `CampaignFlowController.TrySelectStage()`를 호출한다.
+- `CampaignFlowController`는 초기화 여부, 현재 `Lobby` 단계, 스테이지 ID 존재 여부와 잠금 상태를 다시 검사한 뒤 `ActiveStage`를 바꾼다.
+- 3단계 선택 확정은 활성 스테이지만 기록하며 Story·Battle 로딩과 저장 상태 변경은 4단계 책임으로 남겨 둔다.
+- `LobbyStageButton.prefab`은 `Assets/Prefab/Lobby`에 있으며 한국어 `gulim SDF` TMP 폰트를 사용한다.
+- `LobbyStageListView`는 `Awake()`에서 목록 루트, 버튼 프리팹과 빈 목록 문구 참조를 즉시 검사한다.
+- Bootstrap 없이 `LobbyTest`를 직접 실행하면 영속 캠페인 시스템 누락 원인을 한국어 오류로 알리고 Lobby Controller를 비활성화한다.
 
 ### StoryTest
 
@@ -734,6 +771,11 @@ SecurityDoor01
 - Story 런타임 C# 컴파일 경고 0개, 오류 0개.
 - 사용자가 Unity 플레이 모드에서 `StoryTest` 재생을 완료했다.
 - `StorySequenceDataTest`의 대사·배경·스탠딩·완성 만화 이미지·페이드·시간 대기 명령 종류 구성 확인.
+- Lobby 런타임과 UI C#의 Unity 컴파일 경고 0개, 오류 0개.
+- Unity Editor API로 `LobbyTest` 씬 로드, `LobbyStageButton.prefab`, 필수 컴포넌트와 모든 Inspector 참조가 유효함을 확인했다.
+- `LobbyTest`와 `LobbyStageButton.prefab` YAML의 로컬 fileID와 외부 GUID 누락이 없음을 확인했다.
+- `dotnet build S2.slnx --no-restore` 재검증 결과 경고 0개, 오류 0개.
+- 사용자가 원본 Unity 플레이 모드에서 현재 Lobby 표시와 입력 테스트를 완료했다.
 
 ## 17. 현재 한계
 
@@ -746,7 +788,7 @@ SecurityDoor01
 - 선택 표시는 런타임 LineRenderer 임시 링이다.
 - 스테이지 실패 조건과 최종 클리어·실패 UI가 없다.
 - `HeavyGun`은 데이터 타입만 있고 행동 구현이 없다.
-- 캠페인 데이터와 저장·불러오기 기반은 있으나 `LobbyTest`에는 아직 스테이지 선택 UI가 없다.
+- 현재 Lobby UI는 캠페인 흐름 연결을 검증하기 위한 임시 화면이며, 이후 정식 로비를 별도로 제작할 예정이다.
 - Story 재생은 독립 테스트 단계이며 `StageDefinitionData`, `CampaignFlowController`, 전투 전·후 흐름과 아직 연결하지 않았다.
 - 이미 본 Story 기록과 그에 따른 건너뛰기 정책은 아직 저장 데이터에 없다. 현재는 `StoryRunner.Play()` 호출자가 건너뛰기 허용 여부를 전달한다.
 - `StoryTest`의 배경·스탠딩·만화 이미지는 기존 테스트 이미지를 사용하며 최종 시나리오 데이터와 전용 아트가 아니다.
@@ -755,15 +797,15 @@ SecurityDoor01
 
 캠페인 1~4단계의 상세 목적, 예정 책임, 상태별 흐름, 예외 처리와 완료 기준은 `S2-T 작업일지.md`의 `2026-07-26 캠페인 1~4단계 인수인계 문서화` 항목을 기준으로 한다.
 
-현재 캠페인 진행 상태는 **1단계 완료, 2단계 완료, 3단계 다음 작업, 4단계 대기**다.
-2단계 Story는 사용자 Unity 플레이 모드 테스트까지 완료했으며, 다음 개발 세션은 캠페인 3단계 Lobby 구현부터 시작한다.
+현재 캠페인 진행 상태는 **1단계 완료, 2단계 완료, 3단계 완료 및 사용자 테스트 완료, 4단계 다음 구현**이다.
+3단계 Lobby는 코드, 프리팹, Hierarchy, Inspector 연결과 사용자 플레이 확인까지 완료했으며 Story·Battle 전환은 의도적으로 포함하지 않았다.
+현재 Lobby 화면은 임시지만 캠페인 4단계 연결에 사용하기에 문제가 없으므로 그대로 유지한다.
 
-1. 캠페인 3단계로 `LobbyTest`에 `CampaignData`와 저장 상태를 읽는 챕터·스테이지 선택 UI를 구현한다.
-2. 캠페인 4단계에서 `StageDefinitionData`의 전투 전·후 Story 요청을 `StoryRunner`에 전달하는 Bridge를 만든다.
-3. `BattleTest01`, `BattleTest02`의 클리어 상태를 캠페인 저장과 연결한다.
-4. `1-1 선택 → 전투 전 Story → 전투 → 전투 후 Story → 1-2 해금` 수직 슬라이스를 완성한다.
-5. 실제 시나리오와 최종 아트가 준비되면 Story 데이터·이미지 에셋을 교체하고 화면 연출을 조정한다.
-6. 전투 연출과 VFX 보강은 캠페인 기본 흐름이 연결된 뒤 스테이지 제작과 함께 진행한다.
+1. 캠페인 4단계에서 `StageDefinitionData`의 전투 전·후 Story 요청을 `StoryRunner`에 전달하는 Bridge를 만든다.
+2. `BattleTest01`, `BattleTest02`의 클리어 상태를 캠페인 저장과 연결한다.
+3. `1-1 선택 → 전투 전 Story → 전투 → 전투 후 Story → 1-2 해금` 수직 슬라이스를 완성한다.
+4. 실제 시나리오와 최종 아트가 준비되면 Story 데이터·이미지 에셋을 교체하고 화면 연출을 조정한다.
+5. 전투 연출과 VFX 보강은 캠페인 기본 흐름이 연결된 뒤 스테이지 제작과 함께 진행한다.
 
 ## 19. 문서 유지 규칙
 

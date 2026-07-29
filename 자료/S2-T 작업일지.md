@@ -2231,3 +2231,86 @@
 3. `CampaignData`의 선형 스테이지 순서와 저장 상태 `Locked`, `Available`, `BattleCleared`, `Completed`를 Lobby 표시 모델로 연결한다.
 4. 잠긴 스테이지는 선택할 수 없고, 선택 가능한 스테이지만 캠페인 흐름에 전달하는 Lobby 코드 책임을 먼저 구현한다.
 5. 3단계에서는 Story·Battle 씬 전환과 결과 저장 Bridge를 섞지 않고 Lobby 자체 완료 기준까지만 작업한다.
+
+## 2026-07-29 캠페인 3단계 Lobby 구현
+
+## 목적
+
+- `CampaignData`와 JSON 저장 상태를 읽어 선형 챕터·스테이지 선택 화면을 구성한다.
+- Lobby는 저장 상태를 직접 바꾸지 않고 선택 가능한 스테이지 ID만 캠페인 흐름에 전달한다.
+- 3단계에서는 Story·Battle 씬 전환과 전투 결과 저장을 섞지 않고 Lobby 자체 책임만 완성한다.
+
+## 구현
+
+- `Assets/Script/Lobby`를 `Runtime`, `UI` 책임으로 추가했다.
+- `LobbyContext`는 스테이지 목록과 상세 View 참조만 보관한다.
+- `LobbyController`는 영속 `CampaignBootstrap.Instance.Context`에서 `CampaignData`, `CampaignSaveManager`, `CampaignFlowController`를 사용한다.
+- `LobbyStageEntry`가 스테이지 정의와 Lobby 구성 시점의 저장 상태를 함께 보관한다.
+- `LobbyStageListView`가 `CampaignData.Stages` 순서대로 `LobbyStageButton.prefab`을 동적 생성한다.
+- `LobbyStageButtonView`가 번호, 표시 이름, `Locked`, `Available`, `BattleCleared`, `Completed` 상태와 선택 여부를 표시한다.
+- `LobbyStageDetailView`가 선택 스테이지의 상태, 후일담 유무에 따른 다음 흐름 설명과 선택 확정 버튼을 표시한다.
+- 첫 번째 선택 가능 스테이지를 기본 상세 항목으로 보여 주며 잠긴 스테이지는 Button 입력과 Controller 선택 양쪽에서 차단한다.
+- Bootstrap 없이 Lobby 씬을 직접 실행하면 영속 캠페인 시스템 누락을 한국어 오류로 알리고 흐름을 중단한다.
+
+## Campaign 선택 계약
+
+- `CampaignFlowController`에 `ActiveStage`, `ActiveStageChanged`와 `TrySelectStage()`를 추가했다.
+- `TrySelectStage()`는 캠페인 초기화, 현재 `Lobby` 단계, 스테이지 ID 존재 여부와 저장 상태를 다시 검증한다.
+- `Locked` 상태는 직접 API를 호출해도 거부한다.
+- 선택 성공 시 활성 스테이지만 기록하며 Story·Battle 씬 전환과 저장 상태 변경은 하지 않는다.
+- 이 활성 스테이지는 4단계에서 전투 전 Story, Battle, 후일담 재개와 재플레이 분기의 기준으로 사용한다.
+
+## LobbyTest / Inspector 연결
+
+- 사용자가 이번 작업에서 Lobby 코드와 Hierarchy·Inspector 수정, 필요한 프리팹 생성과 자동 연결을 명시적으로 허가했다.
+- `LobbyTest`를 `LobbyRoot`, `LobbyCanvas`, `StageListPanel`, `StageDetailPanel`, `EventSystem`, `Main Camera` 구조로 구성했다.
+- `LobbyRoot`에 `LobbyContext`, `LobbyController`를 연결했다.
+- 목록에는 Mask와 ScrollRect, 동적 Content를 연결하고 상세 화면에는 상태 설명, 선택 확정 버튼과 요청 결과 문구를 연결했다.
+- `Assets/Prefab/Lobby/LobbyStageButton.prefab`을 추가하고 목록 View에 명시적으로 연결했다.
+- Lobby UI 전체에 프로젝트의 한국어 `gulim SDF` TMP 폰트를 연결했다.
+- 일회성 Editor 생성기는 임시 프로젝트에서 실행한 뒤 원본 프로젝트에는 남기지 않았다.
+
+## 검증
+
+- Unity `6000.0.64f1` 임시 복사 프로젝트에서 새 Lobby 런타임·UI와 Editor 생성 도구 컴파일 결과 오류가 없었다.
+- Unity Editor API로 최종 `LobbyTest` 씬을 열어 `LobbyController`, `LobbyContext`, 목록·상세 View, Canvas, EventSystem과 버튼 프리팹 존재를 확인했다.
+- 각 컴포넌트의 `HasValidReference()`와 목록의 프리팹 직렬화 참조 검증을 통과했다.
+- `LobbyTest.unity`와 `LobbyStageButton.prefab`의 로컬 fileID와 외부 GUID 누락이 없음을 확인했다.
+- `dotnet build S2.slnx --no-restore` 결과 경고 0개, 오류 0개.
+- `git diff --check` 공백 오류가 없다.
+
+## 현재 경계
+
+- 3단계에서는 선택 확정 뒤 `ActiveStage`만 설정하고 실제 Story·Battle 씬으로 이동하지 않는다.
+- 저장 파일의 상태를 바꾸는 기능은 Lobby에 넣지 않았다.
+- 원본 프로젝트에서 `BootstrapTest → LobbyTest` 진입, 해상도별 표시와 버튼 입력 감각을 확인하는 플레이 모드 테스트는 남아 있다.
+
+## 다음
+
+1. 원본 Unity에서 `BootstrapTest`를 실행해 `1-1` 진행 가능, `1-2` 잠금과 선택 확정 로그를 확인한다.
+2. 3단계 플레이 확인 뒤 4단계 Campaign·Story Bridge와 전투 결과 연동을 설계한다.
+3. `1-1 선택 → 전투 전 Story → BattleTest01 → 전투 후 Story → 1-2 해금 → Lobby` 수직 슬라이스를 연결한다.
+
+## 2026-07-29 캠페인 3단계 Lobby 사용자 테스트 완료
+
+## 확인
+
+- 사용자가 원본 Unity 프로젝트에서 현재 Lobby 코드와 화면 테스트를 완료했다.
+- `CampaignData`와 저장 상태 기반 목록, 잠금 표시, 선택과 활성 스테이지 전달 구조를 현재 3단계 완료 상태로 확정했다.
+- 현재 Lobby 화면은 캠페인 흐름 검증용 임시 UI이며, 이후 정식 로비를 별도로 제작한다.
+- 임시 UI 상태지만 다음 4단계 Story·Battle·저장 연결에 사용하는 데 문제가 없으므로 현재 구성은 그대로 유지한다.
+
+## 코드 정리
+
+- 기존 프로젝트 양식에 맞춰 `LobbyStageListView.Awake()`에서 `HasValidReference()`를 즉시 호출하도록 보강했다.
+- 목록 루트, 스테이지 버튼 프리팹 또는 빈 목록 TMP 참조가 누락되면 처음 활성화될 때 오류를 알리고 컴포넌트를 비활성화한다.
+- `LobbyController`의 상위 검증도 유지해 씬 진입점과 개별 View 양쪽에서 필수 참조 오류를 확인한다.
+
+## 검증
+
+- `dotnet build S2.slnx --no-restore` 결과 경고 0개, 오류 0개.
+- `git diff --check` 공백 오류가 없다.
+
+## 다음
+
+- 캠페인 3단계를 완료 상태로 두고 4단계 Campaign·Story Bridge와 전투 결과 저장 연동으로 진행한다.
