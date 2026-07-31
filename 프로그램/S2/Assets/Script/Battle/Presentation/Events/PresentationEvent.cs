@@ -111,6 +111,14 @@ public readonly struct PresentationEvent
     }
 
     /// <summary>
+    /// 전투 조작을 열기 전에 실행할 입장 연출 이벤트를 만든다.
+    /// </summary>
+    public static PresentationEvent BattleIntro(string message = null)
+    {
+        return new PresentationEvent(PresentationEventType.BattleIntro, null, null, null, null, default, default, default, default, MovePresentationPhase.None, AttackPresentationKind.None, default, false, message);
+    }
+
+    /// <summary>
     /// 지정한 보안문의 열림 연출 이벤트를 만든다.
     /// </summary>
     public static PresentationEvent SecurityDoorOpened(SecurityDoorController securityDoor, string message = null)

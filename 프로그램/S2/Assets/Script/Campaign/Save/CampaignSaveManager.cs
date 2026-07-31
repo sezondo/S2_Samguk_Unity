@@ -438,6 +438,12 @@ public class CampaignSaveManager : MonoBehaviour
             return false;
         }
 
+        if (string.IsNullOrWhiteSpace(campaignData.StorySceneName))
+        {
+            Debug.LogError($"{nameof(CampaignSaveManager)}: {nameof(CampaignData)}의 Story 씬 이름이 비어 있습니다.", campaignData);
+            return false;
+        }
+
         StageDefinitionData[] stages = campaignData.Stages;
         if (stages == null || stages.Length == 0)
         {
@@ -462,6 +468,21 @@ public class CampaignSaveManager : MonoBehaviour
                 string.IsNullOrWhiteSpace(stage.BattleSceneName))
             {
                 Debug.LogError($"{nameof(CampaignSaveManager)}: 스테이지 데이터 {stage.name}의 ID, 번호, 표시 이름과 전투 씬 이름을 확인하세요.", stage);
+                return false;
+            }
+
+            if (stage.PreBattleStory == null)
+            {
+                Debug.LogError($"{nameof(CampaignSaveManager)}: 스테이지 데이터 {stage.name}에 전투 전 Story가 없습니다.", stage);
+                return false;
+            }
+
+            if (stage.HasPostBattleStory != (stage.PostBattleStory != null))
+            {
+                string reason = stage.HasPostBattleStory
+                    ? "후일담 사용이 켜져 있지만 후일담 데이터가 없습니다"
+                    : "후일담 사용이 꺼져 있지만 후일담 데이터가 연결되어 있습니다";
+                Debug.LogError($"{nameof(CampaignSaveManager)}: 스테이지 데이터 {stage.name}의 후일담 설정이 올바르지 않습니다. {reason}.", stage);
                 return false;
             }
 

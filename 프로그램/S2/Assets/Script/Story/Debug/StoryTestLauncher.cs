@@ -20,6 +20,13 @@ public class StoryTestLauncher : MonoBehaviour
     /// </summary>
     private void Awake()
     {
+        // 캠페인으로 진입했을 때는 StoryCampaignBridge가 재생 데이터를 결정한다.
+        if (CampaignBootstrap.Instance != null)
+        {
+            enabled = false;
+            return;
+        }
+
         if (!HasValidReference())
         {
             enabled = false;

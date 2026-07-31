@@ -5,6 +5,7 @@
 public enum PresentationEventType
 {
     None,
+    BattleIntro,
     MoveActor,
     AlertDetected,
     EnemyReactionMove,

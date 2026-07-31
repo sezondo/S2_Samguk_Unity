@@ -9,12 +9,15 @@ public class CampaignData : ScriptableObject
     [Header("Scene")]
     // Bootstrap 초기화가 끝난 뒤 진입할 메인 로비 씬 이름이다.
     [SerializeField] private string lobbySceneName = "LobbyTest";
+    // 전투 전·후 Story 데이터를 재생할 공통 Story 씬 이름이다.
+    [SerializeField] private string storySceneName = "StoryTest";
 
     [Header("Stage")]
     // 해금 순서대로 정렬된 전체 스테이지 정의 목록이다.
     [SerializeField] private StageDefinitionData[] stages;
 
     public string LobbySceneName => lobbySceneName;
+    public string StorySceneName => storySceneName;
     public StageDefinitionData[] Stages => stages;
 
     /// <summary>

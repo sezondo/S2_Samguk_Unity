@@ -2314,3 +2314,139 @@
 ## 다음
 
 - 캠페인 3단계를 완료 상태로 두고 4단계 Campaign·Story Bridge와 전투 결과 저장 연동으로 진행한다.
+
+## 2026-07-29 캠페인 4단계 수직 슬라이스 구현
+
+## 목적
+
+- 현재 준비된 Lobby, Story, Battle 화면을 연결해 프로토타입 게임 한 바퀴를 완성한다.
+- 완료 스테이지 재플레이에서도 전투 전·후 Story를 다시 재생하고 모든 Story에서 스킵을 허용한다.
+- 전투 실패는 진행 상태를 바꾸지 않고 Lobby로 복귀시킨다.
+- 전투 입장과 결과 구간에 이후 카메라·말풍선·미션 연출을 확장할 명시적 자리를 만든다.
+
+## Campaign·Story 흐름
+
+- `CampaignData`에 공통 `StoryTest` 씬 이름을 추가했다.
+- `StageDefinitionData`에 필수 전투 전 Story와 선택적 전투 후 Story 참조를 추가했다.
+- `hasPostBattleStory` Bool을 기준으로 후일담 참조를 검증한다. Bool과 데이터 유무가 다르면 한국어 오류를 남기고 캠페인 초기화를 중단한다.
+- `CampaignFlowController`에 활성 Story와 목적, 스테이지 시작, Story 완료, 전투 결과 처리를 추가했다.
+- `Available`, `Completed`는 전투 전 Story부터 시작하며 `BattleCleared` 저장은 후일담부터 복구한다.
+- 완료 스테이지의 전투 승리·최종 완료 API는 기존 `Completed`를 유지해 재플레이가 진행 상태를 낮추지 않는다.
+- 전투 승리 저장이나 최종 완료 저장이 실패하면 다음 씬 전환을 중단한다.
+- `StoryCampaignBridge`가 캠페인의 활성 Story를 항상 스킵 가능 상태로 재생하고 정상 완료·스킵을 같은 다음 흐름으로 전달한다.
+- 캠페인 진입 중에는 기존 `StoryTestLauncher`가 자동으로 비활성화되고, StoryTest 직접 실행 동작은 유지한다.
+- 로딩 화면이 완전히 사라진 뒤 Story와 전투 입장 연출을 시작해 즉시 스킵·연속 씬 로딩 충돌을 막았다.
+
+## Battle 입장·실패·결과
+
+- `BattleIntroSequenceData`와 `Wait`, `MoveCamera`, `ShowMissionMessage`, `PlayDialogue` 명령 구조를 추가했다.
+- `BattleIntroPresenter`가 명령 배열을 코루틴으로 자동 실행하며, 말풍선 명령은 기존 `DialogueManager`를 재사용하도록 자리를 마련했다.
+- 현재 `BattleTest01`, `BattleTest02` 테스트 데이터는 미션 안내, 카메라 이동, 대기와 원위치 복귀를 실행한다.
+- 입장 연출을 `ActionPresentationQueue` 첫 이벤트로 실행해 행동과 수동 카메라 이동을 차단하며, `PlayerUnitControlManager`의 선택 입력도 큐 재생 중 차단했다.
+- `StageFailureCoordinator`가 `ActorDiedLogicEvent`를 받아 `DefeatOnDeath` 중요 조작 유닛 사망 또는 조작 유닛 전원 사망을 실패로 확정한다.
+- `유진 테스트 데이터`는 중요 유닛으로 지정했고 동료 테스트 데이터는 일반 유닛으로 유지했다.
+- 실패 연출은 기존 행동의 연출 큐에 추가돼 공격·피격 연출 뒤 결과 UI가 열린다.
+- `StageResultPresenter`를 로그 전용 자리에서 클리어·실패 제목, 설명과 확인 버튼을 가진 임시 UI로 확장했다.
+- `BattleCampaignBridge`는 결과 UI 확정을 캠페인에 전달하며 승리는 후일담 또는 완료 처리, 실패는 저장 변경 없이 Lobby 복귀를 요청한다.
+
+## 데이터·Inspector
+
+- 프로토타입 Story 데이터 `Stage_1-1_Pre`, `Stage_1-1_Post`, `Stage_1-2_Pre`를 추가했다.
+- `Stage_1-1`은 전투 전·후 Story를, `Stage_1-2`는 전투 전 Story만 연결했다.
+- 두 Battle 씬의 `Manager`에 입장 Presenter·Entry Coordinator·실패 Coordinator·Campaign Bridge를 추가하고 필수 참조를 연결했다.
+- 두 Battle 씬에 `CampaignBattleFlowCanvas`와 미션 문구, 결과 패널, 확인 버튼을 추가했다.
+- StoryTest의 기존 `StoryRoot`에 `StoryCampaignBridge`를 추가하고 `StoryRunner`를 연결했다.
+- Player Actor Root, Enemy, Enemy2의 컴포넌트와 Inspector 값은 수정하지 않았다. 실패 판정은 Manager와 기존 Registry·사망 이벤트로 연결했다.
+- 재구성·검증용 `CampaignStage4Setup` Editor 도구를 추가했다.
+
+## 검증
+
+- Unity `6000.0.64f1` 배치 모드에서 데이터 에셋과 세 씬의 Inspector 구성을 적용했다.
+- Unity 배치 검증에서 StoryTest, BattleTest01, BattleTest02의 필수 캠페인 4단계 참조와 Missing Script 검사를 통과했다.
+- 캠페인 후일담 Bool·데이터 조합, 두 전투 씬의 Player Actor Root·Enemy·Enemy2 존재를 확인했다.
+- `dotnet build S2.slnx` 결과 런타임과 Editor 어셈블리 모두 경고 0개, 오류 0개다.
+
+## 현재 경계
+
+- 코드·데이터·Hierarchy·Inspector 연결은 완료했지만 원본 Unity 플레이 모드에서 전체 캠페인 한 바퀴의 사용자 테스트는 남아 있다.
+- 입장 연출 데이터 구조는 말풍선을 지원하지만 현재 테스트 에셋은 미션 문구와 카메라 이동만 사용한다.
+- Story 텍스트, 미션 문구와 결과 UI는 흐름 검증용 임시 콘텐츠다.
+- 대화 로그, 이미 본 Story 기록, 정식 결과 UI와 정식 Lobby는 후순위다.
+
+## 다음
+
+1. 새 저장으로 `1-1 → 전투 전 Story → 전투 → 후일담 → 1-2 해금 → Lobby`를 확인한다.
+2. 완료 스테이지 재플레이, Story Escape 스킵, 전투 실패 Lobby 복귀를 각각 확인한다.
+3. 1-2 승리 뒤 후일담 없이 완료·Lobby 복귀가 되는지 확인한다.
+
+## 2026-07-31 Story·Battle 캠페인 Bridge 로딩 순서 수정
+
+## 문제
+
+- Bootstrap에서 Lobby를 거쳐 `1-1` Story 씬에 진입하면 `StoryCampaignBridge`가 캠페인 Story 요청 상태 오류를 출력했다.
+- 새 씬의 `Start()`가 `SceneTransitionController`의 씬 전환 완료 콜백보다 먼저 실행될 수 있어, 활성 Story 데이터는 준비됐지만 캠페인 단계가 아직 `LoadingStory`인 시점에 상태를 검사한 것이 원인이었다.
+- `BattleCampaignBridge`도 같은 순서로 `Battle` 단계를 즉시 검사하고 있어 동일한 문제가 발생할 가능성이 있었다.
+
+## 변경
+
+- `StoryCampaignBridge`가 영속 캠페인 참조를 확인한 뒤 `SceneTransitionController.IsLoading`이 끝날 때까지 기다리고, 이후 `Story` 단계와 활성 Story 데이터·목적을 검사하도록 순서를 변경했다.
+- `BattleCampaignBridge.Start()`를 코루틴으로 바꾸고 로딩 종료 뒤 `Battle` 단계와 활성 스테이지를 검사하도록 동일한 기준을 적용했다.
+- 상태 오류 로그에 현재 Phase, Story Sequence·Purpose 또는 Active Stage를 함께 출력하도록 보강했다.
+- StoryTest와 BattleTest 씬을 Bootstrap 없이 단독 실행하는 기존 동작은 유지했다.
+
+## 검증
+
+- `dotnet build S2.slnx --no-restore`: 경고 0개, 오류 0개.
+- `git diff --check`: 공백 오류 없음.
+- 씬·프리팹·ScriptableObject와 Inspector 값은 수정하지 않았다.
+
+## 다음
+
+- 원본 Unity에서 `BootstrapTest → LobbyTest → 1-1 전투 전 Story → BattleTest01` 진입을 다시 확인한다.
+
+## 2026-07-31 캠페인 Story 시작 Fade와 StageGoal 표시 점검
+
+## Story 변경
+
+- `Stage_1-1_Pre`, `Stage_1-1_Post`, `Stage_1-2_Pre`가 대사 명령부터 시작해 초기 알파 1의 검은 `FadeOverlay` 뒤에서 대사만 진행되는 문제를 확인했다.
+- 세 캠페인 Story 데이터의 첫 명령에 `Fade In`, 0.5초를 추가했다.
+- 기존 대사·Wait 명령과 Story 완료 뒤 캠페인 전환 흐름은 변경하지 않았다.
+
+## StageGoal 확인
+
+- 플레이 모드 스크린샷의 Scene 뷰에 목표 좌표의 녹색 사각형이 표시되어 `StageGoal.OnDrawGizmos()`, 목표 좌표 변환과 플레이 모드 설정은 정상 실행 중임을 확인했다.
+- 현재 목표 표시는 실제 런타임 Sprite나 Renderer가 아니라 Editor Gizmo다.
+- Game 뷰의 전체 Gizmos 토글 또는 Gizmos 목록의 `StageGoal` 필터가 꺼지면 Game 화면에는 표시되지 않으며, 플레이어 빌드에도 포함되지 않는다.
+- StageGoal 코드와 Battle 씬 Inspector 값은 수정하지 않았다.
+
+## 검증
+
+- 세 Story 데이터의 첫 명령이 `Fade`, 방향 `In`, 0.5초로 직렬화된 것을 확인했다.
+- `dotnet build S2.slnx --no-restore`: 경고 0개, 오류 0개.
+- `git diff --check`: 공백 오류 없음.
+
+## 다음
+
+- 캠페인 Story 진입 시 검은 오버레이가 0.5초 동안 사라지고 대사창이 보이는지 확인한다.
+- 임시 StageGoal을 Game 뷰에서 확인하려면 Game 뷰의 `Gizmos`를 켜고 목록에서 `StageGoal` 표시가 활성화됐는지 확인한다.
+
+## 2026-07-31 캠페인 현재 코드 사용자 테스트 완료
+
+## 확인
+
+- 사용자가 원본 Unity에서 Bootstrap으로 시작해 Lobby에서 1-1을 선택하고 전투 전 Story, Battle과 전투 후 Story로 이어지는 현재 캠페인 흐름 테스트를 완료했다.
+- Story·Battle Bridge의 로딩 완료 대기 수정 뒤 캠페인 단계 진입 오류가 해소된 현재 코드를 기준으로 완료 상태를 확정했다.
+- 캠페인 Story의 시작 `Fade In` 데이터 수정 뒤 검은 오버레이에 가려지던 대사 표시 흐름을 현재 기준으로 반영했다.
+- StageGoal은 현재 Editor Gizmo 기반 임시 표시를 유지하며 별도 런타임 비주얼 작업은 진행하지 않기로 했다.
+
+## 현재 상태
+
+- 캠페인 1~4단계 구현 완료.
+- 1-1 핵심 캠페인 한 바퀴 사용자 플레이 테스트 완료.
+- 완료 스테이지 재플레이, Story 스킵, 실패 분기와 1-2 무후일담 완료 흐름은 별도 예외 테스트 항목으로 유지한다.
+
+## 문서
+
+- `S2-T 현재 구현 구조.md`의 최신 기준을 2026-07-31로 갱신했다.
+- 현재 검증 상태와 다음 작업에서 핵심 한 바퀴 완료 항목을 반영하고 남은 예외 테스트만 유지했다.
+- Notion `프로젝트 S2-T`에는 날짜별 상세 내역을 쌓지 않고 현재 상태와 다음 작업만 갱신한다.

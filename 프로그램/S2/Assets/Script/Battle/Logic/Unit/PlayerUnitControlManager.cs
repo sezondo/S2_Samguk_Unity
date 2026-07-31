@@ -111,7 +111,9 @@ public class PlayerUnitControlManager : MonoBehaviour
         selectionConsumedThisFrame = false;
 
         PlayerInputReader inputReader = PlayerInputReader.Instance;
-        if (inputReader == null || !inputReader.ConfirmPressedThisFrame ||
+        if (inputReader == null ||
+            (ActionPresentationQueue.Instance != null && ActionPresentationQueue.Instance.IsPlaying) ||
+            !inputReader.ConfirmPressedThisFrame ||
             !inputReader.TryGetPointerGridPosition(out GridPosition position) ||
             GridManager.Instance == null ||
             !GridManager.Instance.TryGetActorAt(position, out GridActor actor) ||

@@ -1,6 +1,6 @@
 # S2-T 현재 구현 구조
 
-- 최신 기준: 2026-07-29
+- 최신 기준: 2026-07-31
 - 기준 브랜치: `main`
 - Unity 버전: `6000.0.64f1`
 - 기준 테스트 씬: `Assets/Scenes/Test/BootstrapTest.unity`, `Assets/Scenes/Test/LobbyTest.unity`, `Assets/Scenes/Test/StoryTest.unity`, `Assets/Scenes/Test/BattleTest01.unity`, `Assets/Scenes/Test/BattleTest02.unity`
@@ -22,8 +22,8 @@ S2-T는 사이버 한국 삼국시대 세계관을 사용하는 보드게임식 
 6. 목표 칸에 살아 있는 플레이어 조작 유닛이 도착하면 스테이지가 클리어된다.
 
 현재 전투 플레이는 이동, AP, 잠입, 발각, 적 턴, 전투, 해킹, 목표 달성까지 핵심 뼈대가 연결된 상태로 판단한다.
-캠페인 1단계의 데이터·저장·로딩 기반, 2단계의 분기 없는 선형 비주얼 노벨 Story 재생 기반과 3단계의 저장 상태 기반 선형 Lobby UI까지 구현했다.
-다음 개발 단계는 Story·Battle·저장 흐름을 연결하는 4단계 수직 슬라이스다.
+캠페인 1단계의 데이터·저장·로딩 기반, 2단계의 분기 없는 선형 비주얼 노벨 Story, 3단계의 저장 상태 기반 Lobby UI와 4단계의 Story·Battle·저장 수직 슬라이스까지 구현하고 핵심 한 바퀴 사용자 테스트를 완료했다.
+현재는 `BootstrapTest → LobbyTest → 전투 전 Story → BattleTest → 선택적 전투 후 Story → LobbyTest` 한 바퀴가 코드와 Inspector 기준으로 연결된 상태다.
 
 기본 캠페인 흐름은 `로비의 스테이지 선택 → 전투 전 스토리 → 전투 씬 → 선택적 전투 후 스토리 → 진행 저장 → 로비 복귀`다.
 챕터와 스테이지는 `1-1`, `1-2` 형식으로 구분하며, 앞 숫자는 챕터를 뜻한다.
@@ -98,6 +98,7 @@ S2-T는 사이버 한국 삼국시대 세계관을 사용하는 보드게임식 
 
 ### Battle Support
 
+- `Assets/Script/Battle/Flow`: 전투 입장 연출 데이터·실행, 전투 결과의 캠페인 전달.
 - `Assets/Script/Battle/Dialogue/Data`: 인게임 말풍선 대사 데이터.
 - `Assets/Script/Battle/Dialogue/Runtime`: 인게임 대사 진행과 화자.
 - `Assets/Script/Battle/Dialogue/UI`: 말풍선 Presenter와 View.
@@ -107,7 +108,7 @@ S2-T는 사이버 한국 삼국시대 세계관을 사용하는 보드게임식 
 ### Story
 
 - `Assets/Script/Story/Data`: 선형 명령, 시퀀스, 스탠딩 위치와 페이드 종류.
-- `Assets/Script/Story/Runtime`: 명령을 배열 순서대로 실행하는 `StoryRunner`, 재생 상태·완료 사유와 명시적 참조 주머니 `StoryContext`.
+- `Assets/Script/Story/Runtime`: 명령을 배열 순서대로 실행하는 `StoryRunner`, 재생 상태·완료 사유, 명시적 참조 주머니 `StoryContext`와 캠페인 요청을 연결하는 `StoryCampaignBridge`.
 - `Assets/Script/Story/Input`: 좌클릭·Enter·Space 진행과 Escape 건너뛰기 입력 전달.
 - `Assets/Script/Story/Presentation`: 대사 타이핑, 배경, 스탠딩, 만화 패널과 페이드 표시.
 - `Assets/Script/Story/Debug`: 독립 `StoryTest` 샘플 재생 진입점.
@@ -117,7 +118,7 @@ S2-T는 사이버 한국 삼국시대 세계관을 사용하는 보드게임식 
 - `Assets/Script/Lobby/Runtime`: `CampaignData`와 저장 상태를 읽는 `LobbyController`, 화면 참조 주머니 `LobbyContext`와 표시 항목 `LobbyStageEntry`.
 - `Assets/Script/Lobby/UI`: 동적 스테이지 버튼 목록, 개별 버튼과 선택 스테이지 상세 화면.
 - Lobby는 저장 값을 직접 수정하지 않고 `CampaignSaveManager.TryGetStageProgress()`로 상태만 조회한다.
-- 선택 확정 시 `CampaignFlowController.TrySelectStage()`에 스테이지 ID를 전달하며 Story·Battle 씬 전환은 아직 실행하지 않는다.
+- 선택 확정 시 `CampaignFlowController.TrySelectStage()`로 활성 스테이지를 정한 뒤 `TryStartSelectedStage()`로 Story·Battle 흐름을 시작한다.
 
 인터페이스는 전역 폴더 하나에 모으지 않고 해당 책임 영역의 `Interfaces` 폴더에 둔다.
 폴더 이동과 namespace 변경을 한 번에 섞지 않기 위해 현재 클래스 이름과 namespace 없는 코드 구조는 그대로 유지한다.
@@ -146,9 +147,12 @@ AppRoot
 
 현재 캠페인 데이터는 `Assets/Data/Campaign`에 있다.
 
-- `CampaignData`: 로비 씬 이름과 선형 스테이지 순서.
-- `Stage_1-1`, `Stage_1-2`: 스테이지 ID, 챕터·스테이지 번호, 표시 이름, 전투 씬과 전투 후 스토리 유무.
+- `CampaignData`: 로비·공통 Story 씬 이름과 선형 스테이지 순서.
+- `Stage_1-1`, `Stage_1-2`: 스테이지 식별 정보, 전투 씬, 전투 전 Story, Bool 기준 후일담 사용 여부와 선택적 전투 후 Story.
 - `Stage_1-1`의 전투 씬은 `BattleTest01`, `Stage_1-2`의 전투 씬은 `BattleTest02`다.
+- `Stage_1-1`은 전투 전·후 Story가 모두 있고, `Stage_1-2`는 전투 전 Story만 있다.
+- 세 캠페인 Story 데이터는 검은 `FadeOverlay`를 먼저 걷어 내도록 `Fade In` 명령으로 시작한다.
+- `hasPostBattleStory`가 켜졌는데 후일담 데이터가 없거나, 꺼졌는데 데이터가 연결되면 초기화 검증에서 오류로 중단한다.
 
 진행 상태는 `Locked`, `Available`, `BattleCleared`, `Completed` 네 단계다.
 최초 저장은 `1-1`만 `Available`로 만들고 나머지는 잠근다.
@@ -180,16 +184,16 @@ Main Camera
 - `CampaignData.Stages` 순서대로 `LobbyStageButton.prefab`을 동적 생성하므로 새 스테이지를 코드에 하드코딩하지 않는다.
 - 최초 저장 기준 `1-1`은 `Available`, `1-2`는 `Locked`로 표시한다.
 - `Locked`는 선택할 수 없고, `Available`, `BattleCleared`, `Completed`는 각각 진행 가능, 후일담 대기, 완료 상태와 다음 흐름 설명을 표시한다.
-- 목록 선택은 Lobby 상세 화면만 바꾸며, 상세 화면의 확정 버튼이 `CampaignFlowController.TrySelectStage()`를 호출한다.
+- 목록 선택은 Lobby 상세 화면만 바꾸며, 상세 화면의 확정 버튼이 활성 스테이지 지정과 실제 캠페인 진입을 차례로 요청한다.
 - `CampaignFlowController`는 초기화 여부, 현재 `Lobby` 단계, 스테이지 ID 존재 여부와 잠금 상태를 다시 검사한 뒤 `ActiveStage`를 바꾼다.
-- 3단계 선택 확정은 활성 스테이지만 기록하며 Story·Battle 로딩과 저장 상태 변경은 4단계 책임으로 남겨 둔다.
+- `Available`과 `Completed`는 전투 전 Story부터 시작하고, 비정상 종료로 `BattleCleared`에 머문 스테이지는 후일담부터 재개한다.
 - `LobbyStageButton.prefab`은 `Assets/Prefab/Lobby`에 있으며 한국어 `gulim SDF` TMP 폰트를 사용한다.
 - `LobbyStageListView`는 `Awake()`에서 목록 루트, 버튼 프리팹과 빈 목록 문구 참조를 즉시 검사한다.
 - Bootstrap 없이 `LobbyTest`를 직접 실행하면 영속 캠페인 시스템 누락 원인을 한국어 오류로 알리고 Lobby Controller를 비활성화한다.
 
 ### StoryTest
 
-`StoryTest`는 Campaign·Lobby·Battle 흐름과 분리해서 Story 재생만 검증하는 독립 테스트 씬이다.
+`StoryTest`는 독립 Story 재생과 캠페인 전투 전·후 Story 재생에 함께 사용하는 공통 씬이다.
 
 ```text
 StoryRoot
@@ -204,7 +208,10 @@ StoryRoot
    └─ FadeOverlay
 ```
 
-- `StoryRoot`에는 `StoryContext`, `StoryRunner`, `StoryInputReader`, 각 Presenter와 `StoryTestLauncher`가 연결되어 있다.
+- `StoryRoot`에는 `StoryContext`, `StoryRunner`, `StoryInputReader`, 각 Presenter, `StoryTestLauncher`와 `StoryCampaignBridge`가 연결되어 있다.
+- Bootstrap 없이 직접 실행하면 `StoryTestLauncher`가 기존 샘플을 재생하고, 캠페인으로 진입하면 Launcher는 비활성화되고 Bridge가 `ActiveStorySequence`를 스킵 가능 상태로 재생한다.
+- `StoryCampaignBridge`는 새 씬의 `Start()`가 캠페인 씬 전환 완료 콜백보다 먼저 실행될 수 있는 순서를 고려해 로딩 종료를 기다린 뒤 `Story` 단계와 활성 Story 요청을 검사한다.
+- 정상 완료와 Escape 스킵은 모두 캠페인 다음 흐름으로 전달되며, 재플레이에서도 전투 전·후 Story를 다시 보여 준다.
 - 샘플 `StorySequenceDataTest`는 대사, 배경 변경, 스탠딩 표시·숨김·표정·초점, 완성 만화 이미지 표시, 페이드와 시간 대기를 포함한 27개 명령을 분기 없이 순서대로 실행한다.
 - 대사 타이핑 중 진행 입력은 현재 문장을 즉시 완성하고, 완성 뒤 입력은 다음 명령으로 이동한다.
 - 만화 연출은 외부에서 컷 배치까지 완성한 Sprite 한 장을 전체 화면 Image에 그대로 표시한다. Story 코드는 컷 위치와 분할 레이아웃을 계산하지 않는다.
@@ -229,8 +236,21 @@ StoryRoot
 - `ActorPresentationRegistry`
 - `CombatActionPresenter`
 - `VfxManager`
+- `BattleIntroPresenter`
+- `BattleEntryCoordinator`
+- `StageFailureCoordinator`
+- `BattleCampaignBridge`
 
 `ActionPresentationQueue` 오브젝트에는 씬 단일 연출 큐와 현재 디버그 리시버·테스터가 있다.
+`BattleCampaignBridge`는 로딩 종료 뒤 `Battle` 단계와 활성 스테이지를 검사하고 결과 UI 확정을 영속 캠페인 흐름에 전달한다.
+`CampaignBattleFlowCanvas`에는 입장 미션 문구와 임시 클리어·실패 결과 UI가 있다.
+
+- 입장 연출은 `BattleIntroSequenceData`의 `Wait`, `MoveCamera`, `ShowMissionMessage`, `PlayDialogue` 명령을 배열 순서대로 자동 실행한다.
+- 현재 테스트 데이터는 미션 문구와 카메라 왕복 이동을 사용하며, `PlayDialogue`는 자동 진행 말풍선 데이터와 발화자를 나중에 연결할 확장 자리다.
+- 입장 연출은 `ActionPresentationQueue`의 첫 이벤트로 실행되어 행동, 유닛 선택과 수동 카메라 이동을 막는다.
+- `StageFailureCoordinator`는 `DefeatOnDeath` 중요 조작 유닛 사망 또는 플레이어 조작 유닛 전원 사망을 실패로 판정한다.
+- 현재 유진 테스트 데이터는 `DefeatOnDeath`가 켜져 있고 동료 테스트 데이터는 꺼져 있다.
+- 결과 UI 확인 뒤 승리는 저장 성공을 전제로 후일담 또는 완료·로비 흐름으로 이동하며, 실패는 진행을 바꾸지 않고 로비로 돌아간다.
 
 ### 맵 계층
 
@@ -664,7 +684,7 @@ SecurityDoor01
 
 - `StageGoal`은 목표 `GridPosition`과 씬의 `GridManager` 참조를 가진다.
 - 편집 모드에는 목표 좌표를 Scene 뷰 녹색 디버그 칸으로 표시한다.
-- 플레이 모드에는 Game 뷰의 Gizmos가 켜진 경우 같은 좌표에 프리팹 비주얼 교체 전 임시 목표 표시를 그린다.
+- 플레이 모드에는 Game 뷰의 전체 Gizmos 토글과 `StageGoal` Gizmo 필터가 모두 켜진 경우 같은 좌표에 프리팹 비주얼 교체 전 임시 목표 표시를 그린다.
 - 두 표시는 실제 빌드용 비주얼이 아니며 최종 목표 표시는 이후 프리팹으로 교체한다.
 - `StageGoalManager`는 `MoveCompletedLogicEvent`를 받아 살아 있는 플레이어 조작 유닛의 목표 도착을 검사한다.
 - 목표 달성 시 `StageClearedLogicEvent`와 `StageCleared` 연출을 만든다.
@@ -764,7 +784,7 @@ SecurityDoor01
 - `IPresentationEventHandler` 기반 연출 처리자 등록, 필터링, 실행과 완료 대기 흐름.
 - 그리드 시선 알고리즘의 정면 차단, 좌우 대칭, 한쪽·양쪽 대각선 모서리 규칙.
 - Unity 플레이 모드에서 고정 장애물 그림자, 청각 근접 감지와 보안문 개방 전후 시야 갱신.
-- 편집 모드 Scene 뷰와 플레이 모드 Game 뷰의 `StageGoal` 위치 표시.
+- 편집 모드와 플레이 모드 Scene 뷰의 `StageGoal` 위치 표시. Game 뷰 표시는 Editor의 Game 뷰 Gizmos 토글·필터에 의존한다.
 - `StageResultPresenter`의 클리어 로그 처리와 검 투척·회수 반복 Visual 유지.
 - 스테이지 클리어 후 플레이어 입력, 새 행동, 턴 전환과 남은 적 행동 차단.
 - 프리팹으로 배치한 해킹 터미널과 보안문의 기존 해킹·개방 흐름 유지.
@@ -776,6 +796,9 @@ SecurityDoor01
 - `LobbyTest`와 `LobbyStageButton.prefab` YAML의 로컬 fileID와 외부 GUID 누락이 없음을 확인했다.
 - `dotnet build S2.slnx --no-restore` 재검증 결과 경고 0개, 오류 0개.
 - 사용자가 원본 Unity 플레이 모드에서 현재 Lobby 표시와 입력 테스트를 완료했다.
+- 사용자가 원본 Unity에서 Bootstrap·Lobby를 거쳐 1-1 전투 전 Story, Battle과 전투 후 Story로 이어지는 현재 캠페인 핵심 흐름 테스트를 완료했다.
+- Story·Battle Bridge가 씬 전환 완료 뒤 캠페인 단계를 검사하도록 초기화 순서를 수정한 후 진입 오류가 해소됐다.
+- 세 캠페인 Story 데이터는 시작 `Fade In` 명령으로 검은 오버레이를 걷어 내고 대사를 표시한다.
 
 ## 17. 현재 한계
 
@@ -786,10 +809,9 @@ SecurityDoor01
 - 해킹 연출은 시간 대기와 로그, 문 열림은 비주얼 비활성화 수준이다.
 - 검 경로, 총격, 근접 타격, 적 공격의 최종 VFX가 없다.
 - 선택 표시는 런타임 LineRenderer 임시 링이다.
-- 스테이지 실패 조건과 최종 클리어·실패 UI가 없다.
+- 현재 클리어·실패 결과 UI와 입장 미션 표시는 캠페인 흐름 검증용 임시 화면이며 최종 디자인이 아니다.
 - `HeavyGun`은 데이터 타입만 있고 행동 구현이 없다.
 - 현재 Lobby UI는 캠페인 흐름 연결을 검증하기 위한 임시 화면이며, 이후 정식 로비를 별도로 제작할 예정이다.
-- Story 재생은 독립 테스트 단계이며 `StageDefinitionData`, `CampaignFlowController`, 전투 전·후 흐름과 아직 연결하지 않았다.
 - 이미 본 Story 기록과 그에 따른 건너뛰기 정책은 아직 저장 데이터에 없다. 현재는 `StoryRunner.Play()` 호출자가 건너뛰기 허용 여부를 전달한다.
 - `StoryTest`의 배경·스탠딩·만화 이미지는 기존 테스트 이미지를 사용하며 최종 시나리오 데이터와 전용 아트가 아니다.
 
@@ -797,15 +819,15 @@ SecurityDoor01
 
 캠페인 1~4단계의 상세 목적, 예정 책임, 상태별 흐름, 예외 처리와 완료 기준은 `S2-T 작업일지.md`의 `2026-07-26 캠페인 1~4단계 인수인계 문서화` 항목을 기준으로 한다.
 
-현재 캠페인 진행 상태는 **1단계 완료, 2단계 완료, 3단계 완료 및 사용자 테스트 완료, 4단계 다음 구현**이다.
-3단계 Lobby는 코드, 프리팹, Hierarchy, Inspector 연결과 사용자 플레이 확인까지 완료했으며 Story·Battle 전환은 의도적으로 포함하지 않았다.
-현재 Lobby 화면은 임시지만 캠페인 4단계 연결에 사용하기에 문제가 없으므로 그대로 유지한다.
+현재 캠페인 진행 상태는 **1~4단계 코드·데이터·Hierarchy·Inspector 구현 완료, 1-1 핵심 캠페인 한 바퀴 사용자 플레이 테스트 완료**다.
+현재 Lobby와 전투 결과 UI, 입장 미션 문구는 임시지만 게임 한 바퀴 흐름 검증에는 사용할 수 있다.
 
-1. 캠페인 4단계에서 `StageDefinitionData`의 전투 전·후 Story 요청을 `StoryRunner`에 전달하는 Bridge를 만든다.
-2. `BattleTest01`, `BattleTest02`의 클리어 상태를 캠페인 저장과 연결한다.
-3. `1-1 선택 → 전투 전 Story → 전투 → 전투 후 Story → 1-2 해금` 수직 슬라이스를 완성한다.
-4. 실제 시나리오와 최종 아트가 준비되면 Story 데이터·이미지 에셋을 교체하고 화면 연출을 조정한다.
-5. 전투 연출과 VFX 보강은 캠페인 기본 흐름이 연결된 뒤 스테이지 제작과 함께 진행한다.
+1. 완료 스테이지 재플레이에서 전투 전·후 Story가 다시 나오고 진행 상태가 낮아지지 않는지 확인한다.
+2. Story Escape 스킵 뒤 전투·후일담·로비 흐름이 유지되는지 확인한다.
+3. 유진 사망, 조작 유닛 전원 사망과 일반 전투 실패 시 로비 복귀를 확인한다.
+4. 1-2 승리 뒤 후일담 없이 완료 저장과 Lobby 복귀가 되는지 확인한다.
+5. 실제 시나리오와 최종 아트가 준비되면 임시 Story·입장 연출·결과 UI 데이터를 교체한다.
+6. 대화 로그와 이미 본 Story 기록, 정식 결과 화면은 프로토타입 한 바퀴 이후 확장한다.
 
 ## 19. 문서 유지 규칙
 

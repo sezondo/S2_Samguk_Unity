@@ -205,12 +205,11 @@ public class LobbyController : MonoBehaviour
             return;
         }
 
-        context.StageDetailView.ShowRequestResult(
-            $"'{selectedEntry.Stage.DisplayName}' 선택 완료 · Story/Battle 연결 대기",
-            true);
-        Debug.Log(
-            $"{nameof(LobbyController)}: 스테이지 '{selectedEntry.Stage.DisplayName}'을 캠페인 활성 스테이지로 선택했습니다.",
-            this);
+        context.StageDetailView.ShowRequestResult($"'{selectedEntry.Stage.DisplayName}' 진입 중…", true);
+        if (!campaignContext.FlowController.TryStartSelectedStage())
+        {
+            context.StageDetailView.ShowRequestResult("스테이지 진입 요청에 실패했습니다.", false);
+        }
     }
 
     /// <summary>

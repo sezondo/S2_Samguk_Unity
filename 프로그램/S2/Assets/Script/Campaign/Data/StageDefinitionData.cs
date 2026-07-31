@@ -19,13 +19,21 @@ public class StageDefinitionData : ScriptableObject
     [Header("Scene")]
     // 이 스테이지가 진입할 전투 씬 이름이다.
     [SerializeField] private string battleSceneName = "BattleTest";
+
+    [Header("Story")]
+    // 로비에서 스테이지를 시작한 뒤 전투 진입 전에 재생할 Story 데이터다.
+    [SerializeField] private StorySequenceData preBattleStory;
     // 전투 승리 뒤 후일담 스토리를 재생해야 하는지 나타낸다.
     [SerializeField] private bool hasPostBattleStory;
+    // 후일담 사용이 켜졌을 때 전투 승리 뒤 재생할 Story 데이터다.
+    [SerializeField] private StorySequenceData postBattleStory;
 
     public string StageId => stageId;
     public int ChapterNumber => chapterNumber;
     public int StageNumber => stageNumber;
     public string DisplayName => displayName;
     public string BattleSceneName => battleSceneName;
+    public StorySequenceData PreBattleStory => preBattleStory;
     public bool HasPostBattleStory => hasPostBattleStory;
+    public StorySequenceData PostBattleStory => postBattleStory;
 }
