@@ -111,6 +111,11 @@ public class SecurityDoorController : MonoBehaviour, IActionLogicEventHandler
 
         isOpen = true;
         context.EnqueuePresentation(PresentationEvent.SecurityDoorOpened(this, "보안문 열림 연출"));
+        if (PlayerVisionManager.Instance != null)
+        {
+            // 문 열림 비주얼 뒤에 새로 확보된 시야가 적용되도록 같은 연출 문맥에 추가한다.
+            PlayerVisionManager.Instance.RefreshVision(context);
+        }
 
         if (logDoorState)
         {

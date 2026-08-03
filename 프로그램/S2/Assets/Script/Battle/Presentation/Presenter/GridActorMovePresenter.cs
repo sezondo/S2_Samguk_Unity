@@ -161,7 +161,26 @@ public class GridActorMovePresenter : MonoBehaviour, IPresentationEventHandler
         Vector3 fromWorldPosition = gridManager.GridToWorld(presentationEvent.FromPosition);
         Vector3 toWorldPosition = gridManager.GridToWorld(presentationEvent.ToPosition);
 
+        PlayerVisionPresenter visionPresenter = PlayerVisionPresenter.Instance;
+        bool applyVisionTransition = visionPresenter != null &&
+            visionPresenter.IsEnemyActor(targetActor) &&
+            !visionPresenter.IsActorForcedVisible(targetActor);
+        float startVisionAlpha = applyVisionTransition &&
+            !visionPresenter.ShouldShowEnemyActorAt(targetActor, presentationEvent.FromPosition)
+            ? 0f
+            : 1f;
+        float targetVisionAlpha = applyVisionTransition &&
+            !visionPresenter.ShouldShowEnemyActorAt(targetActor, presentationEvent.ToPosition)
+            ? 0f
+            : 1f;
+
         visualRoot.position = fromWorldPosition;
+        if (applyVisionTransition)
+        {
+            // 적이 시야 경계를 넘는 한 칸 동안 이동과 표시 알파를 함께 보간한다.
+            visualController.SetVisionAlpha(startVisionAlpha);
+        }
+
         visualController.FaceFromTo(presentationEvent.FromPosition, presentationEvent.ToPosition);
         if (StartsMoveAnimation(presentationEvent.MovePhase))
         {
@@ -179,12 +198,22 @@ public class GridActorMovePresenter : MonoBehaviour, IPresentationEventHandler
             float normalizedTime = Mathf.Clamp01(elapsed / moveData.MoveDuration);
             float curveTime = moveData.MoveCurve.Evaluate(normalizedTime);
             visualRoot.position = Vector3.LerpUnclamped(fromWorldPosition, toWorldPosition, curveTime);
+            if (applyVisionTransition)
+            {
+                visualController.SetVisionAlpha(Mathf.Lerp(startVisionAlpha, targetVisionAlpha, curveTime));
+            }
 
             elapsed += Time.deltaTime;
             yield return null;
         }
 
         visualRoot.position = toWorldPosition;
+        if (applyVisionTransition)
+        {
+            visualController.SetVisionAlpha(targetVisionAlpha);
+            visionPresenter.SetMovedEnemyVisibility(targetActor, targetVisionAlpha > 0f);
+        }
+
         if (EndsMoveAnimation(presentationEvent.MovePhase))
         {
             visualController.TryCompleteMoveAnimation(moveData);

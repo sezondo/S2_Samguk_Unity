@@ -152,73 +152,12 @@ public class EnemyGridSight : MonoBehaviour
                     Multiply(right, lateralOffset);
 
                 if (gridManager.IsInside(position) &&
-                    HasForwardLineOfSight(gridManager, origin, position))
+                    GridLineOfSight.HasLineOfSight(gridManager, origin, position))
                 {
                     AddDetectedPosition(position);
                 }
             }
         }
-    }
-
-    /// <summary>
-    /// 시작 칸에서 목표 칸까지 그리드 선을 따라가며 구조물에 가리지 않는지 확인한다.
-    /// 정확히 대각선 모서리를 지날 때는 양쪽 칸이 모두 막힌 경우에만 시야를 차단한다.
-    /// </summary>
-    private static bool HasForwardLineOfSight(
-        GridManager gridManager,
-        GridPosition origin,
-        GridPosition target)
-    {
-        int deltaX = target.x - origin.x;
-        int deltaY = target.y - origin.y;
-        int absoluteDeltaX = Mathf.Abs(deltaX);
-        int absoluteDeltaY = Mathf.Abs(deltaY);
-        int stepX = Math.Sign(deltaX);
-        int stepY = Math.Sign(deltaY);
-
-        int currentX = origin.x;
-        int currentY = origin.y;
-        int horizontalSteps = 0;
-        int verticalSteps = 0;
-
-        while (horizontalSteps < absoluteDeltaX || verticalSteps < absoluteDeltaY)
-        {
-            int horizontalDecision = (1 + 2 * horizontalSteps) * absoluteDeltaY;
-            int verticalDecision = (1 + 2 * verticalSteps) * absoluteDeltaX;
-
-            if (horizontalDecision == verticalDecision)
-            {
-                GridPosition horizontalSide = new(currentX + stepX, currentY);
-                GridPosition verticalSide = new(currentX, currentY + stepY);
-                if (gridManager.IsSightBlocked(horizontalSide) &&
-                    gridManager.IsSightBlocked(verticalSide))
-                {
-                    return false;
-                }
-
-                currentX += stepX;
-                currentY += stepY;
-                horizontalSteps++;
-                verticalSteps++;
-            }
-            else if (horizontalDecision < verticalDecision)
-            {
-                currentX += stepX;
-                horizontalSteps++;
-            }
-            else
-            {
-                currentY += stepY;
-                verticalSteps++;
-            }
-
-            if (gridManager.IsSightBlocked(new GridPosition(currentX, currentY)))
-            {
-                return false;
-            }
-        }
-
-        return true;
     }
 
     /// <summary>

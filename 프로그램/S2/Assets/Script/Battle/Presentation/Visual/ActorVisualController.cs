@@ -24,11 +24,22 @@ public class ActorVisualController : MonoBehaviour
 
     // 마지막으로 재생을 요청한 Animator 상태 이름이다.
     private string currentAnimationStateName;
+    // 경계·피격 같은 기존 색상 연출이 요청한 원본 표시 색이다.
+    private Color presentationColor = Color.white;
+    // 플레이어 시야가 적용하는 별도 표시 알파다. 기존 색상 연출 알파와 곱해서 사용한다.
+    private float visionAlpha = 1f;
+    // 시야 밖 공격자 임시 노출 전에 사용하던 SpriteRenderer Sorting Layer ID다.
+    private int sortingLayerIdBeforeVisionOverride;
+    // 시야 밖 공격자 임시 노출 전에 사용하던 SpriteRenderer Sorting Order다.
+    private int sortingOrderBeforeVisionOverride;
+    // 공격자 임시 노출용 정렬 순서 덮어쓰기가 현재 적용돼 있는지 나타낸다.
+    private bool hasVisionSortingOverride;
 
     public SpriteRenderer TargetRenderer => targetRenderer;
     public Animator Animator => animator;
     public string CurrentAnimationStateName => currentAnimationStateName;
     public bool IsFacingRight { get; private set; }
+    public float VisionAlpha => visionAlpha;
 
     /// <summary>
     /// 시작 시 SpriteRenderer의 현재 반전값을 화면상 바라보는 방향으로 변환한다.
@@ -41,7 +52,9 @@ public class ActorVisualController : MonoBehaviour
             return;
         }
 
+        presentationColor = targetRenderer.color;
         IsFacingRight = artworkFacesRight ? !targetRenderer.flipX : targetRenderer.flipX;
+        ApplyCompositeColor();
     }
 
     /// <summary>
@@ -49,7 +62,68 @@ public class ActorVisualController : MonoBehaviour
     /// </summary>
     public void ApplyColor(Color color)
     {
-        targetRenderer.color = color;
+        presentationColor = color;
+        ApplyCompositeColor();
+    }
+
+    /// <summary>
+    /// 기존 경계·피격 색상은 보존하면서 플레이어 시야에 따른 표시 알파를 적용한다.
+    /// </summary>
+    public void SetVisionAlpha(float alpha)
+    {
+        visionAlpha = Mathf.Clamp01(alpha);
+        ApplyCompositeColor();
+    }
+
+    /// <summary>
+    /// 시야 밖 공격 연출 동안 Actor Sprite를 Fog보다 위에 표시하고 기존 정렬 값을 보존한다.
+    /// </summary>
+    public void BeginVisionSortingOverride(string sortingLayerName, int sortingOrder)
+    {
+        if (targetRenderer == null)
+        {
+            return;
+        }
+
+        if (!hasVisionSortingOverride)
+        {
+            sortingLayerIdBeforeVisionOverride = targetRenderer.sortingLayerID;
+            sortingOrderBeforeVisionOverride = targetRenderer.sortingOrder;
+            hasVisionSortingOverride = true;
+        }
+
+        targetRenderer.sortingLayerName = sortingLayerName;
+        targetRenderer.sortingOrder = sortingOrder;
+    }
+
+    /// <summary>
+    /// 시야 밖 공격자 임시 노출이 끝난 뒤 Actor Sprite의 원래 정렬 값을 복원한다.
+    /// </summary>
+    public void EndVisionSortingOverride()
+    {
+        if (targetRenderer == null || !hasVisionSortingOverride)
+        {
+            return;
+        }
+
+        targetRenderer.sortingLayerID = sortingLayerIdBeforeVisionOverride;
+        targetRenderer.sortingOrder = sortingOrderBeforeVisionOverride;
+        hasVisionSortingOverride = false;
+    }
+
+    /// <summary>
+    /// 연출 색상과 시야 알파를 합쳐 실제 SpriteRenderer 색상에 적용한다.
+    /// </summary>
+    private void ApplyCompositeColor()
+    {
+        if (targetRenderer == null)
+        {
+            return;
+        }
+
+        Color finalColor = presentationColor;
+        finalColor.a *= visionAlpha;
+        targetRenderer.color = finalColor;
     }
 
     /// <summary>

@@ -12,6 +12,8 @@ public enum PresentationEventType
     Attack,
     Hack,
     SecurityDoorOpen,
+    PlayerVisionChanged,
+    ActorVisibilityOverride,
     SwordMove,
     MeleeAttackWithSword,
     MeleeAttackUnarmed,

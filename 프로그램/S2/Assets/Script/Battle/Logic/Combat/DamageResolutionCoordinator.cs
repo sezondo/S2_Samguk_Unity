@@ -53,6 +53,18 @@ public sealed class DamageResolutionCoordinator : IActionLogicEventHandler
                 damageResult));
         }
 
+        bool temporarilyRevealAttacker =
+            applyDamage.PresentationKind == AttackPresentationKind.EnemyRanged &&
+            PlayerVisionManager.Instance != null &&
+            !PlayerVisionManager.Instance.IsVisible(applyDamage.FromPosition);
+        if (temporarilyRevealAttacker)
+        {
+            context.EnqueuePresentation(PresentationEvent.ActorVisibilityOverride(
+                applyDamage.Attacker,
+                true,
+                "시야 밖 공격자 임시 노출"));
+        }
+
         context.EnqueuePresentation(PresentationEvent.CombatAction(
             applyDamage.Attacker,
             applyDamage.Target,
@@ -61,6 +73,14 @@ public sealed class DamageResolutionCoordinator : IActionLogicEventHandler
             applyDamage.PresentationKind,
             damageResult,
             applyDamage.Message));
+
+        if (temporarilyRevealAttacker)
+        {
+            context.EnqueuePresentation(PresentationEvent.ActorVisibilityOverride(
+                applyDamage.Attacker,
+                false,
+                "시야 밖 공격자 임시 노출 해제"));
+        }
     }
 
     /// <summary>

@@ -232,6 +232,12 @@ public class PlayerMeleeAttackAction : MonoBehaviour
             return false;
         }
 
+        if (PlayerVisionManager.Instance != null && !PlayerVisionManager.Instance.IsVisible(targetPosition))
+        {
+            LogBlockedTarget(targetPosition, "현재 플레이어 시야 밖입니다");
+            return false;
+        }
+
         if (!GridManager.Instance.TryGetActorAt(targetPosition, out targetActor) || targetActor == playerContext.GridActor)
         {
             LogBlockedTarget(targetPosition, "피해를 줄 대상이 없습니다");

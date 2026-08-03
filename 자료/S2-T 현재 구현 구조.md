@@ -1,6 +1,6 @@
 # S2-T 현재 구현 구조
 
-- 최신 기준: 2026-07-31
+- 최신 기준: 2026-08-03
 - 기준 브랜치: `main`
 - Unity 버전: `6000.0.64f1`
 - 기준 테스트 씬: `Assets/Scenes/Test/BootstrapTest.unity`, `Assets/Scenes/Test/LobbyTest.unity`, `Assets/Scenes/Test/StoryTest.unity`, `Assets/Scenes/Test/BattleTest01.unity`, `Assets/Scenes/Test/BattleTest02.unity`
@@ -67,6 +67,7 @@ S2-T는 사이버 한국 삼국시대 세계관을 사용하는 보드게임식 
 ### Battle Logic
 
 - `Assets/Script/Battle/Logic/Grid`: 격자 좌표, 셀, 점유와 경로 탐색.
+- `Assets/Script/Battle/Logic/Vision`: 플레이어 합산 시야, 누적 탐색 상태, 시야 스냅샷과 명시적 참조 Context.
 - `Assets/Script/Battle/Logic/Turn`: 플레이어·적 턴과 AP.
 - `Assets/Script/Battle/Logic/Unit`: 공통 전술 유닛, Context, Registry, 제어권과 표적 선택.
 - `Assets/Script/Battle/Logic/Unit/Data`: 플레이어 전술 유닛 튜닝 데이터.
@@ -220,28 +221,32 @@ StoryRoot
 
 ### BattleTest01·BattleTest02 씬 단위 시스템
 
-`BattleTest01`, `BattleTest02`의 `Manager` 오브젝트에는 다음 씬 단위 컴포넌트가 연결되어 있다.
+`BattleTest01`, `BattleTest02`의 씬 단위 시스템은 `BattleRoot` 아래에서 책임별로 구분한다.
 
-- `GridManager`
-- `TurnManager`
-- `TacticalUnitRegistry`
-- `EnemyRegistry`
-- `HackableRegistry`
-- `PlayerInputReader`
-- `PlayerUnitControlManager`
-- `PlayerUnitInputController`
-- `PlayerUnitActionFlowController`
-- `EnemyAlertCoordinator`
-- `EnemyTurnCoordinator`
-- `ActorPresentationRegistry`
-- `CombatActionPresenter`
-- `VfxManager`
-- `BattleIntroPresenter`
-- `BattleEntryCoordinator`
-- `StageFailureCoordinator`
-- `BattleCampaignBridge`
+```text
+BattleRoot
+├─ BattleCore
+│  └─ GridManager / TurnManager / TacticalUnitRegistry / EnemyRegistry / HackableRegistry
+├─ PlayerSystem
+│  └─ PlayerInputReader / PlayerUnitControlManager / PlayerUnitInputController / PlayerUnitActionFlowController
+├─ EnemySystem
+│  └─ EnemyAlertCoordinator / EnemyTurnCoordinator
+├─ BattleStage
+│  └─ StageFailureCoordinator
+├─ BattlePresentation
+│  ├─ ActorPresentationRegistry / CombatActionPresenter / VfxManager
+│  └─ ActionPresentationQueue
+├─ BattleFlow
+│  └─ BattleIntroPresenter / BattleEntryCoordinator / BattleCampaignBridge
+├─ BattleVision
+│  ├─ PlayerVisionContext / PlayerVisionManager / PlayerVisionPresenter
+│  └─ PlayerVisionFogRoot
+└─ BattleDebug
+   └─ Debug
+```
 
-`ActionPresentationQueue` 오브젝트에는 씬 단일 연출 큐와 현재 디버그 리시버·테스터가 있다.
+`ActionPresentationQueue`에는 씬 단일 연출 큐와 현재 디버그 리시버·테스터가 있으며 `BattlePresentation` 아래에 배치한다.
+두 씬의 시야 Context 참조와 Fog 표시 값은 같은 기준으로 연결되어 있고, 유진·동료 테스트 데이터의 시야 거리는 각각 `6칸`으로 명시한다.
 `BattleCampaignBridge`는 로딩 종료 뒤 `Battle` 단계와 활성 스테이지를 검사하고 결과 UI 확정을 영속 캠페인 흐름에 전달한다.
 `CampaignBattleFlowCanvas`에는 입장 미션 문구와 임시 클리어·실패 결과 UI가 있다.
 
@@ -312,6 +317,20 @@ MapVisualGrid
 - `IsSightBlocked()`는 `LogicTilemap` 고정 장애물과 명시적으로 등록된 동적 구조물만 시야 차단물로 판정한다.
 - `RegisterSightBlocker()`와 `UnregisterSightBlocker()`는 닫힌 문처럼 런타임에 바뀌는 시야 차단물을 관리하고 변경 이벤트를 발생시킨다.
 - 플레이어·NPC·적을 포함한 일반 점유 Actor는 동적 시야 차단물로 등록하지 않는다.
+
+### 공통 시선과 플레이어 시야
+
+- `GridLineOfSight`는 적과 플레이어 시야가 함께 사용하는 그리드 가림 계산기다.
+- 정확히 대각선 모서리를 지날 때는 양쪽 인접 칸이 모두 막힌 경우에만 시야를 차단한다.
+- 목표 칸 자체가 벽이어도 벽 표면은 탐색할 수 있으며, 벽 뒤쪽 칸은 가려진다.
+- `PlayerVisionManager`는 살아 있는 플레이어 조작 유닛들의 360도 원형 시야를 합집합으로 계산한다.
+- 유닛별 시야 거리는 `ControllableUnitData.VisionRange`가 제공하며 기본값은 `6칸`이다.
+- 각 칸은 `Unexplored`, `Explored`, `Visible` 세 상태를 가진다. `Explored`는 한 번 보았지만 현재 시야 밖인 누적 탐색 상태다.
+- 플레이어 한 칸 이동의 `MoveStepEnteredLogicEvent`마다 독립 `PlayerVisionSnapshot`을 만들어 이동 연출 바로 뒤에 `PlayerVisionChanged` 이벤트를 추가한다.
+- 스냅샷은 현재·누적 칸뿐 아니라 그 논리 시점에 보였던 적 Actor도 복사해, 이후 적 논리 위치가 먼저 바뀌어도 연출 전에 정보를 누출하지 않는다.
+- 플레이어 유닛 사망과 보안문 개방도 합산 시야를 다시 계산한다.
+- 총·근접·검 투척·해킹은 시야 시스템이 활성화된 전투에서 현재 시야 밖 칸을 대상으로 선택할 수 없다.
+- `PlayerVisionContext`는 Grid, 유닛·적·Actor Visual 등록소, 연출 큐, 시야 Manager·Presenter와 Fog Root 참조만 보관한다.
 
 현재 전투 테스트 씬 설정은 `16 x 16`, 셀 크기 `1`, 원점 `(0, 0, 0)`이다.
 
@@ -602,6 +621,8 @@ PlayerInputReader
 - `SwordMove`
 - `Hack`
 - `SecurityDoorOpen`
+- `PlayerVisionChanged`
+- `ActorVisibilityOverride`
 - `CombatAction`
 - `StageCleared`
 
@@ -610,12 +631,12 @@ PlayerInputReader
 - `ActorPresentationRegistry`: `GridActor`와 `ActorVisualController` 연결을 보관한다.
 - `ActorPresentationBinding`: 각 Actor의 논리·비주얼 연결을 등록한다.
 - `ActorPresentationSynchronizer`: 논리 위치와 VisualRoot 위치를 초기 동기화한다.
-- `ActorVisualController`: SpriteRenderer 색상·좌우 반전과 Animator 상태를 적용한다.
+- `ActorVisualController`: SpriteRenderer 색상·좌우 반전과 Animator 상태를 적용하며, 기존 색상 연출과 독립된 시야 알파를 합성한다.
 - 현재 원본 캐릭터 아트의 기본 방향은 오른쪽이다.
 
 ### Presenter 책임
 
-- `GridActorMovePresenter`: 플레이어·적 이동 위치 보간과 이동 상태 전환.
+- `GridActorMovePresenter`: 플레이어·적 이동 위치 보간과 이동 상태 전환. 적이 시야 경계를 넘으면 한 칸 이동과 표시 알파를 함께 보간한다.
 - `AlertDetectedPresenter`: 경고색 점멸과 선택적 발각 애니메이션.
 - `CombatActionPresenter`: 공격자·피격자 방향과 공격·피격·사망 자세 동시 처리.
 - `SwordActionPresenter`: 검 투척·해킹·회수 위치와 근접 기울기.
@@ -623,6 +644,8 @@ PlayerInputReader
 - `SecurityDoorPresenter`: 열린 문의 `DoorVisual` 비활성화.
 - `StageResultPresenter`: 클리어·실패 연출 이벤트 처리. 현재는 한국어 로그 출력 후 즉시 완료.
 - `PlayerUnitSelectionPresenter`: 현재 조작 유닛의 임시 LineRenderer 선택 링.
+- `PlayerVisionPresenter`: 런타임 Fog 칸 생성, 미탐색·탐색·현재 시야 색 전환, 적 표시와 공격자 임시 노출.
+- 시야 밖 공격자는 공격 연출 동안 Sprite 정렬을 Fog보다 한 단계 위로 올리고, 공격 종료 뒤 기존 Sorting Layer·Order로 복원한다. Fog 지형 자체는 걷지 않는다.
 
 `MovePresentationData`는 이동 시간·커브·이동/Idle 애니메이션 옵션을 보관한다.
 `CombatPresentationData`는 공격 종류별 공격 상태와 유지 시간, 공통 Hit·Death·Idle 상태를 보관한다.
@@ -748,6 +771,7 @@ SecurityDoor01
 - AP 1개당 이동 거리: `3칸`.
 - 해킹·검 투척 사거리: 각각 `5칸`.
 - 총 사거리: `5칸`, 최대 총알 `10`.
+- 플레이어 시야 기본값: `6칸`.
 
 동료1 테스트 데이터:
 
@@ -799,6 +823,11 @@ SecurityDoor01
 - 사용자가 원본 Unity에서 Bootstrap·Lobby를 거쳐 1-1 전투 전 Story, Battle과 전투 후 Story로 이어지는 현재 캠페인 핵심 흐름 테스트를 완료했다.
 - Story·Battle Bridge가 씬 전환 완료 뒤 캠페인 단계를 검사하도록 초기화 순서를 수정한 후 진입 오류가 해소됐다.
 - 세 캠페인 Story 데이터는 시작 `Fade In` 명령으로 검은 오버레이를 걷어 내고 대사를 표시한다.
+- 플레이어 시야 신규 런타임 C#을 포함한 `dotnet build S2.slnx --no-restore`: 경고 0개, 오류 0개.
+- 시야 밖 공격자 임시 노출이 불투명 Fog에 다시 가려지던 문제를 Sorting Layer·Order 임시 덮어쓰기와 원상 복구로 수정했다.
+- 사용자가 `BattleTest01`에서 Fog, 탐색 지형 유지, 적 표시와 공격자 임시 노출을 포함한 시야 기능 플레이 테스트를 완료했다.
+- `BattleTest01`, `BattleTest02`의 `BattleRoot` 책임별 Hierarchy, 시야 필수 참조와 Missing Script를 Unity Editor API로 검증했다.
+- 두 씬의 고유 입장 시퀀스 참조를 유지한 상태에서 `dotnet build S2.slnx`: 경고 0개, 오류 0개.
 
 ## 17. 현재 한계
 
@@ -814,6 +843,8 @@ SecurityDoor01
 - 현재 Lobby UI는 캠페인 흐름 연결을 검증하기 위한 임시 화면이며, 이후 정식 로비를 별도로 제작할 예정이다.
 - 이미 본 Story 기록과 그에 따른 건너뛰기 정책은 아직 저장 데이터에 없다. 현재는 `StoryRunner.Play()` 호출자가 건너뛰기 허용 여부를 전달한다.
 - `StoryTest`의 배경·스탠딩·만화 이미지는 기존 테스트 이미지를 사용하며 최종 시나리오 데이터와 전용 아트가 아니다.
+- 플레이어 시야 Fog는 현재 런타임 사각형 SpriteRenderer 방식의 1차 구현이며, 최종 마스크 Shader와 전용 시각 스타일은 후순위다.
+- Hierarchy 정리 뒤 `BattleTest01` 회귀 테스트와 새로 연결한 `BattleTest02`의 플레이 모드 테스트는 남아 있다.
 
 ## 18. 다음 작업
 
@@ -822,12 +853,14 @@ SecurityDoor01
 현재 캠페인 진행 상태는 **1~4단계 코드·데이터·Hierarchy·Inspector 구현 완료, 1-1 핵심 캠페인 한 바퀴 사용자 플레이 테스트 완료**다.
 현재 Lobby와 전투 결과 UI, 입장 미션 문구는 임시지만 게임 한 바퀴 흐름 검증에는 사용할 수 있다.
 
-1. 완료 스테이지 재플레이에서 전투 전·후 Story가 다시 나오고 진행 상태가 낮아지지 않는지 확인한다.
-2. Story Escape 스킵 뒤 전투·후일담·로비 흐름이 유지되는지 확인한다.
-3. 유진 사망, 조작 유닛 전원 사망과 일반 전투 실패 시 로비 복귀를 확인한다.
-4. 1-2 승리 뒤 후일담 없이 완료 저장과 Lobby 복귀가 되는지 확인한다.
-5. 실제 시나리오와 최종 아트가 준비되면 임시 Story·입장 연출·결과 UI 데이터를 교체한다.
-6. 대화 로그와 이미 본 Story 기록, 정식 결과 화면은 프로토타입 한 바퀴 이후 확장한다.
+1. 정리된 `BattleTest01`에서 기존 시야·전투·캠페인 연결의 회귀 여부를 확인한다.
+2. `BattleTest02`에서 한 칸 이동별 Fog 확장, 적 진입·이탈, 벽·문 차단, 다중 유닛 합산과 공격자 임시 노출을 플레이 모드로 검증한다.
+3. 완료 스테이지 재플레이에서 전투 전·후 Story가 다시 나오고 진행 상태가 낮아지지 않는지 확인한다.
+4. Story Escape 스킵 뒤 전투·후일담·로비 흐름이 유지되는지 확인한다.
+5. 유진 사망, 조작 유닛 전원 사망과 일반 전투 실패 시 로비 복귀를 확인한다.
+6. 1-2 승리 뒤 후일담 없이 완료 저장과 Lobby 복귀가 되는지 확인한다.
+7. 실제 시나리오와 최종 아트가 준비되면 임시 Story·입장 연출·결과 UI 데이터를 교체한다.
+8. 대화 로그와 이미 본 Story 기록, 정식 결과 화면은 프로토타입 한 바퀴 이후 확장한다.
 
 ## 19. 문서 유지 규칙
 

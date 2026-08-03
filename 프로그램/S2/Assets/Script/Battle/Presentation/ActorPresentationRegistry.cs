@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using UnityEngine;
 
@@ -10,6 +11,11 @@ public class ActorPresentationRegistry : MonoBehaviour
 
     // 논리 Actor를 기준으로 등록된 시각 제어 컴포넌트를 찾는 맵이다.
     private readonly Dictionary<GridActor, ActorVisualController> visualByActor = new();
+
+    // 새 Actor와 Visual 연결이 등록됐을 때 발생한다.
+    public event Action<GridActor, ActorVisualController> ActorRegistered;
+    // Actor와 Visual 연결이 등록 해제됐을 때 발생한다.
+    public event Action<GridActor, ActorVisualController> ActorUnregistered;
 
     /// <summary>
     /// 씬의 단일 연출 등록소 인스턴스를 등록한다.
@@ -55,7 +61,13 @@ public class ActorPresentationRegistry : MonoBehaviour
             return false;
         }
 
+        bool isNewBinding = !visualByActor.ContainsKey(actor);
         visualByActor[actor] = visualController;
+        if (isNewBinding)
+        {
+            ActorRegistered?.Invoke(actor, visualController);
+        }
+
         return true;
     }
 
@@ -72,6 +84,7 @@ public class ActorPresentationRegistry : MonoBehaviour
         if (visualByActor.TryGetValue(actor, out ActorVisualController registeredVisual) && registeredVisual == visualController)
         {
             visualByActor.Remove(actor);
+            ActorUnregistered?.Invoke(actor, visualController);
         }
     }
 

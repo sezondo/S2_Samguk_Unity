@@ -148,6 +148,16 @@ public class PlayerSwordThrowAction : MonoBehaviour
     /// </summary>
     private bool TryRequestDamageAtTarget(GridPosition fromPosition, GridPosition targetPosition, ActionResolutionContext resolutionContext)
     {
+        if (PlayerVisionManager.Instance != null && !PlayerVisionManager.Instance.IsVisible(targetPosition))
+        {
+            if (logActionState)
+            {
+                Debug.Log($"{nameof(PlayerSwordThrowAction)}: {targetPosition} 칸은 현재 플레이어 시야 밖이라 피해 대상을 판정하지 않습니다.", this);
+            }
+
+            return false;
+        }
+
         if (!GridManager.Instance.TryGetActorAt(targetPosition, out GridActor targetActor) || targetActor == playerContext.GridActor)
         {
             return false;
@@ -265,6 +275,12 @@ public class PlayerSwordThrowAction : MonoBehaviour
         if (distance > SwordThrowRange)
         {
             LogBlockedTarget(targetPosition, $"검 투척 사거리 밖입니다. 거리: {distance}, 최대 거리: {SwordThrowRange}");
+            return false;
+        }
+
+        if (PlayerVisionManager.Instance != null && !PlayerVisionManager.Instance.IsVisible(targetPosition))
+        {
+            LogBlockedTarget(targetPosition, "현재 플레이어 시야 밖입니다");
             return false;
         }
 

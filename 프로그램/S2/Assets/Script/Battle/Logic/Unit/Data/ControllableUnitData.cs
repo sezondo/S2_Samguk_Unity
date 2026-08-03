@@ -20,6 +20,10 @@ public class ControllableUnitData : ScriptableObject
     // 이 유닛이 사망했을 때 스테이지 패배 조건으로 사용할지 나타낸다. 현재는 기록용이다.
     [SerializeField] private bool defeatOnDeath;
 
+    [Header("Vision")]
+    // 이 유닛이 360도로 확보하는 플레이어 시야의 최대 그리드 거리다.
+    [SerializeField] private int visionRange = 6;
+
     [Header("AP")]
     // 플레이어가 가질 수 있는 최대 AP다.
     [SerializeField] private int maxActionPoint = 3;
@@ -71,6 +75,7 @@ public class ControllableUnitData : ScriptableObject
     public string DisplayName => displayName;
     public UnitAbilityType RequiredAbilities => requiredAbilities;
     public bool DefeatOnDeath => defeatOnDeath;
+    public int VisionRange => visionRange;
     public int MaxActionPoint => maxActionPoint;
     public int StartTurnActionPoint => startTurnActionPoint;
     public int MoveDistancePerActionPoint => moveDistancePerActionPoint;

@@ -2450,3 +2450,124 @@
 - `S2-T 현재 구현 구조.md`의 최신 기준을 2026-07-31로 갱신했다.
 - 현재 검증 상태와 다음 작업에서 핵심 한 바퀴 완료 항목을 반영하고 남은 예외 테스트만 유지했다.
 - Notion `프로젝트 S2-T`에는 날짜별 상세 내역을 쌓지 않고 현재 상태와 다음 작업만 갱신한다.
+
+## 2026-08-02 플레이어 시야·전장의 안개 코드 구현
+
+## 목적
+
+- 플레이어 유닛별 고유 시야를 합산하고, 미탐색·탐색됨·현재 시야의 스타크래프트식 전장의 안개를 만든다.
+- 현재 시야 밖의 적은 숨기고 대상 선택에서도 제외한다.
+- 적이 시야 경계를 이동할 때 순간 표시 전환 대신 한 칸 이동과 함께 자연스럽게 나타나거나 사라지게 한다.
+- 시야 밖 적이 플레이어를 공격하면 공격 연출 동안만 임시 노출한다.
+
+## 구현
+
+- `GridLineOfSight`를 추가해 기존 적 시야와 새 플레이어 시야가 대각선 모서리·고정 장애물·동적 보안문 가림 규칙을 공유하게 했다.
+- `ControllableUnitData`에 기본 `6칸`의 `VisionRange`를 추가했다.
+- `PlayerVisionContext`, `PlayerVisionManager`, `PlayerVisionSnapshot`, `GridVisibilityState`를 `Battle/Logic/Vision`에 추가했다.
+- 살아 있는 플레이어 조작 유닛들의 360도 원형 시야를 합산하고 현재 시야를 누적 탐색 상태에 합친다.
+- 플레이어 한 칸 이동마다 시야를 즉시 계산하고 독립 스냅샷을 `PlayerVisionChanged` 연출 이벤트로 추가한다.
+- 스냅샷에 당시 보이던 적 Actor도 함께 보존해, 같은 논리 처리에서 적의 최종 위치가 먼저 바뀌어도 연출 전에 위치가 누출되지 않게 했다.
+- 플레이어 사망과 보안문 개방 뒤에도 시야를 갱신한다.
+- `PlayerVisionPresenter`가 보드 크기만큼 런타임 Fog SpriteRenderer를 만들고 `Unexplored`, `Explored`, `Visible` 색으로 전환한다.
+- `ActorVisualController`에 기존 경계·피격 색상과 독립된 시야 알파 합성을 추가했다.
+- `GridActorMovePresenter`가 적의 시야 밖→안, 안→밖 이동에서 한 칸 위치와 시야 알파를 함께 보간한다.
+- `DamageResolutionCoordinator`가 시야 밖 적의 원거리 공격 전후에 `ActorVisibilityOverride` 이벤트를 넣어 공격 동안만 적을 표시한다.
+- 총, 근접, 검 투척과 해킹은 시야 시스템이 활성화돼 있을 때 현재 시야 밖을 대상으로 사용할 수 없게 했다.
+- `ActorPresentationRegistry`에 새 Visual 등록 이벤트를 추가해 초기화 순서와 무관하게 적 표시 상태를 맞춘다.
+
+## 현재 연결 경계
+
+- 프로젝트 규칙에 따라 이번 작업에서는 Battle 씬 Hierarchy와 Inspector 직렬화 연결을 임의로 수정하지 않았다.
+- `BattleTest01`, `BattleTest02`에 `PlayerVisionContext`, `PlayerVisionManager`, `PlayerVisionPresenter`, Fog Root를 연결하면 시야 시스템이 활성화된다.
+- Fog는 현재 런타임 사각형 SpriteRenderer 방식의 1차 표현이며 최종 Shader 마스크는 후순위다.
+
+## 검증
+
+- 신규 시야 C# 파일을 컴파일 대상에 포함한 `dotnet build S2.slnx --no-restore`: 경고 0개, 오류 0개.
+- 신규 스크립트와 폴더 `.meta`를 추가하고 GUID 중복이 없도록 구성했다.
+- `git diff --check -- Assets/Script` 공백 오류 없음.
+- Unity 플레이 모드 검증은 씬·Inspector 연결 뒤 진행해야 한다.
+
+## 다음
+
+1. 사용자 허가 후 두 Battle 씬에 시야 시스템 참조와 Fog Root를 연결한다.
+2. 초기 미탐색 Fog, 다중 유닛 시야 합산, 벽과 닫힌 문 차단을 확인한다.
+3. 플레이어 한 칸 이동마다 탐색 영역이 늘고 지나온 지역이 반투명으로 남는지 확인한다.
+4. 적의 시야 진입·이탈 이동과 시야 밖 공격자 임시 노출을 확인한다.
+5. 시야 밖 총·근접·검·해킹 대상 선택 차단을 확인한다.
+
+## 2026-08-03 시야 밖 공격자 임시 노출 수정
+
+## 문제
+
+- `ActorVisibilityOverride` 이벤트는 정상적으로 실행되고 공격자 Sprite 알파도 `1`로 복원됐지만, 정렬 순서 `1000`의 불투명 Fog가 그 위를 계속 덮어 공격자가 보이지 않았다.
+- 공격자를 보여 주기 위해 Fog 칸을 투명하게 만들면 공격자 주변 지형 정보까지 함께 노출되는 문제가 있다.
+
+## 변경
+
+- `ActorVisualController`에 시야 임시 노출 전 SpriteRenderer의 Sorting Layer ID와 Sorting Order를 보존하는 기능을 추가했다.
+- 공격자 임시 노출 시작 시 해당 Sprite만 Fog와 같은 Sorting Layer의 `Fog Order + 1`로 올린다.
+- 공격 연출 종료 후 현재 시야 기준 알파로 돌아간 다음 원래 Sorting Layer와 Sorting Order를 복원한다.
+- Presenter 비활성화 시에도 남은 임시 정렬 덮어쓰기를 복원해 씬 종료나 컴포넌트 비활성화 뒤 상태가 남지 않게 했다.
+- 지형 Fog는 변경하지 않아 시야 밖 공격자만 보이고 주변 맵은 계속 가려진다.
+
+## 검증
+
+- 신규 시야 파일이 Unity 생성 C# 프로젝트에 포함된 상태에서 `dotnet build S2.slnx --no-restore`: 경고 0개, 오류 0개.
+- Battle 씬 Hierarchy와 Inspector 값은 수정하지 않았다.
+- 실제 공격자 표시 여부는 원본 Unity 플레이 모드 재검증이 필요하다.
+
+## Hierarchy 정리 논의
+
+- 현재 `Manager` 단일 오브젝트에 Battle 컴포넌트가 밀집돼 Inspector에서 책임 구분이 어렵다는 문제를 확인했다.
+- `BattleLogic`, `BattlePresentation`, `BattleFlow`, `BattleVision`, `BattleDebug` 단위 분리를 후보로 둔다.
+- 기존 컴포넌트 이동은 직렬화 fileID와 상호 참조 갱신이 필요하므로 시야 기능 검증과 섞지 않고 별도 씬 구조 정리 작업으로 진행한다.
+
+## 2026-08-03 두 Battle 씬 시야 연결·Hierarchy 정리
+
+## 목적
+
+- 사용자 검증이 끝난 `BattleTest01`의 시야 설정을 `BattleTest02`에도 동일하게 적용한다.
+- 단일 `Manager`에 밀집된 씬 단위 컴포넌트를 책임별 오브젝트로 나눈다.
+- `ActionPresentationQueue`, Fog Root와 Debug 오브젝트도 같은 책임 계층 아래에 정리한다.
+
+## 씬 구조 변경
+
+- 두 씬의 기존 `Manager`를 `BattleRoot`와 8개 책임 그룹으로 교체했다.
+- `BattleCore`: Grid, Turn, 전술 유닛·적·해킹 대상 Registry.
+- `PlayerSystem`: 입력, 유닛 선택·제어와 행동 흐름.
+- `EnemySystem`: 경계 전파와 적 턴.
+- `BattleStage`: 실패 판정.
+- `BattlePresentation`: Actor Registry, 전투 Presenter, VFX와 `ActionPresentationQueue`.
+- `BattleFlow`: 입장 Presenter, 전투 진입과 캠페인 Bridge.
+- `BattleVision`: 시야 Context·Manager·Presenter와 `PlayerVisionFogRoot`.
+- `BattleDebug`: 기존 Debug 오브젝트.
+- 기존 컴포넌트의 직렬화 값을 복사한 뒤 씬 전체 Object 참조를 새 컴포넌트로 치환해 연결을 보존했다.
+- `BattleTest01`의 고유 입장 시퀀스 `f0292043...`, `BattleTest02`의 `501aaa9b...` 참조는 각각 유지했다.
+
+## 시야 설정
+
+- `BattleTest02`에 `PlayerVisionContext`, `PlayerVisionManager`, `PlayerVisionPresenter`, `PlayerVisionFogRoot`를 추가했다.
+- Grid, 전술 유닛 Registry, Enemy Registry, Actor Presentation Registry, 연출 큐, Manager·Presenter와 Fog Root 참조를 명시적으로 연결했다.
+- `BattleTest01`의 Presenter 표시 기준을 유지했다: 미탐색 검정 불투명, 탐색됨 알파 `0.65`, 현재 시야 투명, Fog Sorting Order `1000`, 전환 시간 `0.12초`.
+- 유진과 동료 테스트 데이터의 시야 거리를 직렬화 값 `6칸`으로 명시했다.
+
+## 도구
+
+- `BattleSceneHierarchyOrganizer` Editor 도구를 추가했다.
+- 메뉴 `Tools/S2-T/Battle/두 전투 씬 Hierarchy 정리`에서 같은 구조를 재검증할 수 있다.
+- 컴포넌트 중복, 필수 시야 참조, 필수 그룹, Queue·Debug 부모와 Missing Script를 확인하고 오류 시 저장을 중단한다.
+
+## 검증
+
+- Unity `6000.0.64f1` Editor API로 두 씬의 정리와 내부 검증을 완료했다.
+- `BattleTest01`, `BattleTest02` 모두 `BattleRoot`와 8개 책임 그룹, 시야 시스템과 Fog Root가 존재한다.
+- 두 플레이어 테스트 데이터의 `visionRange: 6` 직렬화 값을 확인했다.
+- `dotnet build S2.slnx`: 런타임·Editor 어셈블리 경고 0개, 오류 0개.
+
+## 현재 경계와 다음
+
+- `BattleTest01`은 정리 전 기준으로 시야 기능 사용자 플레이 테스트가 완료됐다.
+- Hierarchy 정리 뒤 `BattleTest01` 회귀 테스트와 `BattleTest02`의 실제 플레이 테스트가 남아 있다.
+- `BattleTest02`에서 초기 Fog, 한 칸 이동별 탐색 확장, 적 진입·이탈, 벽·문 차단, 다중 유닛 합산과 시야 밖 공격자 임시 노출을 확인한다.

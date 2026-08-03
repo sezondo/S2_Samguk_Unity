@@ -280,6 +280,12 @@ public class PlayerHackAction : MonoBehaviour
         }
 
         targetPosition = target.GridPosition;
+        if (PlayerVisionManager.Instance != null && !PlayerVisionManager.Instance.IsVisible(targetPosition))
+        {
+            LogBlockedTarget(target, "현재 플레이어 시야 밖입니다");
+            return false;
+        }
+
         GridPosition hackOriginPosition = playerContext.HasAbility(UnitAbilityType.Sword) && playerContext.SwordState != null
             ? playerContext.SwordState.CurrentPosition
             : playerContext.GridActor.GridPosition;
