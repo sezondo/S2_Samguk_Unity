@@ -7,6 +7,7 @@ using UnityEditor.SceneManagement;
 using UnityEditorInternal;
 using UnityEngine;
 using UnityEngine.SceneManagement;
+using UnityEngine.Tilemaps;
 
 /// <summary>
 /// BattleTest 씬의 단일 Manager 컴포넌트를 책임별 시스템 오브젝트로 분리하고 시야 구성을 통일한다.
@@ -123,6 +124,7 @@ public static class BattleSceneHierarchyOrganizer
         }
 
         Dictionary<string, GameObject> organizedGroups = GetExistingGroups(battleRoot);
+        EnsureLogicTilemaps(scene, organizedGroups);
         EnsureVisionSystem(scene, organizedGroups);
         ValidateScene(scene, organizedGroups);
 
@@ -355,6 +357,68 @@ public static class BattleSceneHierarchyOrganizer
     }
 
     /// <summary>
+    /// 기존 논리 타일맵을 벽 전용으로 보존하고 이동만 막는 낮은 장애물 타일맵을 별도로 연결한다.
+    /// </summary>
+    private static void EnsureLogicTilemaps(Scene scene, IReadOnlyDictionary<string, GameObject> groups)
+    {
+        GameObject mapGrid = FindSceneObject(scene, "MapVisualGrid");
+        if (mapGrid == null)
+        {
+            throw new MissingReferenceException($"{scene.path}에서 MapVisualGrid를 찾지 못했습니다.");
+        }
+
+        Transform wallTransform = mapGrid.transform.Find("WallLogicTilemap");
+        if (wallTransform == null)
+        {
+            wallTransform = mapGrid.transform.Find("LogicTilemap");
+            if (wallTransform == null)
+            {
+                throw new MissingReferenceException($"{scene.path}에서 기존 LogicTilemap을 찾지 못했습니다.");
+            }
+
+            wallTransform.name = "WallLogicTilemap";
+        }
+
+        Tilemap wallTilemap = wallTransform.GetComponent<Tilemap>();
+        if (wallTilemap == null)
+        {
+            throw new MissingReferenceException($"{scene.path}의 WallLogicTilemap에 Tilemap 컴포넌트가 없습니다.");
+        }
+
+        Transform lowObstacleTransform = mapGrid.transform.Find("LowObstacleLogicTilemap");
+        if (lowObstacleTransform == null)
+        {
+            GameObject lowObstacleObject = CreateSceneObject(scene, "LowObstacleLogicTilemap", mapGrid.transform);
+            lowObstacleObject.layer = wallTransform.gameObject.layer;
+            lowObstacleObject.AddComponent<Tilemap>();
+
+            TilemapRenderer wallRenderer = wallTransform.GetComponent<TilemapRenderer>();
+            if (wallRenderer != null &&
+                ComponentUtility.CopyComponent(wallRenderer) &&
+                ComponentUtility.PasteComponentAsNew(lowObstacleObject))
+            {
+                // 기존 논리 타일맵과 같은 편집 표시 설정을 사용한다.
+            }
+            else
+            {
+                lowObstacleObject.AddComponent<TilemapRenderer>();
+            }
+
+            lowObstacleTransform = lowObstacleObject.transform;
+        }
+
+        Tilemap lowObstacleTilemap = lowObstacleTransform.GetComponent<Tilemap>();
+        if (lowObstacleTilemap == null)
+        {
+            throw new MissingReferenceException($"{scene.path}의 LowObstacleLogicTilemap에 Tilemap 컴포넌트가 없습니다.");
+        }
+
+        GridManager gridManager = groups["BattleCore"].GetComponent<GridManager>();
+        SetObjectReference(gridManager, "wallLogicTilemap", wallTilemap);
+        SetObjectReference(gridManager, "lowObstacleLogicTilemap", lowObstacleTilemap);
+    }
+
+    /// <summary>
     /// 현재 씬 구조, 컴포넌트 배치, 시야 필수 참조와 Missing Script를 검증한다.
     /// </summary>
     private static void ValidateScene(Scene scene, IReadOnlyDictionary<string, GameObject> groups)
@@ -384,6 +448,8 @@ public static class BattleSceneHierarchyOrganizer
             throw new InvalidOperationException($"{scene.path}의 Debug가 BattleDebug 아래에 있지 않습니다.");
         }
 
+        ValidateLogicTilemaps(scene, groups);
+
         PlayerVisionContext visionContext = groups["BattleVision"].GetComponent<PlayerVisionContext>();
         PlayerVisionManager visionManager = groups["BattleVision"].GetComponent<PlayerVisionManager>();
         PlayerVisionPresenter visionPresenter = groups["BattleVision"].GetComponent<PlayerVisionPresenter>();
@@ -406,6 +472,27 @@ public static class BattleSceneHierarchyOrganizer
             {
                 throw new MissingReferenceException($"{scene.path}의 {allObjects[i].name}에 Missing Script {missingCount}개가 있습니다.");
             }
+        }
+    }
+
+    /// <summary>
+    /// 두 논리 타일맵의 이름, 공통 Grid 부모와 GridManager 연결을 검증한다.
+    /// </summary>
+    private static void ValidateLogicTilemaps(Scene scene, IReadOnlyDictionary<string, GameObject> groups)
+    {
+        GameObject wallObject = FindSceneObject(scene, "WallLogicTilemap");
+        GameObject lowObstacleObject = FindSceneObject(scene, "LowObstacleLogicTilemap");
+        if (wallObject == null || lowObstacleObject == null ||
+            wallObject.transform.parent != lowObstacleObject.transform.parent)
+        {
+            throw new MissingReferenceException($"{scene.path}의 벽·낮은 장애물 논리 타일맵 구성이 올바르지 않습니다.");
+        }
+
+        GridManager gridManager = groups["BattleCore"].GetComponent<GridManager>();
+        if (gridManager.WallLogicTilemap != wallObject.GetComponent<Tilemap>() ||
+            gridManager.LowObstacleLogicTilemap != lowObstacleObject.GetComponent<Tilemap>())
+        {
+            throw new MissingReferenceException($"{scene.path}의 GridManager 논리 타일맵 참조가 올바르지 않습니다.");
         }
     }
 
@@ -449,14 +536,16 @@ public static class BattleSceneHierarchyOrganizer
     /// </summary>
     private static void ConfigurePlayerVisionRanges()
     {
-        SetVisionRange(EugeneDataPath, 6);
-        SetVisionRange(AllyDataPath, 6);
+        SetUnitDataInt(EugeneDataPath, "visionRange", 6);
+        SetUnitDataInt(AllyDataPath, "visionRange", 6);
+        SetUnitDataInt(EugeneDataPath, "swordVisionRange", 3);
+        SetUnitDataInt(AllyDataPath, "swordVisionRange", 3);
     }
 
     /// <summary>
-    /// 지정한 플레이어 데이터 에셋의 시야 거리를 직렬화 값으로 저장한다.
+    /// 지정한 플레이어 데이터 에셋의 정수 필드를 직렬화 값으로 저장한다.
     /// </summary>
-    private static void SetVisionRange(string assetPath, int visionRange)
+    private static void SetUnitDataInt(string assetPath, string propertyName, int value)
     {
         ControllableUnitData data = AssetDatabase.LoadAssetAtPath<ControllableUnitData>(assetPath);
         if (data == null)
@@ -465,13 +554,13 @@ public static class BattleSceneHierarchyOrganizer
         }
 
         SerializedObject serializedObject = new(data);
-        SerializedProperty property = serializedObject.FindProperty("visionRange");
+        SerializedProperty property = serializedObject.FindProperty(propertyName);
         if (property == null)
         {
-            throw new MissingFieldException(typeof(ControllableUnitData).Name, "visionRange");
+            throw new MissingFieldException(typeof(ControllableUnitData).Name, propertyName);
         }
 
-        property.intValue = visionRange;
+        property.intValue = value;
         serializedObject.ApplyModifiedPropertiesWithoutUndo();
         EditorUtility.SetDirty(data);
     }

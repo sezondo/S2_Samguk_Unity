@@ -122,11 +122,12 @@ public class PlayerSwordThrowAction : MonoBehaviour
         }
 
         playerContext.SwordState.SetDeployedPosition(targetPosition);
-        TryRequestDamageAtTarget(fromPosition, targetPosition, resolutionContext);
         isSwordThrowSelected = false;
         SwordThrowCanceled?.Invoke();
 
+        // 검 위치 변경을 피해 요청보다 먼저 처리해 검 이동 뒤 새 시야가 열린 다음 타격 연출이 이어지게 한다.
         resolutionContext.Publish(new SwordThrownLogicEvent(playerContext.GridActor, fromPosition, targetPosition));
+        TryRequestDamageAtTarget(fromPosition, targetPosition, resolutionContext);
         // 피해 여부와 관계없이 검 이동을 먼저 보여주고, 피해가 있으면 CombatAction이 뒤이어 재생된다.
         resolutionContext.EnqueuePresentation(PresentationEvent.SwordMove(
             playerContext.GridActor,
@@ -148,16 +149,6 @@ public class PlayerSwordThrowAction : MonoBehaviour
     /// </summary>
     private bool TryRequestDamageAtTarget(GridPosition fromPosition, GridPosition targetPosition, ActionResolutionContext resolutionContext)
     {
-        if (PlayerVisionManager.Instance != null && !PlayerVisionManager.Instance.IsVisible(targetPosition))
-        {
-            if (logActionState)
-            {
-                Debug.Log($"{nameof(PlayerSwordThrowAction)}: {targetPosition} 칸은 현재 플레이어 시야 밖이라 피해 대상을 판정하지 않습니다.", this);
-            }
-
-            return false;
-        }
-
         if (!GridManager.Instance.TryGetActorAt(targetPosition, out GridActor targetActor) || targetActor == playerContext.GridActor)
         {
             return false;
@@ -275,12 +266,6 @@ public class PlayerSwordThrowAction : MonoBehaviour
         if (distance > SwordThrowRange)
         {
             LogBlockedTarget(targetPosition, $"검 투척 사거리 밖입니다. 거리: {distance}, 최대 거리: {SwordThrowRange}");
-            return false;
-        }
-
-        if (PlayerVisionManager.Instance != null && !PlayerVisionManager.Instance.IsVisible(targetPosition))
-        {
-            LogBlockedTarget(targetPosition, "현재 플레이어 시야 밖입니다");
             return false;
         }
 

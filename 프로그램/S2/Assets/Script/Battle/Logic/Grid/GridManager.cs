@@ -1,11 +1,12 @@
 using System;
 using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.Serialization;
 using UnityEngine.Tilemaps;
 
 /// <summary>
 /// 격자 보드의 크기, 좌표 변환, 고정 이동불가 상태, 칸 점유와 동적 시야 차단 상태를 관리한다.
-/// 고정 이동불가 상태는 LogicTilemap에서 읽고 턴제 규칙은 Transform 대신 GridPosition을 기준으로 판단한다.
+/// 벽과 낮은 장애물은 모두 이동을 막지만 벽만 시야를 막는다.
 /// </summary>
 public class GridManager : MonoBehaviour
 {
@@ -20,8 +21,11 @@ public class GridManager : MonoBehaviour
     [SerializeField] private Vector3 originWorldPosition;
 
     [Header("Logic Tilemap")]
-    // 타일이 칠해진 칸을 고정 이동불가 칸으로 사용하는 필수 논리 타일맵이다.
-    [SerializeField] private Tilemap logicTilemap;
+    // 이동과 시야를 모두 차단하는 벽 칸을 제공하는 필수 논리 타일맵이다.
+    [FormerlySerializedAs("logicTilemap")]
+    [SerializeField] private Tilemap wallLogicTilemap;
+    // 이동은 차단하지만 시야는 통과시키는 낮은 장애물 칸을 제공한다. 낮은 장애물이 없는 씬은 비워둘 수 있다.
+    [SerializeField] private Tilemap lowObstacleLogicTilemap;
 
     [Header("Gizmos")]
     // Scene 뷰에서 보드 선과 점유 칸을 그릴지 정한다.
@@ -47,6 +51,10 @@ public class GridManager : MonoBehaviour
     public int Height => height;
     // 외부에서 읽는 한 칸의 월드 크기다.
     public float CellSize => cellSize;
+    // 이동과 시야를 모두 차단하는 벽 논리 타일맵이다.
+    public Tilemap WallLogicTilemap => wallLogicTilemap;
+    // 이동만 차단하는 낮은 장애물 논리 타일맵이다.
+    public Tilemap LowObstacleLogicTilemap => lowObstacleLogicTilemap;
 
     // 동적 시야 차단물이 등록되거나 해제될 때 발생한다.
     public event Action SightBlockingChanged;
@@ -74,11 +82,11 @@ public class GridManager : MonoBehaviour
     }
 
     /// <summary>
-    /// 인스펙터에서 보드 설정이 바뀌면 LogicTilemap 기준으로 런타임 칸 상태를 갱신한다.
+    /// 인스펙터에서 보드 설정이 바뀌면 두 논리 타일맵 기준으로 런타임 칸 상태를 갱신한다.
     /// </summary>
     private void OnValidate()
     {
-        if (logicTilemap != null && width > 0 && height > 0 && cellSize > 0f)
+        if (wallLogicTilemap != null && width > 0 && height > 0 && cellSize > 0f)
         {
             RebuildCellStates();
         }
@@ -147,11 +155,11 @@ public class GridManager : MonoBehaviour
     }
 
     /// <summary>
-    /// 지정한 칸이 고정 LogicTilemap 또는 등록된 동적 구조물에 의해 시야가 막힌 칸인지 확인한다.
+    /// 지정한 칸이 벽 타일 또는 등록된 동적 구조물에 의해 시야가 막힌 칸인지 확인한다.
     /// </summary>
     public bool IsSightBlocked(GridPosition position)
     {
-        if (IsBlocked(position))
+        if (HasTileAt(wallLogicTilemap, position))
         {
             return true;
         }
@@ -321,7 +329,7 @@ public class GridManager : MonoBehaviour
         {
             return;
         }
-        if (logicTilemap != null && width > 0 && height > 0 && cellSize > 0f)
+        if (wallLogicTilemap != null && width > 0 && height > 0 && cellSize > 0f)
         {
             RebuildCellStates();
         }
@@ -363,7 +371,7 @@ public class GridManager : MonoBehaviour
     }
 
     /// <summary>
-    /// 보드 범위 안의 모든 칸 상태를 다시 만들고 LogicTilemap의 타일 유무를 이동불가 상태로 반영한다.
+    /// 보드 범위 안의 모든 칸 상태를 다시 만들고 벽·낮은 장애물 타일을 이동불가 상태로 반영한다.
     /// </summary>
     private void RebuildCellStates()
     {
@@ -388,7 +396,8 @@ public class GridManager : MonoBehaviour
                 GridPosition position = new(x, y);
                 GridCellState cellState = new(position);
 
-                if (IsBlockedByLogicTilemap(position))
+                if (HasTileAt(wallLogicTilemap, position) ||
+                    HasTileAt(lowObstacleLogicTilemap, position))
                 {
                     cellState.SetBlocked(true);
                 }
@@ -404,27 +413,27 @@ public class GridManager : MonoBehaviour
     }
 
     /// <summary>
-    /// 지정한 논리 그리드 칸의 월드 위치와 겹치는 LogicTilemap 셀에 타일이 있는지 확인한다.
+    /// 지정한 논리 그리드 칸의 월드 위치와 겹치는 논리 타일맵 셀에 타일이 있는지 확인한다.
     /// </summary>
-    private bool IsBlockedByLogicTilemap(GridPosition position)
+    private bool HasTileAt(Tilemap tilemap, GridPosition position)
     {
-        if (logicTilemap == null)
+        if (tilemap == null)
         {
             return false;
         }
 
-        Vector3Int tilePosition = logicTilemap.WorldToCell(GridToWorld(position));
-        return logicTilemap.HasTile(tilePosition);
+        Vector3Int tilePosition = tilemap.WorldToCell(GridToWorld(position));
+        return tilemap.HasTile(tilePosition);
     }
 
     /// <summary>
-    /// 그리드 고정 이동불가 정보를 제공할 필수 LogicTilemap 참조가 연결되어 있는지 확인한다.
+    /// 이동과 시야를 차단하는 필수 벽 논리 타일맵 참조가 연결되어 있는지 확인한다.
     /// </summary>
     public bool HasValidReference()
     {
-        if (logicTilemap == null)
+        if (wallLogicTilemap == null)
         {
-            Debug.LogError($"{nameof(GridManager)} on {name}에는 고정 이동불가 칸을 제공할 {nameof(Tilemap)} 참조가 필요합니다.", this);
+            Debug.LogError($"{nameof(GridManager)} on {name}에는 이동과 시야를 차단할 벽 {nameof(Tilemap)} 참조가 필요합니다.", this);
             return false;
         }
 

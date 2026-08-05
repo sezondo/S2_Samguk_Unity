@@ -4,7 +4,7 @@ using UnityEngine;
 /// 도깨비 환도의 현재 기준 칸과 회수 상태를 보관한다.
 /// 검은 보드 점유 액터가 아니므로 GridManager에 등록하지 않고 위치 값만 관리한다.
 /// </summary>
-public class PlayerSwordState : MonoBehaviour, IActionLogicEventHandler
+public class PlayerSwordState : MonoBehaviour
 {
     [Header("Reference")]
     // 플레이어 위치와 행동 데이터를 제공하는 Context다.
@@ -41,46 +41,6 @@ public class PlayerSwordState : MonoBehaviour, IActionLogicEventHandler
 
         currentPosition = initializeAtPlayerPosition ? playerContext.GridActor.GridPosition : initialSwordPosition;
         isRecalled = currentPosition == playerContext.GridActor.GridPosition;
-    }
-
-    /// <summary>
-    /// 논리 이벤트 버스에 검 위치 갱신 핸들러를 등록한다.
-    /// </summary>
-    private void OnEnable()
-    {
-        ActionLogicEventBus.Register(this);
-    }
-
-    /// <summary>
-    /// 논리 이벤트 버스에서 검 위치 갱신 핸들러를 해제한다.
-    /// </summary>
-    private void OnDisable()
-    {
-        ActionLogicEventBus.Unregister(this);
-    }
-
-    /// <summary>
-    /// 이 상태 컴포넌트가 처리할 수 있는 논리 이벤트인지 확인한다.
-    /// </summary>
-    public bool CanHandle(IActionLogicEvent logicEvent)
-    {
-        GridActor playerActor = playerContext != null ? playerContext.GridActor : null;
-        return playerActor != null &&
-            logicEvent is HackCompletedLogicEvent hackCompleted &&
-            hackCompleted.Actor == playerActor;
-    }
-
-    /// <summary>
-    /// 해킹 완료 이벤트를 받아 검 기준 칸을 해킹 실행 위치로 갱신한다.
-    /// </summary>
-    public void Handle(IActionLogicEvent logicEvent, ActionResolutionContext context)
-    {
-        if (logicEvent is not HackCompletedLogicEvent hackCompleted || hackCompleted.Actor != playerContext.GridActor)
-        {
-            return;
-        }
-
-        SetDeployedPosition(hackCompleted.ExecutionPosition);
     }
 
     /// <summary>

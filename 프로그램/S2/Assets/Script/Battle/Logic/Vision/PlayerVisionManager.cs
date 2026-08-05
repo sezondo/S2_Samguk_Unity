@@ -8,6 +8,9 @@ using UnityEngine;
 /// </summary>
 public class PlayerVisionManager : MonoBehaviour, IActionLogicEventHandler
 {
+    // 플레이어 유닛이 벽 모서리와 무관하게 항상 인식하는 주변 8칸의 거리다.
+    private const int GuaranteedAdjacentVisionRange = 1;
+
     [Header("Reference")]
     // 플레이어 시야 계산에 필요한 씬 참조 주머니다.
     [SerializeField] private PlayerVisionContext context;
@@ -172,7 +175,7 @@ public class PlayerVisionManager : MonoBehaviour, IActionLogicEventHandler
     }
 
     /// <summary>
-    /// 플레이어 한 명의 360도 원형 시야와 벽·문 가림 결과를 합산 버퍼에 추가한다.
+    /// 플레이어 한 명의 360도 원형 시야와 배치된 도깨비검 시야를 합산 버퍼에 추가한다.
     /// </summary>
     private bool TryAddUnitVision(TacticalUnitContext unit)
     {
@@ -189,28 +192,66 @@ public class PlayerVisionManager : MonoBehaviour, IActionLogicEventHandler
             return false;
         }
 
-        GridManager gridManager = context.GridManager;
         GridPosition origin = unit.GridActor.GridPosition;
+        AddVisionArea(origin, visionRange, true);
+
+        if (!unit.HasAbility(UnitAbilityType.Sword))
+        {
+            return true;
+        }
+
+        PlayerSwordState swordState = unit.SwordState;
+        if (swordState == null)
+        {
+            Debug.LogError($"{nameof(PlayerVisionManager)}: {unit.name} 검 능력 유닛의 {nameof(PlayerSwordState)} 참조가 비어 있습니다.", unit);
+            return false;
+        }
+
+        int swordVisionRange = unit.UnitData.SwordVisionRange;
+        if (swordVisionRange <= 0)
+        {
+            Debug.LogError($"{nameof(PlayerVisionManager)}: {unit.name} 도깨비검 시야 거리는 0보다 커야 합니다. 현재 값: {swordVisionRange}", unit.UnitData);
+            return false;
+        }
+
+        if (!swordState.IsRecalled)
+        {
+            AddVisionArea(swordState.CurrentPosition, swordVisionRange, false);
+        }
+
+        return true;
+    }
+
+    /// <summary>
+    /// 지정한 원점의 원형 시야를 합산하고 플레이어 근접 시야 여부에 따라 주변 8칸의 가림을 무시한다.
+    /// </summary>
+    private void AddVisionArea(GridPosition origin, int visionRange, bool guaranteeAdjacentVision)
+    {
+        GridManager gridManager = context.GridManager;
         int squaredRange = visionRange * visionRange;
         for (int xOffset = -visionRange; xOffset <= visionRange; xOffset++)
         {
             for (int yOffset = -visionRange; yOffset <= visionRange; yOffset++)
             {
-                if (xOffset * xOffset + yOffset * yOffset > squaredRange)
+                bool isGuaranteedAdjacent = guaranteeAdjacentVision &&
+                    Mathf.Max(Mathf.Abs(xOffset), Mathf.Abs(yOffset)) <= GuaranteedAdjacentVisionRange;
+                if (!isGuaranteedAdjacent && xOffset * xOffset + yOffset * yOffset > squaredRange)
                 {
                     continue;
                 }
 
                 GridPosition target = origin + new GridPosition(xOffset, yOffset);
-                if (gridManager.IsInside(target) &&
-                    GridLineOfSight.HasLineOfSight(gridManager, origin, target))
+                if (!gridManager.IsInside(target))
+                {
+                    continue;
+                }
+
+                if (isGuaranteedAdjacent || GridLineOfSight.HasLineOfSight(gridManager, origin, target))
                 {
                     nextVisiblePositions.Add(target);
                 }
             }
         }
-
-        return true;
     }
 
     /// <summary>
@@ -232,15 +273,19 @@ public class PlayerVisionManager : MonoBehaviour, IActionLogicEventHandler
     }
 
     /// <summary>
-    /// 플레이어 한 칸 이동과 플레이어 유닛 사망 이벤트를 처리할 수 있는지 확인한다.
+    /// 플레이어 이동·사망과 도깨비검 배치 상태 변경 이벤트를 처리할 수 있는지 확인한다.
     /// </summary>
     public bool CanHandle(IActionLogicEvent logicEvent)
     {
-        return logicEvent is MoveStepEnteredLogicEvent || logicEvent is ActorDiedLogicEvent;
+        return logicEvent is MoveStepEnteredLogicEvent ||
+            logicEvent is ActorDiedLogicEvent ||
+            logicEvent is SwordThrownLogicEvent ||
+            logicEvent is SwordRecalledLogicEvent ||
+            logicEvent is HackCompletedLogicEvent;
     }
 
     /// <summary>
-    /// 플레이어 위치나 생존 유닛 구성이 바뀐 논리 시점에 시야 스냅샷을 갱신한다.
+    /// 플레이어 위치·생존 구성이나 도깨비검 위치가 바뀐 논리 시점에 시야 스냅샷을 갱신한다.
     /// </summary>
     public void Handle(IActionLogicEvent logicEvent, ActionResolutionContext resolutionContext)
     {
@@ -248,6 +293,9 @@ public class PlayerVisionManager : MonoBehaviour, IActionLogicEventHandler
         {
             MoveStepEnteredLogicEvent moved => moved.Actor,
             ActorDiedLogicEvent died => died.DeadActor,
+            SwordThrownLogicEvent thrown => thrown.Actor,
+            SwordRecalledLogicEvent recalled => recalled.Actor,
+            HackCompletedLogicEvent hackCompleted => hackCompleted.Actor,
             _ => null,
         };
 

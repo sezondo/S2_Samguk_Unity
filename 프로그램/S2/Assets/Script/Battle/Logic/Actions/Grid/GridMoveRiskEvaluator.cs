@@ -161,7 +161,7 @@ public class GridMoveRiskEvaluator : MonoBehaviour, IActionLogicEventHandler
     {
         if (logicEvent.Actor != playerContext.GridActor ||
             didLogAddInCurrentMove ||
-            !TryFindDetectingEnemy(logicEvent.StepPosition, out EnemyGridSight detectingSight))
+            !TryFindDetectingEnemy(logicEvent.StepPosition, false, out EnemyGridSight detectingSight))
         {
             return;
         }
@@ -229,7 +229,8 @@ public class GridMoveRiskEvaluator : MonoBehaviour, IActionLogicEventHandler
         {
             for (int i = 0; i < path.Count; i++)
             {
-                if (TryFindDetectingEnemy(path[i], out detectingEnemy))
+                // 경고 표시는 현재 보이는 적만 사용해 Fog 밖 적의 위치와 감지 범위를 누설하지 않는다.
+                if (TryFindDetectingEnemy(path[i], true, out detectingEnemy))
                 {
                     riskPosition = path[i];
                     return true;
@@ -243,9 +244,12 @@ public class GridMoveRiskEvaluator : MonoBehaviour, IActionLogicEventHandler
     }
 
     /// <summary>
-    /// 지정한 칸을 감지할 수 있는 적 시야 컴포넌트를 찾는다.
+    /// 지정한 칸을 감지할 수 있는 적 시야 컴포넌트를 찾고 필요하면 현재 보이는 적으로 제한한다.
     /// </summary>
-    private bool TryFindDetectingEnemy(GridPosition position, out EnemyGridSight detectingEnemy)
+    private bool TryFindDetectingEnemy(
+        GridPosition position,
+        bool requireVisibleEnemy,
+        out EnemyGridSight detectingEnemy)
     {
         if (EnemyRegistry.Instance == null)
         {
@@ -258,7 +262,10 @@ public class GridMoveRiskEvaluator : MonoBehaviour, IActionLogicEventHandler
         {
             EnemyContext enemy = enemies[i];
             EnemyGridSight enemySight = enemy != null ? enemy.GridSight : null;
-            if (enemySight != null && enemySight.enabled && enemySight.CanDetect(position))
+            if (enemySight != null &&
+                enemySight.enabled &&
+                (!requireVisibleEnemy || IsEnemyVisibleToPlayer(enemy)) &&
+                enemySight.CanDetect(position))
             {
                 detectingEnemy = enemySight;
                 return true;
@@ -267,6 +274,20 @@ public class GridMoveRiskEvaluator : MonoBehaviour, IActionLogicEventHandler
 
         detectingEnemy = null;
         return false;
+    }
+
+    /// <summary>
+    /// 지정한 적의 현재 칸이 플레이어 합산 시야 안에 있는지 확인한다.
+    /// </summary>
+    private bool IsEnemyVisibleToPlayer(EnemyContext enemy)
+    {
+        if (enemy == null || enemy.GridActor == null)
+        {
+            return false;
+        }
+
+        PlayerVisionManager visionManager = PlayerVisionManager.Instance;
+        return visionManager == null || visionManager.IsVisible(enemy.GridActor.GridPosition);
     }
 
     /// <summary>

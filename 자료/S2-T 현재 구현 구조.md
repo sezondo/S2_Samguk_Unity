@@ -1,6 +1,6 @@
 # S2-T 현재 구현 구조
 
-- 최신 기준: 2026-08-03
+- 최신 기준: 2026-08-05
 - 기준 브랜치: `main`
 - Unity 버전: `6000.0.64f1`
 - 기준 테스트 씬: `Assets/Scenes/Test/BootstrapTest.unity`, `Assets/Scenes/Test/LobbyTest.unity`, `Assets/Scenes/Test/StoryTest.unity`, `Assets/Scenes/Test/BattleTest01.unity`, `Assets/Scenes/Test/BattleTest02.unity`
@@ -263,14 +263,16 @@ BattleRoot
 MapVisualGrid
 ├─ FloorTilemap
 ├─ ObjectTilemap
-└─ LogicTilemap
+├─ WallLogicTilemap
+└─ LowObstacleLogicTilemap
 ```
 
 - `FloorTilemap`: 바닥 화면 표시.
 - `ObjectTilemap`: 벽과 장식 오브젝트 화면 표시.
-- `LogicTilemap`: 고정 이동불가 칸의 단일 논리 원본.
+- `WallLogicTilemap`: 이동과 시야를 모두 차단하는 벽 칸의 논리 원본.
+- `LowObstacleLogicTilemap`: 이동은 차단하지만 시야는 통과시키는 낮은 상자·엄폐물 칸의 논리 원본.
 - 화면용 타일맵과 논리 타일맵은 서로 독립적이다.
-- 문처럼 런타임에 열리는 장애물은 `LogicTilemap`에 칠하지 않고 `GridActor` 점유로 막는다.
+- 문처럼 런타임에 열리는 장애물은 두 논리 타일맵에 칠하지 않고 `GridActor` 점유와 동적 시야 차단 등록으로 막는다.
 
 ### 전술 유닛
 
@@ -301,7 +303,7 @@ MapVisualGrid
 
 각 칸은 다음 상태를 가진다.
 
-- `IsBlocked`: `LogicTilemap`에서 읽은 고정 장애물 여부.
+- `IsBlocked`: `WallLogicTilemap` 또는 `LowObstacleLogicTilemap`에서 읽은 고정 이동 장애물 여부.
 - `OccupiedActor`: 현재 칸을 점유한 `GridActor`.
 - `CanEnter`: 고정 장애물도 없고 점유자도 없는지 여부.
 
@@ -311,10 +313,11 @@ MapVisualGrid
 
 - 보드 크기, 셀 크기, 월드 원점을 관리한다.
 - `GridToWorld()`, `WorldToGrid()`로 좌표를 변환한다.
-- 논리 칸의 월드 위치를 `LogicTilemap.WorldToCell()`로 변환해 타일 유무를 읽는다.
+- 논리 칸의 월드 위치를 두 논리 타일맵의 셀로 변환해 이동 차단 타일 유무를 읽는다.
 - `RegisterActor()`, `UnregisterActor()`, `TryMoveActor()`로 동적 점유를 관리한다.
 - `CanEnter()`, `IsBlocked()`, `IsOccupied()`, `TryGetActorAt()`을 제공한다.
-- `IsSightBlocked()`는 `LogicTilemap` 고정 장애물과 명시적으로 등록된 동적 구조물만 시야 차단물로 판정한다.
+- `IsSightBlocked()`는 `WallLogicTilemap` 벽과 명시적으로 등록된 동적 구조물만 시야 차단물로 판정한다.
+- `LowObstacleLogicTilemap`은 이동을 막지만 시야를 막지 않으며 추후 낮은 엄폐 판정의 논리 원본으로 확장할 수 있다.
 - `RegisterSightBlocker()`와 `UnregisterSightBlocker()`는 닫힌 문처럼 런타임에 바뀌는 시야 차단물을 관리하고 변경 이벤트를 발생시킨다.
 - 플레이어·NPC·적을 포함한 일반 점유 Actor는 동적 시야 차단물로 등록하지 않는다.
 
@@ -324,12 +327,16 @@ MapVisualGrid
 - 정확히 대각선 모서리를 지날 때는 양쪽 인접 칸이 모두 막힌 경우에만 시야를 차단한다.
 - 목표 칸 자체가 벽이어도 벽 표면은 탐색할 수 있으며, 벽 뒤쪽 칸은 가려진다.
 - `PlayerVisionManager`는 살아 있는 플레이어 조작 유닛들의 360도 원형 시야를 합집합으로 계산한다.
+- 플레이어 유닛 주변 8칸은 벽 모서리와 관계없이 근접 시야로 항상 보인다. 이 예외는 플레이어 시야에만 적용하고 공통 LOS와 적 시야는 바꾸지 않는다.
 - 유닛별 시야 거리는 `ControllableUnitData.VisionRange`가 제공하며 기본값은 `6칸`이다.
+- 검 능력 유닛의 도깨비검이 배치 상태면 검 위치에서 `SwordVisionRange`만큼 별도 시야를 합산한다. 현재 테스트 값은 `3칸`이다.
+- 검 시야는 벽과 닫힌 문에 막히고 낮은 장애물을 통과하며, 플레이어 근접 시야의 주변 8칸 강제 표시 예외는 사용하지 않는다.
 - 각 칸은 `Unexplored`, `Explored`, `Visible` 세 상태를 가진다. `Explored`는 한 번 보았지만 현재 시야 밖인 누적 탐색 상태다.
 - 플레이어 한 칸 이동의 `MoveStepEnteredLogicEvent`마다 독립 `PlayerVisionSnapshot`을 만들어 이동 연출 바로 뒤에 `PlayerVisionChanged` 이벤트를 추가한다.
 - 스냅샷은 현재·누적 칸뿐 아니라 그 논리 시점에 보였던 적 Actor도 복사해, 이후 적 논리 위치가 먼저 바뀌어도 연출 전에 정보를 누출하지 않는다.
-- 플레이어 유닛 사망과 보안문 개방도 합산 시야를 다시 계산한다.
-- 총·근접·검 투척·해킹은 시야 시스템이 활성화된 전투에서 현재 시야 밖 칸을 대상으로 선택할 수 없다.
+- 플레이어 유닛 사망, 보안문 개방과 검 투척·회수·해킹 위치 변경도 합산 시야를 다시 계산한다.
+- 총·근접·해킹은 시야 시스템이 활성화된 전투에서 현재 시야 밖 칸을 대상으로 선택할 수 없다.
+- 검 투척은 현재 시야와 관계없이 검 위치 기준 사거리 안의 보드 칸을 선택할 수 있다. 숨은 적의 칸을 우연히 지정하면 검 도착 시야가 열린 뒤 표준 피해 연출이 이어진다.
 - `PlayerVisionContext`는 Grid, 유닛·적·Actor Visual 등록소, 연출 큐, 시야 Manager·Presenter와 Fog Root 참조만 보관한다.
 
 현재 전투 테스트 씬 설정은 `16 x 16`, 셀 크기 `1`, 원점 `(0, 0, 0)`이다.
@@ -454,8 +461,9 @@ PlayerInputReader
 
 `GridMoveRiskEvaluator`는 이동 미리보기와 실제 칸 진입을 적 시야와 비교한다.
 
-- 미리보기에서 첫 위험 칸을 경고색으로 표시한다.
+- 미리보기는 현재 플레이어 시야에 보이는 적만 검사해 첫 위험 칸을 경고색으로 표시한다. Fog 밖 적의 위치와 감지 범위는 경고로 누설하지 않는다.
 - 실제 이동 중 처음 감지된 칸에서 `AlertTriggeredLogicEvent`를 발행한다.
+- 실제 발각 판정은 표시 여부와 무관하게 살아 있는 모든 적 시야를 사용한다.
 - 이동 1회당 첫 발각만 처리한다.
 - 발각 자체는 현재 논리 이동을 중단시키지 않는다.
 
@@ -477,9 +485,12 @@ PlayerInputReader
 검은 보드 점유 Actor가 아니므로 `GridManager`에 등록되지 않는다.
 
 - 투척은 현재 검 위치에서 사거리 안의 보드 칸으로 이동한다.
+- 투척 목표 칸은 현재 플레이어 시야 밖이어도 선택할 수 있다.
 - 목표 칸에 `IDamageable` 대상이 있으면 표준 피해 이벤트를 발행한다.
 - 회수는 검을 플레이어 칸으로 되돌린다.
 - 해킹은 대상 주변 실행 칸으로 검 기준 위치를 옮긴다.
+- 배치된 검은 `SwordVisionRange`만큼 별도 시야를 제공하지만 전술 유닛이나 GridActor가 아니므로 적 애드를 발생시키지 않는다.
+- 검 이동 연출 뒤 새 시야가 열리고, 숨은 대상이 있으면 이후 타격 연출이 이어진다.
 - `SwordActionPresenter`가 검 Visual의 부모, 위치, 방향 회전과 근접 공격 기울기를 제어한다.
 - 경로 VFX 통로는 있으나 현재 테스트의 `Path Vfx Id`는 `None`이다.
 
@@ -546,7 +557,7 @@ PlayerInputReader
 
 - 전방 거리가 멀어질수록 좌우 폭이 넓어진다.
 - 부채꼴의 각 후보 칸까지 그리드 시선을 검사해 고정·동적 장애물이 만드는 뒤쪽 그림자를 제외한다.
-- `LogicTilemap` 고정 장애물과 닫힌 보안문은 시야를 막고, 플레이어·NPC·적의 점유 칸은 시야를 막지 않는다.
+- `WallLogicTilemap` 벽과 닫힌 보안문은 시야를 막고, `LowObstacleLogicTilemap`과 플레이어·NPC·적의 점유 칸은 시야를 막지 않는다.
 - 장애물 칸 자체는 정면 시야 감지 칸에 포함하지 않는다.
 - 시선이 정확히 대각선 모서리를 지날 때 한쪽만 막혀 있으면 허용하고 양쪽이 모두 막혀 있으면 차단한다.
 - 근접 감지는 청각 규칙이며 방향과 장애물의 영향을 받지 않고 현재 설정 반경의 8방향 칸을 감지한다.
@@ -684,7 +695,7 @@ SecurityDoor01
 
 - 왼쪽 Blocker는 `(8, 9)`, 오른쪽 Blocker는 `(9, 9)`를 점유한다.
 - 두 Blocker 모두 `OccupyCell = true`, `SnapToGridOnEnable = false`다.
-- 두 칸은 `LogicTilemap`에 칠하지 않는다.
+- 두 칸은 고정 논리 타일맵에 칠하지 않는다.
 - `SecurityDoorController.UnlockHackable`은 터미널의 `HackableObject`를 참조한다.
 - `BlockingActors`에는 좌우 Logic의 `GridActor` 두 개가 연결되어 있다.
 - `SecurityDoorController`는 기존 `BlockingActors`를 닫힌 동안 동적 시야 차단물로 자동 등록하며, 열릴 때 등록과 점유를 함께 해제한다.
@@ -801,7 +812,7 @@ SecurityDoor01
 - 플레이어 이동, 범위·경로 표시, 적 시야 발각과 경계 반응.
 - 적 턴 공격·엄폐 이동.
 - 검 투척·해킹·회수 Visual과 통합 전투 자세.
-- `LogicTilemap` 기반 고정 장애물 판정.
+- `WallLogicTilemap`, `LowObstacleLogicTilemap` 기반 고정 이동·시야 장애물 판정.
 - 편집 모드 `GridActor` 점유 칸 표시.
 - WASD·방향키 카메라 이동과 범위 제한.
 - 해킹 터미널과 2칸 보안문의 차단·개방 전체 흐름.
@@ -828,6 +839,11 @@ SecurityDoor01
 - 사용자가 `BattleTest01`에서 Fog, 탐색 지형 유지, 적 표시와 공격자 임시 노출을 포함한 시야 기능 플레이 테스트를 완료했다.
 - `BattleTest01`, `BattleTest02`의 `BattleRoot` 책임별 Hierarchy, 시야 필수 참조와 Missing Script를 Unity Editor API로 검증했다.
 - 두 씬의 고유 입장 시퀀스 참조를 유지한 상태에서 `dotnet build S2.slnx`: 경고 0개, 오류 0개.
+- 두 Battle 씬의 기존 논리 타일을 `WallLogicTilemap`으로 보존하고 빈 `LowObstacleLogicTilemap`을 생성해 `GridManager`에 연결했다.
+- 플레이어 주변 8칸 강제 시야, 도깨비검 `3칸` 시야, 시야 밖 검 투척과 보이는 적 기반 발각 예상 코드를 구현하고 Unity Editor 참조 검증을 통과했다.
+- 사용자가 현재 코드로 두 Battle 씬의 시야·전투·캠페인 흐름을 플레이 테스트했고 문제없이 동작함을 확인했다.
+- 플레이어 주변 8칸 근접 시야, 도깨비검 정찰·눈먼 투척, 검 이동·시야 개방·피해 연출 순서, 검 회수·해킹 뒤 시야 갱신을 확인했다.
+- 보이는 적 기반 발각 예상 경고, 숨은 적의 실제 이동 발각과 `LowObstacleLogicTilemap`의 이동 차단·시야 통과를 확인했다.
 
 ## 17. 현재 한계
 
@@ -844,7 +860,7 @@ SecurityDoor01
 - 이미 본 Story 기록과 그에 따른 건너뛰기 정책은 아직 저장 데이터에 없다. 현재는 `StoryRunner.Play()` 호출자가 건너뛰기 허용 여부를 전달한다.
 - `StoryTest`의 배경·스탠딩·만화 이미지는 기존 테스트 이미지를 사용하며 최종 시나리오 데이터와 전용 아트가 아니다.
 - 플레이어 시야 Fog는 현재 런타임 사각형 SpriteRenderer 방식의 1차 구현이며, 최종 마스크 Shader와 전용 시각 스타일은 후순위다.
-- Hierarchy 정리 뒤 `BattleTest01` 회귀 테스트와 새로 연결한 `BattleTest02`의 플레이 모드 테스트는 남아 있다.
+- 적 공격의 LOS 적용 여부는 의도적으로 보류 상태다.
 
 ## 18. 다음 작업
 
@@ -853,14 +869,12 @@ SecurityDoor01
 현재 캠페인 진행 상태는 **1~4단계 코드·데이터·Hierarchy·Inspector 구현 완료, 1-1 핵심 캠페인 한 바퀴 사용자 플레이 테스트 완료**다.
 현재 Lobby와 전투 결과 UI, 입장 미션 문구는 임시지만 게임 한 바퀴 흐름 검증에는 사용할 수 있다.
 
-1. 정리된 `BattleTest01`에서 기존 시야·전투·캠페인 연결의 회귀 여부를 확인한다.
-2. `BattleTest02`에서 한 칸 이동별 Fog 확장, 적 진입·이탈, 벽·문 차단, 다중 유닛 합산과 공격자 임시 노출을 플레이 모드로 검증한다.
-3. 완료 스테이지 재플레이에서 전투 전·후 Story가 다시 나오고 진행 상태가 낮아지지 않는지 확인한다.
-4. Story Escape 스킵 뒤 전투·후일담·로비 흐름이 유지되는지 확인한다.
-5. 유진 사망, 조작 유닛 전원 사망과 일반 전투 실패 시 로비 복귀를 확인한다.
-6. 1-2 승리 뒤 후일담 없이 완료 저장과 Lobby 복귀가 되는지 확인한다.
-7. 실제 시나리오와 최종 아트가 준비되면 임시 Story·입장 연출·결과 UI 데이터를 교체한다.
-8. 대화 로그와 이미 본 Story 기록, 정식 결과 화면은 프로토타입 한 바퀴 이후 확장한다.
+1. 완료 스테이지 재플레이에서 전투 전·후 Story가 다시 나오고 진행 상태가 낮아지지 않는지 확인한다.
+2. Story Escape 스킵 뒤 전투·후일담·로비 흐름이 유지되는지 확인한다.
+3. 유진 사망, 조작 유닛 전원 사망과 일반 전투 실패 시 로비 복귀를 확인한다.
+4. 1-2 승리 뒤 후일담 없이 완료 저장과 Lobby 복귀가 되는지 확인한다.
+5. 실제 시나리오와 최종 아트가 준비되면 임시 Story·입장 연출·결과 UI 데이터를 교체한다.
+6. 대화 로그와 이미 본 Story 기록, 정식 결과 화면은 프로토타입 한 바퀴 이후 확장한다.
 
 ## 19. 문서 유지 규칙
 

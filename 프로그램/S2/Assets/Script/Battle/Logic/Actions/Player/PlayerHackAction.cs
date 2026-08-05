@@ -149,6 +149,12 @@ public class PlayerHackAction : MonoBehaviour
             ? playerContext.SwordState.CurrentPosition
             : playerContext.GridActor.GridPosition;
 
+        if (usesSword)
+        {
+            // 시야 갱신 핸들러가 해킹 완료 이벤트를 받을 때 새 검 위치를 읽을 수 있도록 논리 상태를 먼저 확정한다.
+            playerContext.SwordState.SetDeployedPosition(executionPosition);
+        }
+
         target.OnHackStarted();
         target.OnHackCompleted();
 

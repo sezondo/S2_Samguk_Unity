@@ -47,6 +47,8 @@ public class ControllableUnitData : ScriptableObject
     [Header("Sword")]
     // 검 현재 위치 기준으로 검을 다시 던질 수 있는 최대 맨해튼 거리다.
     [SerializeField] private int swordThrowRange = 3;
+    // 검이 플레이어에게서 떨어져 배치됐을 때 주변을 밝히는 최대 그리드 거리다.
+    [SerializeField] private int swordVisionRange = 3;
     // 검 투척 행동 1회가 소비하는 AP 비용이다.
     [SerializeField] private int swordThrowActionPointCost = 1;
     // 검 투척 목표 칸에 피해 가능 대상이 있을 때 적용할 피해량이다.
@@ -84,6 +86,7 @@ public class ControllableUnitData : ScriptableObject
     public int HackRange => hackRange;
     public int HackActionPointCost => hackActionPointCost;
     public int SwordThrowRange => swordThrowRange;
+    public int SwordVisionRange => swordVisionRange;
     public int SwordThrowActionPointCost => swordThrowActionPointCost;
     public int SwordThrowDamage => swordThrowDamage;
     public int SwordRecallActionPointCost => swordRecallActionPointCost;
