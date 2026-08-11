@@ -115,7 +115,7 @@ public class EnemyAlertCoordinator : MonoBehaviour, IActionLogicEventHandler
             }
 
             int distance = spreadOrigin.ManhattanDistanceTo(enemy.GridActor.GridPosition);
-            if (distance > spreadRange)
+            if (!IsAlertRecipientInRange(sourceEnemy, enemy, spreadOrigin, spreadRange))
             {
                 continue;
             }
@@ -138,6 +138,46 @@ public class EnemyAlertCoordinator : MonoBehaviour, IActionLogicEventHandler
                 "적 경계 상태 전환 연출"));
             context.Publish(new EnemyAlertedLogicEvent(enemy, sourceEnemy, detectedPosition, knownPlayerPosition, reason));
         }
+    }
+
+    /// <summary>
+    /// 같은 PatrolGroup은 거리와 무관하게, 다른 그룹은 구성원 하나라도 전파 거리 안이면 대상이 된다.
+    /// </summary>
+    private static bool IsAlertRecipientInRange(
+        EnemyContext sourceEnemy,
+        EnemyContext candidate,
+        GridPosition spreadOrigin,
+        int spreadRange)
+    {
+        EnemyPatrolGroup sourceGroup = sourceEnemy.RoutineController != null
+            ? sourceEnemy.RoutineController.PatrolGroup
+            : null;
+        EnemyPatrolGroup candidateGroup = candidate.RoutineController != null
+            ? candidate.RoutineController.PatrolGroup
+            : null;
+
+        if (sourceGroup != null && sourceGroup == candidateGroup)
+        {
+            return true;
+        }
+
+        if (candidateGroup == null)
+        {
+            return spreadOrigin.ManhattanDistanceTo(candidate.GridActor.GridPosition) <= spreadRange;
+        }
+
+        IReadOnlyList<EnemyPatrolGroupMember> members = candidateGroup.Members;
+        for (int i = 0; i < members.Count; i++)
+        {
+            EnemyContext member = members[i].Enemy;
+            if (member != null && member.IsAlive &&
+                spreadOrigin.ManhattanDistanceTo(member.GridActor.GridPosition) <= spreadRange)
+            {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /// <summary>

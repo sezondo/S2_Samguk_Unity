@@ -3,7 +3,7 @@ using UnityEngine;
 
 /// <summary>
 /// 적 하나의 턴 행동을 결정하고 실행한다.
-/// 경계 상태인 살아 있는 적만 2AP 안에서 이동과 원거리 공격을 수행한다.
+/// 적 인식 상태에 따라 평상 루틴, 의심 조사 또는 기존 전투 행동을 실행한다.
 /// </summary>
 public class EnemyTurnAgent : MonoBehaviour
 {
@@ -57,6 +57,27 @@ public class EnemyTurnAgent : MonoBehaviour
         {
             return false;
         }
+
+        if (enemyContext.AlertState.IsUnaware)
+        {
+            return enemyContext.RoutineController != null &&
+                enemyContext.RoutineController.TryExecuteRoutineTurn(resolutionContext);
+        }
+
+        if (enemyContext.AlertState.IsSuspicious)
+        {
+            return enemyContext.InvestigationAgent != null &&
+                enemyContext.InvestigationAgent.TryExecuteSuspiciousTurn(resolutionContext);
+        }
+
+        return TryExecuteAlertedTurn(resolutionContext);
+    }
+
+    /// <summary>
+    /// 발각 상태의 기존 엄폐 이동과 공격 행동을 실행한다.
+    /// </summary>
+    private bool TryExecuteAlertedTurn(ActionResolutionContext resolutionContext)
+    {
 
         if (!targetSelector.TrySelectNearestPlayerUnit(enemyContext.GridActor.GridPosition, out TacticalUnitContext targetUnit))
         {
@@ -193,23 +214,10 @@ public class EnemyTurnAgent : MonoBehaviour
             return false;
         }
 
-        GridPosition previousPosition = enemyContext.GridActor.GridPosition;
-        for (int i = 0; i < path.Count; i++)
+        int movedSteps = EnemyMovementUtility.MoveAlongPath(enemyContext, path, resolutionContext, "적 턴 이동 연출");
+        if (movedSteps != path.Count)
         {
-            GridPosition nextPosition = path[i];
-            if (!enemyContext.GridActor.TryMoveTo(nextPosition))
-            {
-                Debug.LogError($"{nameof(EnemyTurnAgent)}: {enemyContext.name} 적을 {nextPosition} 칸으로 이동시키지 못해 적 턴 이동을 중단합니다.", this);
-                return false;
-            }
-
-            resolutionContext.EnqueuePresentation(PresentationEvent.EnemyReactionMove(
-                enemyContext,
-                previousPosition,
-                nextPosition,
-                MovePresentationPhaseUtility.GetPhase(i, path.Count),
-                "적 턴 이동 연출"));
-            previousPosition = nextPosition;
+            return false;
         }
 
         if (!enemyContext.ActionPoint.TrySpend(MoveActionPointCost))
@@ -287,16 +295,6 @@ public class EnemyTurnAgent : MonoBehaviour
             return false;
         }
 
-        if (!enemyContext.AlertState.IsAlerted)
-        {
-            if (logTurnAction)
-            {
-                Debug.Log($"{nameof(EnemyTurnAgent)}: {enemyContext.name} 적은 경계 상태가 아니라 적 턴 행동을 생략합니다.", this);
-            }
-
-            return false;
-        }
-
         return true;
     }
 
@@ -332,7 +330,8 @@ public class EnemyTurnAgent : MonoBehaviour
             return false;
         }
 
-        if (enemyContext.AttackAction == null || !enemyContext.AttackAction.enabled)
+        if (enemyContext.AlertState != null && enemyContext.AlertState.IsAlerted &&
+            (enemyContext.AttackAction == null || !enemyContext.AttackAction.enabled))
         {
             Debug.LogError($"{nameof(EnemyTurnAgent)} on {name}에는 {nameof(EnemyContext)}에 연결된 활성 {nameof(EnemyAttackAction)} 참조가 필요합니다.", this);
             return false;
@@ -341,6 +340,18 @@ public class EnemyTurnAgent : MonoBehaviour
         if (enemyContext.ActionPoint == null || !enemyContext.ActionPoint.enabled)
         {
             Debug.LogError($"{nameof(EnemyTurnAgent)} on {name}에는 {nameof(EnemyContext)}에 연결된 활성 {nameof(EnemyActionPoint)} 참조가 필요합니다.", this);
+            return false;
+        }
+
+        if (enemyContext.AlertState != null && enemyContext.AlertState.IsUnaware && enemyContext.RoutineController == null)
+        {
+            Debug.LogError($"{nameof(EnemyTurnAgent)} on {name}의 평상 행동에는 {nameof(EnemyRoutineController)} 참조가 필요합니다.", this);
+            return false;
+        }
+
+        if (enemyContext.AlertState != null && enemyContext.AlertState.IsSuspicious && enemyContext.InvestigationAgent == null)
+        {
+            Debug.LogError($"{nameof(EnemyTurnAgent)} on {name}의 의심 행동에는 {nameof(EnemyInvestigationAgent)} 참조가 필요합니다.", this);
             return false;
         }
 

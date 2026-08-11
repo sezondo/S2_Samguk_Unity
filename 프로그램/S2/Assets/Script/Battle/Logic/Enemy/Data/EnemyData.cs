@@ -15,6 +15,20 @@ public class EnemyData : ScriptableObject
     // 근접 감지에 사용할 주변 칸 반경이다. 1이면 인접한 8칸을 검사한다.
     [SerializeField] private int adjacentDetectionRange = 1;
 
+    [Header("Suspicion")]
+    // 도깨비검 기척을 360도 원형으로 감지하는 최대 거리다.
+    [SerializeField] private int swordDetectionRange = 3;
+    // 직접 감지자 주변의 다른 패트롤 그룹에 의심을 전달하는 맨해튼 거리다.
+    [SerializeField] private int suspicionSpreadRange = 5;
+    // 의심 상태 진입 직후 AP와 별개로 조사 위치까지 반응 이동할 수 있는 최대 거리다.
+    [SerializeField] private int suspicionReactionMoveRange = 3;
+    // 새 이상 현상 없이 조사 상태를 유지할 적 턴 수다.
+    [SerializeField] private int suspicionDurationTurns = 3;
+    // 조사 위치가 이상 현상과 유지하려는 최소 거리다.
+    [SerializeField] private int investigationMinimumDistance = 1;
+    // 조사 위치가 이상 현상과 유지하려는 최대 거리다.
+    [SerializeField] private int investigationMaximumDistance = 3;
+
     [Header("Alert")]
     // 이 적이 플레이어를 발견했을 때 주변 적에게 애드를 전파하는 맨해튼 거리다.
     [SerializeField] private int alertSpreadRange = 5;
@@ -22,6 +36,8 @@ public class EnemyData : ScriptableObject
     [SerializeField] private int alertReactionMoveRange = 3;
 
     [Header("Turn AI")]
+    // 평상 순찰이 적 턴마다 1AP로 이동할 수 있는 최대 칸 수다.
+    [SerializeField] private int patrolMoveRange = 3;
     // 적 턴마다 이 적이 사용할 수 있는 행동 AP다.
     [SerializeField] private int turnActionPoint = 2;
     // 적 턴 이동 행동 1회로 이동할 수 있는 최대 칸 수다.
@@ -34,9 +50,16 @@ public class EnemyData : ScriptableObject
     public int SightRange => sightRange;
     public bool UseAdjacentDetection => useAdjacentDetection;
     public int AdjacentDetectionRange => adjacentDetectionRange;
+    public int SwordDetectionRange => swordDetectionRange;
+    public int SuspicionSpreadRange => suspicionSpreadRange;
+    public int SuspicionReactionMoveRange => suspicionReactionMoveRange;
+    public int SuspicionDurationTurns => suspicionDurationTurns;
+    public int InvestigationMinimumDistance => investigationMinimumDistance;
+    public int InvestigationMaximumDistance => investigationMaximumDistance;
     public int AlertSpreadRange => alertSpreadRange;
     public int AlertReactionMoveRange => alertReactionMoveRange;
     public int TurnActionPoint => turnActionPoint;
+    public int PatrolMoveRange => patrolMoveRange;
     public int TurnMoveRange => turnMoveRange;
     public int RangedAttackRange => rangedAttackRange;
     public int RangedAttackDamage => rangedAttackDamage;

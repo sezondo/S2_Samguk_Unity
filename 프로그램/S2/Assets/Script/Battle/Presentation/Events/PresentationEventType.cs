@@ -8,6 +8,7 @@ public enum PresentationEventType
     BattleIntro,
     MoveActor,
     AlertDetected,
+    SuspicionDetected,
     EnemyReactionMove,
     Attack,
     Hack,

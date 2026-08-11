@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using UnityEngine;
 
 /// <summary>
@@ -19,8 +20,21 @@ public class PlayerSwordThrowAction : MonoBehaviour
     // 검 투척 불가 사유를 출력할지 정한다.
     [SerializeField] private bool logBlockedTarget = true;
 
+    [Header("Suspicion Preview")]
+    // 관측된 비발각 적의 도깨비검 감지 범위를 표시할 색이다.
+    [SerializeField] private Color suspicionAreaColor = new(1f, 0.75f, 0.15f, 0.28f);
+    // 현재 투척 칸이 의심 또는 직접 타격을 일으킬 때 표시할 경고 색이다.
+    [SerializeField] private Color swordWarningColor = new(1f, 0.2f, 0.1f, 0.65f);
+
     // 플레이어가 현재 검 투척 행동을 선택한 상태인지 나타낸다.
     private bool isSwordThrowSelected;
+    // 관측된 비발각 적의 검 감지 범위를 표시하는 런타임 하이라이터다.
+    private GridCellHighlighter suspicionAreaHighlighter;
+    // 현재 포인터 칸의 검 의심/직접 타격 경고를 표시하는 런타임 하이라이터다.
+    private GridCellHighlighter swordWarningHighlighter;
+    private readonly HashSet<GridPosition> suspicionAreaSet = new();
+    private readonly List<GridPosition> suspicionAreaPositions = new();
+    private readonly List<GridPosition> warningPositions = new();
 
     public bool IsSwordThrowSelected => isSwordThrowSelected;
     public int SwordThrowRange => playerContext.UnitData.SwordThrowRange;
@@ -60,6 +74,7 @@ public class PlayerSwordThrowAction : MonoBehaviour
         }
 
         isSwordThrowSelected = true;
+        RefreshSuspicionAreaPreview();
         SwordThrowSelected?.Invoke();
 
         if (logActionState)
@@ -123,6 +138,7 @@ public class PlayerSwordThrowAction : MonoBehaviour
 
         playerContext.SwordState.SetDeployedPosition(targetPosition);
         isSwordThrowSelected = false;
+        ClearSuspicionPreview();
         SwordThrowCanceled?.Invoke();
 
         // 검 위치 변경을 피해 요청보다 먼저 처리해 검 이동 뒤 새 시야가 열린 다음 타격 연출이 이어지게 한다.
@@ -142,6 +158,131 @@ public class PlayerSwordThrowAction : MonoBehaviour
         }
 
         return true;
+    }
+
+    /// <summary>
+    /// 현재 포인터 칸이 관측된 적의 검 감지 범위 또는 직접 타격 칸인지 경고한다.
+    /// Alerted 적의 검 감지 범위는 숨기되 직접 타격 경고는 유지한다.
+    /// </summary>
+    public void RefreshSuspicionPreview(GridPosition targetPosition)
+    {
+        if (!isSwordThrowSelected)
+        {
+            ClearSuspicionPreview();
+            return;
+        }
+
+        RefreshSuspicionAreaPreview();
+        bool shouldWarn = suspicionAreaSet.Contains(targetPosition) || IsVisibleEnemyAt(targetPosition);
+        warningPositions.Clear();
+        if (shouldWarn)
+        {
+            warningPositions.Add(targetPosition);
+        }
+
+        EnsurePreviewHighlighters();
+        swordWarningHighlighter.Show(warningPositions);
+    }
+
+    /// <summary>
+    /// 포인터가 보드 밖으로 나갔을 때 감지 범위는 유지하고 목표 경고만 숨긴다.
+    /// </summary>
+    public void ClearSuspicionTargetWarning()
+    {
+        warningPositions.Clear();
+        swordWarningHighlighter?.Hide();
+    }
+
+    /// <summary>
+    /// 현재 관측된 Unaware/Suspicious 적들의 검 감지 칸 합집합을 표시한다.
+    /// </summary>
+    private void RefreshSuspicionAreaPreview()
+    {
+        suspicionAreaSet.Clear();
+        suspicionAreaPositions.Clear();
+        if (EnemyRegistry.Instance == null || PlayerVisionManager.Instance == null)
+        {
+            return;
+        }
+
+        IReadOnlyList<EnemyContext> enemies = EnemyRegistry.Instance.Enemies;
+        for (int i = 0; i < enemies.Count; i++)
+        {
+            EnemyContext enemy = enemies[i];
+            if (enemy == null || !enemy.IsAlive || enemy.AlertState == null || enemy.AlertState.IsAlerted ||
+                enemy.GridSight == null || !PlayerVisionManager.Instance.IsVisible(enemy.GridActor.GridPosition))
+            {
+                continue;
+            }
+
+            IReadOnlyList<GridPosition> positions = enemy.GridSight.SwordDetectionPositions;
+            for (int positionIndex = 0; positionIndex < positions.Count; positionIndex++)
+            {
+                if (suspicionAreaSet.Add(positions[positionIndex]))
+                {
+                    suspicionAreaPositions.Add(positions[positionIndex]);
+                }
+            }
+        }
+
+        EnsurePreviewHighlighters();
+        suspicionAreaHighlighter.Show(suspicionAreaPositions);
+    }
+
+    /// <summary>
+    /// 지정 칸에 플레이어가 현재 관측한 살아 있는 적이 있는지 확인한다.
+    /// </summary>
+    private static bool IsVisibleEnemyAt(GridPosition position)
+    {
+        if (GridManager.Instance == null || PlayerVisionManager.Instance == null ||
+            !PlayerVisionManager.Instance.IsVisible(position) ||
+            !GridManager.Instance.TryGetActorAt(position, out GridActor actor) || EnemyRegistry.Instance == null)
+        {
+            return false;
+        }
+
+        IReadOnlyList<EnemyContext> enemies = EnemyRegistry.Instance.Enemies;
+        for (int i = 0; i < enemies.Count; i++)
+        {
+            if (enemies[i] != null && enemies[i].IsAlive && enemies[i].GridActor == actor)
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /// <summary>
+    /// 검 감지 범위와 경고 표시용 런타임 하이라이터를 준비한다.
+    /// </summary>
+    private void EnsurePreviewHighlighters()
+    {
+        if (suspicionAreaHighlighter == null)
+        {
+            GameObject areaObject = new($"{nameof(PlayerSwordThrowAction)}_SuspicionArea");
+            suspicionAreaHighlighter = areaObject.AddComponent<GridCellHighlighter>();
+            suspicionAreaHighlighter.ConfigureFallbackStyle(suspicionAreaColor, 0.8f, 24, -0.08f);
+        }
+
+        if (swordWarningHighlighter == null)
+        {
+            GameObject warningObject = new($"{nameof(PlayerSwordThrowAction)}_Warning");
+            swordWarningHighlighter = warningObject.AddComponent<GridCellHighlighter>();
+            swordWarningHighlighter.ConfigureFallbackStyle(swordWarningColor, 0.65f, 26, -0.1f);
+        }
+    }
+
+    /// <summary>
+    /// 검 감지 범위와 현재 경고 표시를 모두 숨긴다.
+    /// </summary>
+    private void ClearSuspicionPreview()
+    {
+        suspicionAreaSet.Clear();
+        suspicionAreaPositions.Clear();
+        warningPositions.Clear();
+        suspicionAreaHighlighter?.Hide();
+        swordWarningHighlighter?.Hide();
     }
 
     /// <summary>

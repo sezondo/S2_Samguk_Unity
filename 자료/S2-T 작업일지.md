@@ -2654,3 +2654,68 @@
 
 - 2026-08-03에 추가한 근접 시야, 도깨비검 정찰·눈먼 투척, 발각 예상 정보 제한과 장애물 논리 분리는 플레이 모드 검증까지 완료했다.
 - 다음 작업은 완료 스테이지 재플레이, Story 스킵, 실패 복귀와 `1-2` 무후일담 완료 흐름의 캠페인 예외 테스트다.
+
+## 2026-08-05 적 순찰·도깨비검 의심 AI 1차 코드 구현
+
+## 확정 규칙
+
+- Patrol은 씬의 `PatrolPoint` 연결 그래프를 따른다. 분기점에서는 직전 지점을 제외한 후보 중 무작위 선택하고 막다른 지점에서는 되돌아간다.
+- 순찰은 1AP, 최대 3칸을 기본값으로 하며 그룹은 고정 편대 오프셋을 유지한다.
+- 검 감지는 원형 거리와 벽·닫힌 문 LOS 차단을 사용한다. 같은 그룹은 무조건 공유하고 다른 그룹은 거리 안에서 단일 단계로 전파한다.
+- 직접 감지자와 지원자를 구분하며 지원자는 별도 조사 엄폐 위치를 찾는다.
+- 즉시 반응은 AP·조사 턴과 별개다. 조사 시간은 적 턴 3회이며 새 이상 현상은 카운트를 초기화한다.
+- 조사 종료 뒤 Guard는 원위치, Patrol은 중단 목적지로 복귀한다.
+- 검 직접 타격은 Suspicious를 건너뛰고 Alerted만 발생한다. 한 그룹원의 Alerted는 같은 그룹 전체에 거리와 무관하게 전파된다.
+- Alerted 적의 검 의심 범위는 투척 미리보기에서 숨기고 직접 타격 경고만 유지한다.
+
+## 구현
+
+- 인식 상태를 `Unaware/Suspicious/Alerted`로 확장하고 의심 정보·행동 단계·유지 턴을 추가했다.
+- `PatrolPoint`, `EnemyRoutineController`, `EnemyPatrolGroup`으로 단독·분기·그룹 순찰을 구현했다.
+- 그룹원 점유를 제외하는 `GridPathfinder` 오버로드와 공통 적 이동·시야 갱신 도구를 추가했다.
+- `EnemyPerceptionCoordinator`로 적 이동·회전 뒤 플레이어 감지를 기존 Alert 흐름에 연결했다.
+- `EnemySuspicionCoordinator`, `EnemyInvestigationAgent`로 검 감지, 전파, 역할별 엄폐 조사, 3턴 탐색과 복귀를 구현했다.
+- `EnemyGridSight`에 원형 LOS 검 감지 목록을 추가하고 검 투척 모드에 관측된 범위·목표 경고를 표시했다.
+- `SuspicionDetected` 연출을 추가하고 기존 Alert Presenter가 의심 색을 처리하도록 확장했다.
+- 그룹 행동 전에 모든 적 AP가 준비되도록 적 턴 순서를 수정했다.
+
+## 검증과 남은 작업
+
+- 신규 런타임 스크립트를 포함한 `dotnet build Assembly-CSharp.csproj --no-restore`에서 경고 0개, 오류 0개를 확인했다.
+- 코드와 로컬 문서만 수정했다. Battle 씬, 적 프리팹과 Inspector 값은 수정하지 않았다.
+- 다음 작업에서 적 Context의 Routine/Investigation 참조, EnemySystem 조정자, PatrolPoint 그래프와 PatrolGroup 편대를 연결해야 한다.
+- 연결 후 단독 왕복·Loop·분기 복귀, 그룹 1~3칸 부분 이동, 검 LOS, 그룹 간 전파, 재의심 초기화, Guard/Patrol 복귀와 기존 Alerted 전투를 플레이 테스트한다.
+- 소프트 턴 제한과 증원은 구상만 유지하며 이번 구현 범위에 포함하지 않았다.
+
+## 2026-08-05 BattleTest01 적 AI Inspector 연결 예시
+
+## 적용 범위
+
+- 사용자 요청에 따라 `BattleTest01`만 수정했다.
+- `BattleTest02`, 공용 `EnemyDataTest`, HackTerminal·SecurityDoor 프리팹과 기타 공용 프리팹은 수정하지 않았다.
+- 두 적은 씬 로컬 오브젝트라 적 프리팹 변경 없이 각 `EnemyLogic` Inspector에 직접 연결했다.
+
+## Hierarchy와 Inspector
+
+- 두 `EnemyLogic`에 `EnemyRoutineController`, `EnemyInvestigationAgent`를 추가했다.
+- 각 `EnemyContext`의 `RoutineController`, `InvestigationAgent` 참조를 같은 오브젝트 컴포넌트에 연결했다.
+- 두 Routine은 `Patrol`, 같은 `EnemyPatrolGroup` 참조로 설정했다.
+- `EnemySystem`에 `EnemyPerceptionCoordinator`, `EnemySuspicionCoordinator`를 추가했다.
+- `EnemySystem` 자식으로 `PatrolRoute_Group01`을 만들고 `EnemyPatrolGroup`을 추가했다.
+- 리더는 `(6,8)` 적, 구성원 오프셋은 `(0,0)`과 `(2,0)`이다.
+- 자식 PatrolPoint는 A `(6,8)`, B `(6,6)`, C `(4,6)`이며 `A ↔ B ↔ C`로 연결했다.
+- A는 대기 0·위쪽, B는 대기 1·아래쪽, C는 대기 1·오른쪽을 바라본다.
+
+## 경로 선정 이유
+
+- 원래 위쪽 방으로 향하는 `(6,8) → (6,10) → (6,12)`를 검토했다.
+- 논리 타일맵의 실제 셀 오프셋과 좁은 입구를 적용하면 두 적의 2칸 편대를 유지할 수 없어 제외했다.
+- 아래쪽 L자 경로는 두 구성원의 목적 칸과 중간 칸이 모두 고정 장애물을 피하면서 2칸 편대를 유지한다.
+
+## 검증
+
+- Unity Editor가 `BattleTest01`을 재임포트하고 정상 로드했다.
+- 새 스크립트 GUID, 컴포넌트, 상호 참조와 PatrolPoint 연결을 확인했다.
+- 씬 YAML 중복 fileID 0개, 누락 로컬 참조 0개다.
+- `dotnet build Assembly-CSharp.csproj --no-restore`: 경고 0개, 오류 0개다.
+- 실제 플레이 모드 순찰·의심·Alerted 회귀 테스트는 사용자가 씬 구성을 확인한 뒤 진행한다.

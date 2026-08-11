@@ -117,6 +117,14 @@ public readonly struct PresentationEvent
     }
 
     /// <summary>
+    /// 적이 이상 현상을 감지한 의심 연출 이벤트를 만든다.
+    /// </summary>
+    public static PresentationEvent SuspicionDetected(GridPosition eventPosition, EnemyContext enemy, string message = null)
+    {
+        return new PresentationEvent(PresentationEventType.SuspicionDetected, null, null, enemy, null, default, default, eventPosition, eventPosition, MovePresentationPhase.None, AttackPresentationKind.None, default, false, message);
+    }
+
+    /// <summary>
     /// 전투 조작을 열기 전에 실행할 입장 연출 이벤트를 만든다.
     /// </summary>
     public static PresentationEvent BattleIntro(string message = null)

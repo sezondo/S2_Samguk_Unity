@@ -883,3 +883,65 @@ SecurityDoor01
 - 클래스가 제거되거나 책임이 바뀌면 과거 설명을 덧붙이지 않고 해당 현재 항목을 직접 갱신한다.
 - 씬 설정을 바꾸면 코드 설명뿐 아니라 `테스트 씬과 캠페인 기반`, `현재 테스트 데이터`, `현재 검증 상태`도 함께 갱신한다.
 - 다음 작업을 완료하면 `현재 한계`와 `다음 작업`에서 완료 항목을 제거하거나 새 상태로 교체한다.
+
+## 20. 적 평상 순찰과 도깨비검 의심 AI 코드 구조
+
+### 인식 상태와 턴 분기
+
+- `EnemyAlertState`는 `Unaware`, `Suspicious`, `Alerted`를 보관한다.
+- `Unaware`는 `EnemyRoutineController`, `Suspicious`는 `EnemyInvestigationAgent`, `Alerted`는 기존 `EnemyTurnAgent` 전투 행동을 실행한다.
+- 플레이어를 발견한 적 턴에는 기존 즉시 엄폐 반응만 실행되고 공격은 다음 적 턴부터 가능하다. `Alerted`는 현재 영구 상태다.
+- `TurnManager.EnemyTurnIndex`가 의심 유지 턴과 그룹 행동 중복 실행의 기준 번호를 제공한다.
+
+### PatrolPoint 그래프와 그룹 순찰
+
+- `PatrolPoint`는 씬 위치, 도착 방향, 대기 턴과 연결 지점 목록을 가진다.
+- 다음 목적지는 직전 지점을 우선 제외한 연결 후보 중 무작위 선택한다. 다른 후보가 없는 막다른 지점에서는 직전 지점으로 되돌아간다.
+- 양방향 두 지점은 왕복, 원형 연결은 Loop, 분기 지점은 등록된 연결 안의 제한적 랜덤 순찰로 동작한다.
+- 목적지는 도착할 때까지 유지하며, 한 적 턴에 1AP와 `EnemyData.PatrolMoveRange`만큼 이동한다. 연속 막힘은 경고 로그로 드러낸다.
+- Scene 뷰 Gizmo로 지점, 도착 방향과 연결선을 확인할 수 있다.
+- `EnemyPatrolGroup`은 하나의 그래프와 목적지를 공유하고 그룹원별 `FormationOffset`을 유지한다.
+- 모든 생존 그룹원이 이동 가능한 공통 구간까지만 진행하므로 3칸 경로의 뒤가 막히면 1~2칸 이동할 수 있다. 한 명도 다음 공통 이동을 못 하면 그룹 전체가 멈춘다.
+- 그룹원 점유는 리더 경로 탐색에서 제외하고, 고정 장애물과 외부 유닛 점유는 유지한다. 도착 후에는 지점의 공통 방향을 바라본다.
+
+### 도깨비검 감지와 의심 조사
+
+- `EnemyGridSight.SwordDetectionPositions`는 플레이어 감지 시야와 별도로 계산한다.
+- 검 기척은 `SwordDetectionRange`의 제곱 유클리드 거리 기반 원형이며 벽과 닫힌 문 LOS에 막히고 낮은 장애물은 통과한다.
+- 검 투척·검 기반 해킹과 평상 적 이동 뒤 `EnemySuspicionCoordinator`가 감지를 검사한다.
+- 적 직접 타격은 의심을 만들지 않고 기존 피해 흐름으로 즉시 `Alerted`를 발생시킨다.
+- 같은 PatrolGroup은 거리와 무관하게 의심을 공유한다. 다른 그룹은 직접 감지자의 `SuspicionSpreadRange` 안에 그룹원 하나라도 있으면 그룹 전체가 공유한다. 전파는 단일 단계다.
+- 직접 감지자는 `Investigator`, 전파받은 적은 `Support` 역할을 받는다.
+- `EnemyInvestigationAgent`는 AP와 별개의 즉시 반응 이동으로 이상 지점을 볼 수 있는 적정 거리의 엄폐 후보를 찾는다. 지원자는 거리·분산 점수로 한 지점 밀집을 피한다.
+- 즉시 반응은 조사 턴에 포함하지 않는다. 이후 적 턴 3회 동안 방향을 돌며 탐색하고, 새 검 투척·해킹 감지는 조사 정보와 카운트를 초기화한다.
+- 조사 이동 자체는 같은 배치 검의 재의심을 만들지 않는다. 종료 후 Guard는 시작 위치·방향, Patrol은 중단 당시 목적지로 복귀한다.
+
+### 검 투척 미리보기와 의심 연출
+
+- 검 투척 모드는 현재 보이는 `Unaware/Suspicious` 적들의 검 감지 범위 합집합을 표시하고 포인터 칸의 의심 경고를 별도 표시한다.
+- `Alerted` 적의 검 감지 범위와 의심 경고는 숨기지만, 해당 적을 직접 타격하는 칸의 공격 경고는 유지한다.
+- `SuspicionDetected` 연출은 기존 `AlertDetectedPresenter`가 노란 의심 상태 색과 점멸로 처리한다.
+
+### 아직 필요한 씬 연결과 검증
+
+- 이번 작업에서는 코드와 문서만 수정했으며 Battle 씬, 적 프리팹과 Inspector 직렬화 값은 수정하지 않았다.
+- 각 적에 `EnemyRoutineController`, `EnemyInvestigationAgent`를 추가하고 `EnemyContext`의 두 참조를 연결해야 한다.
+- 씬 `EnemySystem`에 `EnemyPerceptionCoordinator`, `EnemySuspicionCoordinator`를 추가해야 한다.
+- Patrol 적은 `PatrolPoint` 그래프를 연결하고, 그룹은 `EnemyPatrolGroup`의 리더·구성원·FormationOffset과 각 RoutineController의 그룹 참조를 연결해야 한다.
+- `EnemyData`의 검 감지·의심 전파·즉시 반응·3턴 유지·조사 거리·순찰 이동 수치를 확인해야 한다.
+- 신규 런타임 파일을 포함한 `dotnet build Assembly-CSharp.csproj --no-restore` 결과는 경고 0개, 오류 0개다.
+- 단독/분기/그룹 순찰, 검 감지 LOS, 의심 전파·3턴 복귀와 기존 전투 회귀는 Inspector 연결 후 플레이 모드 검증이 필요하다.
+
+### BattleTest01 그룹 순찰 연결 예시
+
+- `BattleTest01`만 적 AI 컴포넌트와 그룹 순찰 Inspector 연결을 완료했다. `BattleTest02`와 공용 적 데이터·프리팹은 수정하지 않았다.
+- 씬의 두 적은 프리팹 인스턴스가 아닌 씬 로컬 `EnemyLogic` 오브젝트다.
+- 각 적에 `EnemyRoutineController`, `EnemyInvestigationAgent`를 추가하고 자기 `EnemyContext`와 상호 참조를 연결했다.
+- `EnemySystem`에 `EnemyPerceptionCoordinator`, `EnemySuspicionCoordinator`를 추가했다.
+- `EnemySystem/PatrolRoute_Group01` 아래에 `PatrolPoint_A_6_8`, `PatrolPoint_B_6_6`, `PatrolPoint_C_4_6`을 배치했다.
+- 연결은 `A ↔ B ↔ C`이며 A 대기 0턴·위쪽, B 대기 1턴·아래쪽, C 대기 1턴·오른쪽 방향이다.
+- `EnemyPatrolGroup` 리더는 `(6,8)` 적이며 편대는 리더 `(0,0)`, 두 번째 적 `(2,0)` 오프셋이다.
+- 두 적은 `(6,8)/(8,8) → (6,6)/(8,6) → (4,6)/(6,6)`의 L자 경로를 편대를 유지하며 왕복한다.
+- 위쪽 `(6,10)` 방향은 논리 타일맵의 좁은 입구에서 2칸 편대를 유지할 수 없어 예제 경로에서 제외했다.
+- Unity Editor가 수정된 씬을 임포트·로드했으며 Missing Script가 없었다. YAML fileID 중복 0개, 누락 로컬 참조 0개와 런타임 어셈블리 컴파일 경고 0개·오류 0개를 확인했다.
+- 실제 이동, 의심 반응과 복귀는 플레이 모드 검증이 남아 있다.

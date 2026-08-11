@@ -29,6 +29,10 @@ public class EnemyContext : MonoBehaviour, ITacticalUnit
     [SerializeField] private EnemyTurnAgent turnAgent;
     // 적 원거리 공격 판정과 피해 요청을 담당하는 선택 컴포넌트다. 적 턴 AI를 쓰는 씬에서 연결한다.
     [SerializeField] private EnemyAttackAction attackAction;
+    // 평상 상태의 경비·순찰 행동과 중단된 순찰 진행을 관리하는 선택 컴포넌트다.
+    [SerializeField] private EnemyRoutineController routineController;
+    // 의심 상태의 즉시 반응, 조사와 평상 복귀를 실행하는 선택 컴포넌트다.
+    [SerializeField] private EnemyInvestigationAgent investigationAgent;
     // 현재 EnemyRegistry에 등록되어 있는지 나타낸다.
     private bool registeredToRegistry;
     // 현재 TacticalUnitRegistry에 등록되어 있는지 나타낸다.
@@ -44,6 +48,8 @@ public class EnemyContext : MonoBehaviour, ITacticalUnit
     public EnemyActionPoint ActionPoint => actionPoint;
     public EnemyTurnAgent TurnAgent => turnAgent;
     public EnemyAttackAction AttackAction => attackAction;
+    public EnemyRoutineController RoutineController => routineController;
+    public EnemyInvestigationAgent InvestigationAgent => investigationAgent;
 
     /// <summary>
     /// 적 Context에 필요한 참조를 확인한다.

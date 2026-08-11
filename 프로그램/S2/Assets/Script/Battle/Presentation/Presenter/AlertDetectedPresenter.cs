@@ -16,6 +16,8 @@ public class AlertDetectedPresenter : MonoBehaviour, IPresentationEventHandler
     [Header("Presentation")]
     // 평상 상태일 때 적용할 색이다.
     [SerializeField] private Color normalColor = Color.white;
+    // 의심 상태일 때 적용할 색이다.
+    [SerializeField] private Color suspiciousColor = new(1f, 0.75f, 0.15f, 1f);
     // 발각 상태일 때 적용할 색이다.
     [SerializeField] private Color alertedColor = new(1f, 0.25f, 0.2f, 1f);
     // 발각 순간 점멸에 사용할 경고색이다.
@@ -118,7 +120,8 @@ public class AlertDetectedPresenter : MonoBehaviour, IPresentationEventHandler
     /// </summary>
     public bool CanHandle(PresentationEvent presentationEvent)
     {
-        return presentationEvent.Type == PresentationEventType.AlertDetected &&
+        return (presentationEvent.Type == PresentationEventType.AlertDetected ||
+                presentationEvent.Type == PresentationEventType.SuspicionDetected) &&
                presentationEvent.Enemy == targetEnemy;
     }
 
@@ -155,7 +158,7 @@ public class AlertDetectedPresenter : MonoBehaviour, IPresentationEventHandler
             Debug.Log($"{nameof(AlertDetectedPresenter)}: {targetEnemy.name}의 발각 연출을 시작합니다. 발각 칸: {presentationEvent.EventPosition}", this);
         }
 
-        if (playAlertAnimation)
+        if (playAlertAnimation && presentationEvent.Type == PresentationEventType.AlertDetected)
         {
             visualController.TryPlayAnimationState(alertAnimationStateName, 0f);
         }
@@ -255,7 +258,11 @@ public class AlertDetectedPresenter : MonoBehaviour, IPresentationEventHandler
     /// </summary>
     private void ApplyCurrentStateColor()
     {
-        Color stateColor = targetEnemy.AlertState.IsAlerted ? alertedColor : normalColor;
+        Color stateColor = targetEnemy.AlertState.IsAlerted
+            ? alertedColor
+            : targetEnemy.AlertState.IsSuspicious
+                ? suspiciousColor
+                : normalColor;
         visualController.ApplyColor(stateColor);
     }
 }

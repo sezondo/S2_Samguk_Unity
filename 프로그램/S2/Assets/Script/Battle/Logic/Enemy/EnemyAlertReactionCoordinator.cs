@@ -160,24 +160,7 @@ public class EnemyAlertReactionCoordinator : MonoBehaviour, IActionLogicEventHan
     /// </summary>
     private void MoveEnemyAlongPath(IReadOnlyList<GridPosition> path, ActionResolutionContext context)
     {
-        GridPosition previousPosition = enemyContext.GridActor.GridPosition;
-        for (int i = 0; i < path.Count; i++)
-        {
-            GridPosition nextPosition = path[i];
-            if (!enemyContext.GridActor.TryMoveTo(nextPosition))
-            {
-                Debug.LogError($"{nameof(EnemyAlertReactionCoordinator)}: {enemyContext.name} 적을 {nextPosition} 칸으로 이동시키지 못해 경계 반응 이동을 중단합니다.", this);
-                return;
-            }
-
-            context.EnqueuePresentation(PresentationEvent.EnemyReactionMove(
-                enemyContext,
-                previousPosition,
-                nextPosition,
-                MovePresentationPhaseUtility.GetPhase(i, path.Count),
-                "적 경계 엄폐 이동 연출"));
-            previousPosition = nextPosition;
-        }
+        EnemyMovementUtility.MoveAlongPath(enemyContext, path, context, "적 경계 엄폐 이동 연출");
     }
 
     /// <summary>

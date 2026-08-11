@@ -81,6 +81,7 @@ public class PlayerUnitInputController : MonoBehaviour
 
         HandleActionSelection(input, unit);
         RefreshMovePreview(input, unit);
+        RefreshSwordThrowPreview(input, unit);
 
         if (input.RecallSwordPressedThisFrame)
         {
@@ -214,6 +215,27 @@ public class PlayerUnitInputController : MonoBehaviour
         }
 
         PlayerUnitActionFlowController.Instance.TryExecuteSwordRecall();
+    }
+
+    /// <summary>
+    /// 검 투척 모드에서 관측된 적 감지 범위와 현재 목표 경고를 갱신한다.
+    /// </summary>
+    private static void RefreshSwordThrowPreview(PlayerInputReader input, TacticalUnitContext unit)
+    {
+        PlayerSwordThrowAction swordThrowAction = unit.SwordThrowAction;
+        if (swordThrowAction == null || !swordThrowAction.IsSwordThrowSelected)
+        {
+            return;
+        }
+
+        if (input.TryGetPointerGridPosition(out GridPosition targetPosition))
+        {
+            swordThrowAction.RefreshSuspicionPreview(targetPosition);
+        }
+        else
+        {
+            swordThrowAction.ClearSuspicionTargetWarning();
+        }
     }
 
     /// <summary>

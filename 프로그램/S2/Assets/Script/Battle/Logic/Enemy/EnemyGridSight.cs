@@ -21,6 +21,10 @@ public class EnemyGridSight : MonoBehaviour
     private readonly List<GridPosition> detectedPositions = new();
     // 시야 칸 중복 등록을 막기 위한 재사용 집합이다.
     private readonly HashSet<GridPosition> detectedPositionSet = new();
+    // 도깨비검 기척을 감지할 수 있는 별도 360도 원형 칸 목록이다.
+    private readonly List<GridPosition> swordDetectionPositions = new();
+    // 도깨비검 감지 칸 중복 등록을 막는 집합이다.
+    private readonly HashSet<GridPosition> swordDetectionPositionSet = new();
 
     // 같은 오브젝트의 적 말 컴포넌트다.
     private GridActor actor;
@@ -29,6 +33,7 @@ public class EnemyGridSight : MonoBehaviour
 
     public GridDirection FacingDirection => facingDirection;
     public IReadOnlyList<GridPosition> DetectedPositions => detectedPositions;
+    public IReadOnlyList<GridPosition> SwordDetectionPositions => swordDetectionPositions;
 
     // 시야 칸 목록이 갱신될 때 발생한다.
     public event Action<IReadOnlyList<GridPosition>> SightRefreshed;
@@ -99,6 +104,8 @@ public class EnemyGridSight : MonoBehaviour
     {
         detectedPositions.Clear();
         detectedPositionSet.Clear();
+        swordDetectionPositions.Clear();
+        swordDetectionPositionSet.Clear();
         TrySubscribeSightBlockingChanged();
 
         GridManager gridManager = GridManager.Instance;
@@ -109,6 +116,7 @@ public class EnemyGridSight : MonoBehaviour
 
         AddForwardConeSight(gridManager);
         AddAdjacentDetection(gridManager);
+        AddSwordDetectionArea(gridManager);
 
         if (logSightRefresh)
         {
@@ -129,6 +137,51 @@ public class EnemyGridSight : MonoBehaviour
         }
 
         return detectedPositionSet.Contains(targetPosition);
+    }
+
+    /// <summary>
+    /// 지정한 플레이어 칸이 현재 전방 시야 또는 근접 절대 감지에 들어오는지 확인한다.
+    /// </summary>
+    public bool CanDetectPlayer(GridPosition targetPosition)
+    {
+        return CanDetect(targetPosition);
+    }
+
+    /// <summary>
+    /// 지정한 도깨비검 칸이 현재 별도 기척 감지 범위에 들어오는지 확인한다.
+    /// </summary>
+    public bool CanDetectSword(GridPosition swordPosition)
+    {
+        return enemyContext.IsAlive && swordDetectionPositionSet.Contains(swordPosition);
+    }
+
+    /// <summary>
+    /// 현재 적 위치를 기준으로 벽과 닫힌 문에 막히는 도깨비검 원형 감지 칸을 추가한다.
+    /// </summary>
+    private void AddSwordDetectionArea(GridManager gridManager)
+    {
+        GridPosition origin = actor.GridPosition;
+        int range = enemyContext.EnemyData.SwordDetectionRange;
+        int squaredRange = range * range;
+
+        for (int xOffset = -range; xOffset <= range; xOffset++)
+        {
+            for (int yOffset = -range; yOffset <= range; yOffset++)
+            {
+                if (xOffset == 0 && yOffset == 0 || xOffset * xOffset + yOffset * yOffset > squaredRange)
+                {
+                    continue;
+                }
+
+                GridPosition position = origin + new GridPosition(xOffset, yOffset);
+                if (gridManager.IsInside(position) &&
+                    GridLineOfSight.HasLineOfSight(gridManager, origin, position) &&
+                    swordDetectionPositionSet.Add(position))
+                {
+                    swordDetectionPositions.Add(position);
+                }
+            }
+        }
     }
 
     /// <summary>
@@ -280,6 +333,12 @@ public class EnemyGridSight : MonoBehaviour
         if (data.AdjacentDetectionRange < 0)
         {
             Debug.LogError($"{nameof(EnemyGridSight)} on {name}의 {nameof(EnemyData)} 근접 감지 반경은 0 이상이어야 합니다.", this);
+            return false;
+        }
+
+        if (data.SwordDetectionRange <= 0)
+        {
+            Debug.LogError($"{nameof(EnemyGridSight)} on {name}의 도깨비검 감지 거리는 0보다 커야 합니다.", this);
             return false;
         }
 

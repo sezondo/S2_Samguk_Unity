@@ -358,6 +358,7 @@ public class S2TDebugOverlay : MonoBehaviour, IActionLogicEventHandler
 
         IReadOnlyList<EnemyContext> enemies = registry.Enemies;
         int activeCount = 0;
+        int suspiciousCount = 0;
         int alertedCount = 0;
         for (int i = 0; i < enemies.Count; i++)
         {
@@ -368,7 +369,11 @@ public class S2TDebugOverlay : MonoBehaviour, IActionLogicEventHandler
             }
 
             activeCount++;
-            if (enemy.AlertState != null && enemy.AlertState.CurrentLevel == EnemyAlertLevel.Alerted)
+            if (enemy.AlertState != null && enemy.AlertState.IsSuspicious)
+            {
+                suspiciousCount++;
+            }
+            else if (enemy.AlertState != null && enemy.AlertState.IsAlerted)
             {
                 alertedCount++;
             }
@@ -376,6 +381,8 @@ public class S2TDebugOverlay : MonoBehaviour, IActionLogicEventHandler
 
         builder.Append("Active: ");
         builder.Append(activeCount);
+        builder.Append(" / Suspicious: ");
+        builder.Append(suspiciousCount);
         builder.Append(" / Alerted: ");
         builder.AppendLine(alertedCount.ToString());
     }

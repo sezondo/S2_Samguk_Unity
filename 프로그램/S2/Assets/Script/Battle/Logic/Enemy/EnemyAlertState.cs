@@ -1,9 +1,9 @@
 using System;
 using UnityEngine;
+using UnityEngine.Serialization;
 
 /// <summary>
-/// 적 하나의 현재 경계 상태를 보관하고 외부 상태 전환 요청을 처리한다.
-/// 현재 단계에서는 평상과 발각 상태만 구분한다.
+/// 적 하나의 평상·의심·발각 상태와 현재 의심 정보를 보관한다.
 /// </summary>
 public class EnemyAlertState : MonoBehaviour
 {
@@ -12,25 +12,38 @@ public class EnemyAlertState : MonoBehaviour
     [SerializeField] private EnemyContext enemyContext;
 
     [Header("State")]
-    // 현재 적의 경계 상태다.
-    [SerializeField] private EnemyAlertLevel currentLevel = EnemyAlertLevel.Normal;
+    // 현재 적의 전장 인식 상태다.
+    [FormerlySerializedAs("currentLevel")]
+    [SerializeField] private EnemyAwarenessState currentState = EnemyAwarenessState.Unaware;
+
+    // 현재 의심 행동 단계다.
+    private SuspiciousBehaviorPhase suspiciousPhase = SuspiciousBehaviorPhase.MovingToInvestigationPosition;
+    // 현재 조사 중인 이상 현상 정보다.
+    private EnemySuspicionInfo suspicionInfo;
+    // 새 이상 현상 없이 조사를 계속할 남은 적 턴 수다.
+    private int remainingSuspicionTurns;
 
     [Header("Log")]
     // true면 상태 변경 결과를 Unity 콘솔에 출력한다.
     [SerializeField] private bool logStateChanges = true;
 
-    public EnemyAlertLevel CurrentLevel => currentLevel;
-    public bool IsAlerted => currentLevel == EnemyAlertLevel.Alerted;
+    public EnemyAwarenessState CurrentState => currentState;
+    public bool IsUnaware => currentState == EnemyAwarenessState.Unaware;
+    public bool IsSuspicious => currentState == EnemyAwarenessState.Suspicious;
+    public bool IsAlerted => currentState == EnemyAwarenessState.Alerted;
+    public SuspiciousBehaviorPhase SuspiciousPhase => suspiciousPhase;
+    public EnemySuspicionInfo SuspicionInfo => suspicionInfo;
+    public int RemainingSuspicionTurns => remainingSuspicionTurns;
 
     // 경계 상태가 바뀔 때 이전 상태와 새 상태를 전달한다.
-    public event Action<EnemyAlertLevel, EnemyAlertLevel> AlertLevelChanged;
+    public event Action<EnemyAwarenessState, EnemyAwarenessState> AwarenessStateChanged;
 
     /// <summary>
     /// 상태 관리에 필요한 참조를 확인한다.
     /// </summary>
     private void Awake()
     {
-        if (!HasValidReference())
+        if (!HasValidReference() || !HasValidData())
         {
             enabled = false;
         }
@@ -41,29 +54,116 @@ public class EnemyAlertState : MonoBehaviour
     /// </summary>
     public bool RequestAlert(GridPosition detectedPosition, EnemyContext sourceEnemy)
     {
-        return TrySetLevel(EnemyAlertLevel.Alerted, detectedPosition, sourceEnemy);
+        return TrySetState(EnemyAwarenessState.Alerted, detectedPosition, sourceEnemy);
+    }
+
+    /// <summary>
+    /// 지정한 이상 현상을 현재 조사 대상으로 기록하고 의심 유지 시간을 초기화한다.
+    /// </summary>
+    public bool RequestSuspicion(EnemySuspicionInfo info)
+    {
+        if (IsAlerted || !HasValidData())
+        {
+            return false;
+        }
+
+        bool changed = currentState != EnemyAwarenessState.Suspicious;
+        EnemyAwarenessState previousState = currentState;
+        currentState = EnemyAwarenessState.Suspicious;
+        suspicionInfo = info;
+        suspiciousPhase = SuspiciousBehaviorPhase.MovingToInvestigationPosition;
+        remainingSuspicionTurns = enemyContext.EnemyData.SuspicionDurationTurns;
+
+        if (changed)
+        {
+            AwarenessStateChanged?.Invoke(previousState, currentState);
+        }
+
+        return true;
+    }
+
+    /// <summary>
+    /// 의심 행동의 현재 내부 단계를 변경한다.
+    /// </summary>
+    public void SetSuspiciousPhase(SuspiciousBehaviorPhase nextPhase)
+    {
+        if (IsSuspicious)
+        {
+            suspiciousPhase = nextPhase;
+        }
+    }
+
+    /// <summary>
+    /// 조사 적 턴을 하나 소비하고 남은 턴이 있는지 반환한다.
+    /// </summary>
+    public bool ConsumeSuspicionTurn()
+    {
+        if (!IsSuspicious || remainingSuspicionTurns <= 0)
+        {
+            return false;
+        }
+
+        remainingSuspicionTurns--;
+        return remainingSuspicionTurns > 0;
+    }
+
+    /// <summary>
+    /// 조사와 복귀가 끝난 적을 평상 상태로 되돌린다.
+    /// </summary>
+    public bool RequestUnaware()
+    {
+        if (!IsSuspicious)
+        {
+            return false;
+        }
+
+        return TrySetState(EnemyAwarenessState.Unaware, suspicionInfo.Position, suspicionInfo.Detector);
     }
 
     /// <summary>
     /// 현재 경계 상태를 새 상태로 바꾸고 변경 이벤트를 알린다.
     /// </summary>
-    private bool TrySetLevel(EnemyAlertLevel nextLevel, GridPosition detectedPosition, EnemyContext sourceEnemy)
+    private bool TrySetState(EnemyAwarenessState nextState, GridPosition detectedPosition, EnemyContext sourceEnemy)
     {
-        if (currentLevel == nextLevel)
+        if (currentState == nextState)
         {
             return false;
         }
 
-        EnemyAlertLevel previousLevel = currentLevel;
-        currentLevel = nextLevel;
+        EnemyAwarenessState previousState = currentState;
+        currentState = nextState;
+        if (nextState != EnemyAwarenessState.Suspicious)
+        {
+            remainingSuspicionTurns = 0;
+        }
 
         if (logStateChanges)
         {
             string sourceName = sourceEnemy != null ? sourceEnemy.name : "알 수 없는 적";
-            Debug.Log($"{nameof(EnemyAlertState)}: {enemyContext.name} 적 상태가 {previousLevel}에서 {currentLevel}로 변경됐습니다. 발각 칸: {detectedPosition}, 전파 출처: {sourceName}", this);
+            Debug.Log($"{nameof(EnemyAlertState)}: {enemyContext.name} 적 상태가 {previousState}에서 {currentState}로 변경됐습니다. 사건 칸: {detectedPosition}, 전파 출처: {sourceName}", this);
         }
 
-        AlertLevelChanged?.Invoke(previousLevel, currentLevel);
+        AwarenessStateChanged?.Invoke(previousState, currentState);
+        return true;
+    }
+
+    /// <summary>
+    /// 의심 유지 시간에 필요한 적 데이터가 유효한지 확인한다.
+    /// </summary>
+    public bool HasValidData()
+    {
+        if (enemyContext == null || enemyContext.EnemyData == null)
+        {
+            Debug.LogError($"{nameof(EnemyAlertState)} on {name}에는 의심 데이터를 제공할 {nameof(EnemyData)}가 필요합니다.", this);
+            return false;
+        }
+
+        if (enemyContext.EnemyData.SuspicionDurationTurns <= 0)
+        {
+            Debug.LogError($"{nameof(EnemyAlertState)} on {name}의 의심 유지 턴은 0보다 커야 합니다.", this);
+            return false;
+        }
+
         return true;
     }
 
@@ -85,13 +185,4 @@ public class EnemyAlertState : MonoBehaviour
 
         return true;
     }
-}
-
-/// <summary>
-/// 적의 현재 경계 상태 단계다.
-/// </summary>
-public enum EnemyAlertLevel
-{
-    Normal,
-    Alerted,
 }

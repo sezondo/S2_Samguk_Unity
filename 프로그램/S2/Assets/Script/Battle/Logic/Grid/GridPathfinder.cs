@@ -93,6 +93,21 @@ public static class GridPathfinder
         int maxDistance,
         List<GridPosition> path)
     {
+        return TryFindPath(gridManager, startPosition, targetPosition, maxDistance, path, null);
+    }
+
+    /// <summary>
+    /// 지정한 아군 점유자를 장애물에서 제외하고 목표 칸까지 최단 경로를 계산한다.
+    /// 편대 전체가 같은 방향으로 이동하는 그룹 순찰에서만 사용한다.
+    /// </summary>
+    public static bool TryFindPath(
+        GridManager gridManager,
+        GridPosition startPosition,
+        GridPosition targetPosition,
+        int maxDistance,
+        List<GridPosition> path,
+        ISet<GridActor> ignoredActors)
+    {
         path.Clear();
 
         if (gridManager == null || maxDistance <= 0 || startPosition == targetPosition)
@@ -100,7 +115,7 @@ public static class GridPathfinder
             return false;
         }
 
-        if (!gridManager.IsInside(startPosition) || !CanEnterForPath(gridManager, targetPosition, startPosition))
+        if (!gridManager.IsInside(startPosition) || !CanEnterForPath(gridManager, targetPosition, startPosition, ignoredActors))
         {
             return false;
         }
@@ -131,7 +146,7 @@ public static class GridPathfinder
             for (int i = 0; i < CardinalDirections.Length; i++)
             {
                 GridPosition next = current + CardinalDirections[i];
-                if (distanceByPosition.ContainsKey(next) || !CanEnterForPath(gridManager, next, startPosition))
+                if (distanceByPosition.ContainsKey(next) || !CanEnterForPath(gridManager, next, startPosition, ignoredActors))
                 {
                     continue;
                 }
@@ -151,7 +166,30 @@ public static class GridPathfinder
     /// </summary>
     private static bool CanEnterForPath(GridManager gridManager, GridPosition position, GridPosition startPosition)
     {
-        return position == startPosition || gridManager.CanEnter(position);
+        return CanEnterForPath(gridManager, position, startPosition, null);
+    }
+
+    /// <summary>
+    /// 고정 장애물은 유지하면서 지정한 액터의 점유만 경로 장애물에서 제외한다.
+    /// </summary>
+    private static bool CanEnterForPath(
+        GridManager gridManager,
+        GridPosition position,
+        GridPosition startPosition,
+        ISet<GridActor> ignoredActors)
+    {
+        if (position == startPosition)
+        {
+            return true;
+        }
+
+        if (!gridManager.IsInside(position) || gridManager.IsBlocked(position))
+        {
+            return false;
+        }
+
+        return !gridManager.TryGetActorAt(position, out GridActor occupied) ||
+            ignoredActors != null && ignoredActors.Contains(occupied);
     }
 
     /// <summary>

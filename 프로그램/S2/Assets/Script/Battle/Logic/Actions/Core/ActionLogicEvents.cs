@@ -157,6 +157,40 @@ public sealed class SwordThrownLogicEvent : IActionLogicEvent
 }
 
 /// <summary>
+/// 적의 위치 또는 시야 방향이 바뀌어 플레이어 감지를 다시 검사해야 함을 알린다.
+/// </summary>
+public sealed class EnemyPerceptionChangedLogicEvent : IActionLogicEvent
+{
+    public EnemyContext Enemy { get; }
+
+    /// <summary>
+    /// 감지 정보를 갱신한 적을 지정해 이벤트를 만든다.
+    /// </summary>
+    public EnemyPerceptionChangedLogicEvent(EnemyContext enemy)
+    {
+        Enemy = enemy;
+    }
+}
+
+/// <summary>
+/// 적 하나가 이상 현상을 직접 감지하거나 전파받아 의심 행동을 시작했음을 알린다.
+/// </summary>
+public sealed class EnemySuspicionTriggeredLogicEvent : IActionLogicEvent
+{
+    public EnemyContext Enemy { get; }
+    public EnemySuspicionInfo SuspicionInfo { get; }
+
+    /// <summary>
+    /// 의심 상태로 전환되거나 조사 정보가 갱신된 적 이벤트를 만든다.
+    /// </summary>
+    public EnemySuspicionTriggeredLogicEvent(EnemyContext enemy, EnemySuspicionInfo suspicionInfo)
+    {
+        Enemy = enemy;
+        SuspicionInfo = suspicionInfo;
+    }
+}
+
+/// <summary>
 /// 검 회수 행동으로 검이 플레이어 위치로 돌아왔음을 알리는 논리 이벤트다.
 /// </summary>
 public sealed class SwordRecalledLogicEvent : IActionLogicEvent

@@ -41,6 +41,8 @@ public class TurnManager : MonoBehaviour
     public bool IsPlayerTurn => CurrentSide == TurnSide.Player;
     // 현재 턴이 적 턴인지 빠르게 확인하는 값이다.
     public bool IsEnemyTurn => CurrentSide == TurnSide.Enemy;
+    // 지금까지 시작된 적 턴의 누적 번호다. 의심 유지 시간과 그룹 중복 실행 방지에 사용한다.
+    public int EnemyTurnIndex { get; private set; }
 
     // 새 턴이 시작될 때 현재 진영을 전달한다.
     public event Action<TurnSide> TurnStarted;
@@ -156,6 +158,10 @@ public class TurnManager : MonoBehaviour
         }
 
         CurrentSide = side;
+        if (side == TurnSide.Enemy)
+        {
+            EnemyTurnIndex++;
+        }
 
         if (logTurnChanges)
         {

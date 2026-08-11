@@ -112,6 +112,17 @@ public class EnemyTurnCoordinator : MonoBehaviour
         }
 
         IReadOnlyList<EnemyContext> enemies = EnemyRegistry.Instance.Enemies;
+        // 그룹 순찰은 첫 그룹원이 실행될 때 다른 그룹원 AP도 필요하므로 행동 전에 전원 AP를 채운다.
+        for (int i = 0; i < enemies.Count; i++)
+        {
+            EnemyContext refillEnemy = enemies[i];
+            if (refillEnemy != null && refillEnemy.enabled && refillEnemy.IsAlive &&
+                refillEnemy.ActionPoint != null && refillEnemy.ActionPoint.enabled)
+            {
+                refillEnemy.ActionPoint.RefillForTurn();
+            }
+        }
+
         for (int i = 0; i < enemies.Count; i++)
         {
             if (!stageStateManager.IsPlaying)
@@ -145,8 +156,6 @@ public class EnemyTurnCoordinator : MonoBehaviour
 
                 continue;
             }
-
-            enemy.ActionPoint.RefillForTurn();
 
             ActionResolutionContext resolutionContext = new(presentationQueue);
             bool acted = turnAgent.TryExecuteTurn(resolutionContext);
