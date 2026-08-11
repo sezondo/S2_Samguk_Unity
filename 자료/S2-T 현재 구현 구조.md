@@ -655,7 +655,7 @@ PlayerInputReader
 - `SecurityDoorPresenter`: 열린 문의 `DoorVisual` 비활성화.
 - `StageResultPresenter`: 클리어·실패 연출 이벤트 처리. 현재는 한국어 로그 출력 후 즉시 완료.
 - `PlayerUnitSelectionPresenter`: 현재 조작 유닛의 임시 LineRenderer 선택 링.
-- `PlayerVisionPresenter`: 런타임 Fog 칸 생성, 미탐색·탐색·현재 시야 색 전환, 적 표시와 공격자 임시 노출.
+- `PlayerVisionPresenter`: 런타임 Fog 칸 생성, 미탐색·탐색·현재 시야 색 전환, 적 표시와 공격자 임시 노출. `Reveal All For Debug`를 켜면 실제 시야 판정은 유지한 채 Fog와 적 숨김만 해제하며 플레이 중에도 즉시 전환할 수 있다.
 - 시야 밖 공격자는 공격 연출 동안 Sprite 정렬을 Fog보다 한 단계 위로 올리고, 공격 종료 뒤 기존 Sorting Layer·Order로 복원한다. Fog 지형 자체는 걷지 않는다.
 
 `MovePresentationData`는 이동 시간·커브·이동/Idle 애니메이션 옵션을 보관한다.
@@ -935,6 +935,7 @@ SecurityDoor01
 ### BattleTest01 그룹 순찰 연결 예시
 
 - `BattleTest01`만 적 AI 컴포넌트와 그룹 순찰 Inspector 연결을 완료했다. `BattleTest02`와 공용 적 데이터·프리팹은 수정하지 않았다.
+- `BattleTest01`의 `LowObstacleLogicTilemap`에는 이동 차단·시야 통과와 순찰 우회를 확인할 테스트용 논리 타일 17칸이 배치되어 있다.
 - 씬의 두 적은 프리팹 인스턴스가 아닌 씬 로컬 `EnemyLogic` 오브젝트다.
 - 각 적에 `EnemyRoutineController`, `EnemyInvestigationAgent`를 추가하고 자기 `EnemyContext`와 상호 참조를 연결했다.
 - `EnemySystem`에 `EnemyPerceptionCoordinator`, `EnemySuspicionCoordinator`를 추가했다.
@@ -944,4 +945,5 @@ SecurityDoor01
 - 두 적은 `(6,8)/(8,8) → (6,6)/(8,6) → (4,6)/(6,6)`의 L자 경로를 편대를 유지하며 왕복한다.
 - 위쪽 `(6,10)` 방향은 논리 타일맵의 좁은 입구에서 2칸 편대를 유지할 수 없어 예제 경로에서 제외했다.
 - Unity Editor가 수정된 씬을 임포트·로드했으며 Missing Script가 없었다. YAML fileID 중복 0개, 누락 로컬 참조 0개와 런타임 어셈블리 컴파일 경고 0개·오류 0개를 확인했다.
-- 실제 이동, 의심 반응과 복귀는 플레이 모드 검증이 남아 있다.
+- 현재 씬만으로 낮은 장애물의 플레이어 이동 차단·경로 우회, 벽과의 시야 차이, 그룹 순찰 우회를 우선 확인한다.
+- 적 감지·도깨비검 의심, 조사 이동과 복귀 테스트는 필요한 비교 위치와 후속 테스트 구성을 추가한 뒤 진행한다.

@@ -28,6 +28,10 @@ public class PlayerVisionPresenter : MonoBehaviour, IPresentationEventHandler
     // 한 칸 시야 변화와 적 표시 전환에 사용할 페이드 시간이다.
     [SerializeField] private float transitionDuration = 0.12f;
 
+    [Header("Debug")]
+    // true면 실제 시야 판정은 유지하면서 Fog와 적 숨김만 해제한다.
+    [SerializeField] private bool revealAllForDebug;
+
     [Header("Log")]
     // true면 Fog와 적 표시 갱신 결과를 Unity 콘솔에 출력한다.
     [SerializeField] private bool logVisionPresentation;
@@ -50,6 +54,8 @@ public class PlayerVisionPresenter : MonoBehaviour, IPresentationEventHandler
     private PresentationEventHandle activeHandle;
     // 이벤트 구독 중인 시야 매니저다.
     private PlayerVisionManager subscribedVisionManager;
+    // 런타임에 마지막으로 화면에 적용한 테스트용 전체 공개 설정값이다.
+    private bool appliedRevealAllForDebug;
 
     public static PlayerVisionPresenter Instance { get; private set; }
     public PlayerVisionSnapshot PresentedSnapshot => presentedSnapshot;
@@ -73,6 +79,7 @@ public class PlayerVisionPresenter : MonoBehaviour, IPresentationEventHandler
         }
 
         Instance = this;
+        appliedRevealAllForDebug = revealAllForDebug;
         BuildFogRenderers();
     }
 
@@ -99,6 +106,20 @@ public class PlayerVisionPresenter : MonoBehaviour, IPresentationEventHandler
         {
             ApplySnapshotImmediately(context.PlayerVisionManager.CurrentSnapshot);
         }
+    }
+
+    /// <summary>
+    /// 플레이 중 인스펙터의 전체 공개 설정이 바뀌면 현재 Fog와 적 표시를 즉시 다시 적용한다.
+    /// </summary>
+    private void Update()
+    {
+        if (appliedRevealAllForDebug == revealAllForDebug || presentationCoroutine != null)
+        {
+            return;
+        }
+
+        appliedRevealAllForDebug = revealAllForDebug;
+        ApplyCurrentPresentationImmediately();
     }
 
     /// <summary>
@@ -181,7 +202,7 @@ public class PlayerVisionPresenter : MonoBehaviour, IPresentationEventHandler
     /// </summary>
     public bool ShouldShowEnemyActorAt(GridActor actor, GridPosition position)
     {
-        return IsActorForcedVisible(actor) || IsPositionPresentedVisible(position);
+        return revealAllForDebug || IsActorForcedVisible(actor) || IsPositionPresentedVisible(position);
     }
 
     /// <summary>
@@ -200,7 +221,7 @@ public class PlayerVisionPresenter : MonoBehaviour, IPresentationEventHandler
     /// </summary>
     private bool ShouldShowEnemyActorInSnapshot(GridActor actor)
     {
-        if (IsActorForcedVisible(actor))
+        if (revealAllForDebug || IsActorForcedVisible(actor))
         {
             return true;
         }
@@ -325,6 +346,31 @@ public class PlayerVisionPresenter : MonoBehaviour, IPresentationEventHandler
         foreach (KeyValuePair<GridPosition, SpriteRenderer> pair in fogRendererByPosition)
         {
             pair.Value.color = GetFogColor(snapshot.GetState(pair.Key));
+        }
+
+        ApplyAllEnemyVisibilityImmediately();
+    }
+
+    /// <summary>
+    /// 현재까지 화면에 적용된 시야를 기준으로 테스트용 전체 공개 설정을 즉시 반영한다.
+    /// </summary>
+    private void ApplyCurrentPresentationImmediately()
+    {
+        PlayerVisionSnapshot snapshot = presentedSnapshot;
+        if (snapshot == null && context != null && context.PlayerVisionManager != null)
+        {
+            snapshot = context.PlayerVisionManager.CurrentSnapshot;
+        }
+
+        if (snapshot != null)
+        {
+            ApplySnapshotImmediately(snapshot);
+            return;
+        }
+
+        foreach (KeyValuePair<GridPosition, SpriteRenderer> pair in fogRendererByPosition)
+        {
+            pair.Value.color = GetFogColor(GridVisibilityState.Unexplored);
         }
 
         ApplyAllEnemyVisibilityImmediately();
@@ -485,6 +531,11 @@ public class PlayerVisionPresenter : MonoBehaviour, IPresentationEventHandler
     /// </summary>
     private Color GetFogColor(GridVisibilityState state)
     {
+        if (revealAllForDebug)
+        {
+            return Color.clear;
+        }
+
         return state switch
         {
             GridVisibilityState.Visible => visibleColor,
@@ -522,7 +573,7 @@ public class PlayerVisionPresenter : MonoBehaviour, IPresentationEventHandler
 
                 SpriteRenderer renderer = fogCell.AddComponent<SpriteRenderer>();
                 renderer.sprite = fogSprite;
-                renderer.color = unexploredColor;
+                renderer.color = GetFogColor(GridVisibilityState.Unexplored);
                 renderer.sortingLayerName = fogSortingLayerName;
                 renderer.sortingOrder = fogSortingOrder;
                 fogRendererByPosition[position] = renderer;

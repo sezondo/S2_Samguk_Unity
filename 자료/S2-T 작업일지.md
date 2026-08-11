@@ -2719,3 +2719,49 @@
 - 씬 YAML 중복 fileID 0개, 누락 로컬 참조 0개다.
 - `dotnet build Assembly-CSharp.csproj --no-restore`: 경고 0개, 오류 0개다.
 - 실제 플레이 모드 순찰·의심·Alerted 회귀 테스트는 사용자가 씬 구성을 확인한 뒤 진행한다.
+
+## 2026-08-11 플레이어 시야 표시 전체 공개 디버그 옵션
+
+## 목적
+
+- 적 순찰·의심 AI를 관찰할 때 실제 플레이어 시야 판정은 유지하면서 전체 맵과 모든 적을 볼 수 있게 한다.
+
+## 변경
+
+- `PlayerVisionPresenter`에 `Reveal All For Debug` 인스펙터 체크박스를 추가했다.
+- 체크하면 Fog만 완전히 투명하게 만들고 모든 적의 시야 알파를 표시 상태로 유지한다.
+- 플레이 중 체크 상태를 바꿔도 즉시 반영되며, 해제하면 현재 시야 스냅샷의 Fog와 적 표시 상태로 복원된다.
+- `PlayerVisionManager`와 공격·해킹·이동 위험 예측에 사용되는 실제 시야 판정은 변경하지 않았다.
+- Battle 씬, 프리팹과 기존 Inspector 직렬화 값은 수정하지 않았다.
+
+## 검증
+
+- `dotnet build S2.slnx --no-restore`: 경고 0개, 오류 0개.
+- `git diff --check -- Assets/Script/Battle/Presentation/Presenter/PlayerVisionPresenter.cs`: 공백 오류 없음.
+- 실제 체크·해제 화면 전환은 Unity 플레이 모드에서 확인해야 한다.
+
+## 2026-08-11 BattleTest01 낮은 장애물 테스트 준비
+
+## 현재 구성
+
+- 사용자가 `BattleTest01`의 `LowObstacleLogicTilemap`에 테스트용 논리 타일 17칸을 직접 배치했다.
+- 해당 타일은 `GridManager`에서 고정 이동불가 칸으로 반영되지만 `IsSightBlocked()`에는 포함되지 않으므로 시야는 통과한다.
+- 낮은 장애물 Visual이 필요하면 같은 칸의 `ObjectTilemap`에 별도로 배치하고, 이동 판정은 `LowObstacleLogicTilemap`이 담당한다.
+
+## 실행 중 확인한 사항
+
+- 첫 실행에서 플레이어 시야가 전체 공개된 현상은 낮은 장애물의 LOS 문제가 아니었다.
+- Unity 라이브 컴포넌트와 씬 직렬화 값을 확인한 결과 `PlayerVisionPresenter.Reveal All For Debug`가 켜진 상태로 저장되어 있었다.
+- 시야·Fog 자체를 확인할 때는 전체 공개를 끄고, 숨은 적의 AI 행동만 관찰할 때는 켜서 사용한다.
+
+## 테스트 경계
+
+1. 현재 구성에서는 낮은 장애물 칸의 플레이어 이동 차단과 경로 우회를 확인한다.
+2. 같은 배치를 `WallLogicTilemap`과 비교해 낮은 장애물은 시야 통과, 벽은 시야 차단인지 확인한다.
+3. 그룹 순찰이 낮은 장애물을 밟지 않고 우회하며 편대가 겹치거나 정지하지 않는지 확인한다.
+4. 적 감지·도깨비검 의심, 조사 이동·복귀와 전체 전투 회귀는 필요한 비교 위치와 후속 테스트 구성을 추가한 뒤 진행한다.
+
+## 현재 상태
+
+- 낮은 장애물 테스트용 씬 구성과 확인 항목 정리까지 완료했다.
+- 위 1~3번의 실제 플레이 결과는 아직 완료로 기록하지 않았으며 사용자 테스트 후 갱신한다.
