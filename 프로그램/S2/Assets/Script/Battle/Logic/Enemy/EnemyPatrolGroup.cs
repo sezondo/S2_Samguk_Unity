@@ -38,6 +38,12 @@ public class EnemyPatrolGroup : MonoBehaviour
     // 같은 목표로 연속 이동하지 못했을 때 구성 경고를 출력할 턴 수다.
     [SerializeField] private int blockedWarningTurns = 3;
 
+    [Header("Regroup")]
+    // 조사 종료 후 현재 편대 기준 칸 주변에서 새 편대 Anchor를 찾을 최대 맨해튼 거리다.
+    [SerializeField] private int regroupSearchRadius = 8;
+    // 편대 복귀가 연속으로 막혔을 때 기존 Anchor를 폐기하고 다시 계산할 턴 수다.
+    [SerializeField] private int regroupAnchorRetryTurns = 3;
+
     // 현재 그룹이 도착해 있는 순찰 지점이다.
     private PatrolPoint currentPoint;
     // 현재 지점에 오기 직전에 방문한 지점이다.
@@ -58,6 +64,8 @@ public class EnemyPatrolGroup : MonoBehaviour
     private bool hasRegroupAnchor;
     // 조사 종료 후 생존 구성원이 모일 편대의 기준 칸이다.
     private GridPosition regroupAnchor;
+    // 현재 편대 복귀 Anchor로 연속 이동하지 못한 적 턴 수다.
+    private int regroupBlockedTurnCount;
 
     // 리더의 전체 경로 계산 버퍼다.
     private readonly List<GridPosition> leaderPathBuffer = new();
@@ -185,6 +193,11 @@ public class EnemyPatrolGroup : MonoBehaviour
         }
 
         lastExecutedEnemyTurnIndex = enemyTurnIndex;
+        if (hasRegroupAnchor && !IsRegroupAnchorValid())
+        {
+            InvalidateRegroupAnchor("편대 목표 칸이 장애물 또는 외부 유닛 점유로 유효하지 않게 됐습니다.");
+        }
+
         if (!hasRegroupAnchor && !TrySelectRegroupAnchor())
         {
             HandleBlockedRegroupTurn();
@@ -203,7 +216,7 @@ public class EnemyPatrolGroup : MonoBehaviour
             return false;
         }
 
-        blockedTurnCount = 0;
+        regroupBlockedTurnCount = 0;
         if (IsRegroupComplete())
         {
             CompleteRegroup(context);
@@ -248,7 +261,7 @@ public class EnemyPatrolGroup : MonoBehaviour
     }
 
     /// <summary>
-    /// 현재 생존 편대를 놓을 수 있는 칸 중 전체 이동 거리가 가장 짧은 기준 칸을 선택한다.
+    /// 현재 편대 기준 칸 주변에서 생존 편대를 놓을 수 있고 전체 경로가 가장 짧은 Anchor를 선택한다.
     /// </summary>
     private bool TrySelectRegroupAnchor()
     {
@@ -271,11 +284,21 @@ public class EnemyPatrolGroup : MonoBehaviour
         bool found = false;
         int bestScore = int.MaxValue;
         GridPosition bestAnchor = GridPosition.Zero;
-        for (int x = 0; x < gridManager.Width; x++)
+        GridPosition searchCenter = GetRegroupSearchCenter();
+        int minX = Mathf.Max(0, searchCenter.x - regroupSearchRadius);
+        int maxX = Mathf.Min(gridManager.Width - 1, searchCenter.x + regroupSearchRadius);
+        int minY = Mathf.Max(0, searchCenter.y - regroupSearchRadius);
+        int maxY = Mathf.Min(gridManager.Height - 1, searchCenter.y + regroupSearchRadius);
+        for (int x = minX; x <= maxX; x++)
         {
-            for (int y = 0; y < gridManager.Height; y++)
+            for (int y = minY; y <= maxY; y++)
             {
                 GridPosition candidateAnchor = new(x, y);
+                if (searchCenter.ManhattanDistanceTo(candidateAnchor) > regroupSearchRadius)
+                {
+                    continue;
+                }
+
                 if (!TryScoreRegroupAnchor(candidateAnchor, out int score))
                 {
                     continue;
@@ -297,9 +320,10 @@ public class EnemyPatrolGroup : MonoBehaviour
 
         regroupAnchor = bestAnchor;
         hasRegroupAnchor = true;
+        regroupBlockedTurnCount = 0;
         if (logPatrol)
         {
-            Debug.Log($"{nameof(EnemyPatrolGroup)}: {name} 그룹이 조사 후 편대 재구성 기준 칸으로 {regroupAnchor}을 선택했습니다.", this);
+            Debug.Log($"{nameof(EnemyPatrolGroup)}: {name} 그룹이 {searchCenter} 주변 {regroupSearchRadius}칸 안에서 편대 재구성 기준 칸 {regroupAnchor}을 선택했습니다.", this);
         }
 
         return true;
@@ -331,19 +355,67 @@ public class EnemyPatrolGroup : MonoBehaviour
                 return false;
             }
 
-            if (enemy.GridActor.GridPosition != target &&
-                !GridPathfinder.TryFindPath(
+            if (enemy.GridActor.GridPosition == target)
+            {
+                continue;
+            }
+
+            if (!GridPathfinder.TryFindPath(
                     gridManager,
                     enemy.GridActor.GridPosition,
                     target,
-                    gridManager.Width * gridManager.Height,
+                    regroupSearchRadius,
                     regroupPathBuffer,
                     memberActorSet))
             {
                 return false;
             }
 
-            score += enemy.GridActor.GridPosition.ManhattanDistanceTo(target);
+            score += regroupPathBuffer.Count;
+        }
+
+        return true;
+    }
+
+    /// <summary>
+    /// 현재 활성 리더가 오프셋 0인 편대의 기준 칸을 Anchor 탐색 중심으로 반환한다.
+    /// </summary>
+    private GridPosition GetRegroupSearchCenter()
+    {
+        return activeLeader.GridActor.GridPosition - GetActiveFormationOffset(activeLeader);
+    }
+
+    /// <summary>
+    /// 현재 Anchor의 모든 편대 목표 칸이 고정 장애물과 외부 유닛 점유를 피하는지 확인한다.
+    /// </summary>
+    private bool IsRegroupAnchorValid()
+    {
+        GridManager gridManager = GridManager.Instance;
+        if (gridManager == null)
+        {
+            return false;
+        }
+
+        for (int i = 0; i < members.Count; i++)
+        {
+            EnemyContext enemy = members[i].Enemy;
+            if (enemy == null || !enemy.IsAlive)
+            {
+                continue;
+            }
+
+            GridPosition target = regroupAnchor + GetActiveFormationOffset(enemy);
+            if (!gridManager.IsInside(target) || gridManager.IsBlocked(target))
+            {
+                return false;
+            }
+
+            if (gridManager.TryGetActorAt(target, out GridActor occupied) &&
+                occupied != enemy.GridActor &&
+                !IsGroupActor(occupied))
+            {
+                return false;
+            }
         }
 
         return true;
@@ -355,7 +427,6 @@ public class EnemyPatrolGroup : MonoBehaviour
     private bool TryMoveOneMemberForRegroup(ActionResolutionContext context)
     {
         GridManager gridManager = GridManager.Instance;
-        int searchDistance = gridManager.Width * gridManager.Height;
         for (int i = 0; i < members.Count; i++)
         {
             EnemyContext enemy = members[i].Enemy;
@@ -380,7 +451,7 @@ public class EnemyPatrolGroup : MonoBehaviour
                     gridManager,
                     enemy.GridActor.GridPosition,
                     target,
-                    searchDistance,
+                    regroupSearchRadius,
                     regroupPathBuffer))
             {
                 continue;
@@ -442,7 +513,7 @@ public class EnemyPatrolGroup : MonoBehaviour
         }
 
         hasRegroupAnchor = false;
-        blockedTurnCount = 0;
+        regroupBlockedTurnCount = 0;
         if (currentPoint != null)
         {
             FaceGroup(currentPoint.LookDirection, context);
@@ -455,15 +526,34 @@ public class EnemyPatrolGroup : MonoBehaviour
     }
 
     /// <summary>
-    /// 편대 재구성 막힘 횟수를 기록하고 장기 정체 시 원인을 확인할 경고를 남긴다.
+    /// 편대 재구성 막힘 횟수를 기록하고 임계치에 도달하면 기존 Anchor를 폐기한다.
     /// </summary>
     private void HandleBlockedRegroupTurn()
     {
-        blockedTurnCount++;
-        if (blockedWarningTurns > 0 && blockedTurnCount >= blockedWarningTurns)
+        regroupBlockedTurnCount++;
+        if (regroupBlockedTurnCount < regroupAnchorRetryTurns)
         {
-            Debug.LogWarning($"{nameof(EnemyPatrolGroup)}: {name} 그룹이 {blockedTurnCount}턴 연속 편대를 재구성하지 못했습니다. 경로의 장애물과 점유 상태를 확인하세요.", this);
+            return;
         }
+
+        if (hasRegroupAnchor)
+        {
+            InvalidateRegroupAnchor($"{regroupBlockedTurnCount}턴 연속 편대를 재구성하지 못했습니다.");
+            return;
+        }
+
+        regroupBlockedTurnCount = 0;
+        Debug.LogWarning($"{nameof(EnemyPatrolGroup)}: {name} 그룹이 현재 편대 기준 칸 주변 {regroupSearchRadius}칸 안에서 유효한 재구성 Anchor를 찾지 못했습니다. 이후 편대 복귀 실행에서 다시 시도합니다.", this);
+    }
+
+    /// <summary>
+    /// 현재 편대 복귀 Anchor와 막힘 횟수를 초기화하고 이후 재계산 원인을 기록한다.
+    /// </summary>
+    private void InvalidateRegroupAnchor(string reason)
+    {
+        hasRegroupAnchor = false;
+        regroupBlockedTurnCount = 0;
+        Debug.LogWarning($"{nameof(EnemyPatrolGroup)}: {name} 그룹의 편대 재구성 Anchor를 폐기합니다. {reason} 이후 편대 복귀 실행에서 다시 계산합니다.", this);
     }
 
     /// <summary>
@@ -789,6 +879,7 @@ public class EnemyPatrolGroup : MonoBehaviour
                 activeLeader = candidate;
                 activeLeaderSourceOffset = GetConfiguredFormationOffset(candidate);
                 hasRegroupAnchor = false;
+                regroupBlockedTurnCount = 0;
                 break;
             }
         }
@@ -879,6 +970,18 @@ public class EnemyPatrolGroup : MonoBehaviour
         if (!startPoint.HasValidData() || members.Count == 0 || blockedWarningTurns < 0)
         {
             Debug.LogError($"{nameof(EnemyPatrolGroup)} on {name}의 순찰 데이터가 올바르지 않습니다.", this);
+            return false;
+        }
+
+        if (regroupSearchRadius <= 0)
+        {
+            Debug.LogError($"{nameof(EnemyPatrolGroup)} on {name}의 편대 재구성 탐색 반경은 0보다 커야 합니다.", this);
+            return false;
+        }
+
+        if (regroupAnchorRetryTurns <= 0)
+        {
+            Debug.LogError($"{nameof(EnemyPatrolGroup)} on {name}의 편대 Anchor 재계산 대기 턴은 0보다 커야 합니다.", this);
             return false;
         }
 

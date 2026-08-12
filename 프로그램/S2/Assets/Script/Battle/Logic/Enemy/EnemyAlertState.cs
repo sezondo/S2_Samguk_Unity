@@ -69,6 +69,8 @@ public class EnemyAlertState : MonoBehaviour
 
         if (IsSuspicious)
         {
+            // 즉시 반응은 반복하지 않지만 이후 조사와 복귀 로그는 가장 최근 이상 현상을 기준으로 삼는다.
+            suspicionInfo = info;
             remainingSuspicionTurns = enemyContext.EnemyData.SuspicionDurationTurns;
 
             // 복귀 도중 새 이상 현상을 감지하면 복귀만 중단하고 즉시 반응 연출은 다시 실행하지 않는다.
