@@ -188,13 +188,18 @@ public class EnemyInvestigationAgent : MonoBehaviour, IActionLogicEventHandler
     }
 
     /// <summary>
-    /// Guard는 원래 자리로 이동하고 Patrol은 보존된 목적지를 이어서 수행하도록 평상 상태로 전환한다.
+    /// Guard는 원래 자리로 이동하고 Patrol 그룹은 편대를 재구성한 뒤 평상 상태로 전환한다.
     /// </summary>
     private bool TryReturnToRoutine(ActionResolutionContext context)
     {
         EnemyRoutineController routine = enemyContext.RoutineController;
         if (routine.RoutineType == EnemyRoutineType.Patrol)
         {
+            if (routine.PatrolGroup != null)
+            {
+                return routine.PatrolGroup.TryRegroupAfterInvestigation(enemyContext, context);
+            }
+
             enemyContext.AlertState.RequestUnaware();
             return true;
         }

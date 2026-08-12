@@ -67,17 +67,26 @@ public class EnemyAlertState : MonoBehaviour
             return false;
         }
 
-        bool changed = currentState != EnemyAwarenessState.Suspicious;
+        if (IsSuspicious)
+        {
+            remainingSuspicionTurns = enemyContext.EnemyData.SuspicionDurationTurns;
+
+            // 복귀 도중 새 이상 현상을 감지하면 복귀만 중단하고 즉시 반응 연출은 다시 실행하지 않는다.
+            if (suspiciousPhase == SuspiciousBehaviorPhase.ReturningToRoutine)
+            {
+                suspiciousPhase = SuspiciousBehaviorPhase.Searching;
+            }
+
+            return true;
+        }
+
         EnemyAwarenessState previousState = currentState;
         currentState = EnemyAwarenessState.Suspicious;
         suspicionInfo = info;
         suspiciousPhase = SuspiciousBehaviorPhase.MovingToInvestigationPosition;
         remainingSuspicionTurns = enemyContext.EnemyData.SuspicionDurationTurns;
 
-        if (changed)
-        {
-            AwarenessStateChanged?.Invoke(previousState, currentState);
-        }
+        AwarenessStateChanged?.Invoke(previousState, currentState);
 
         return true;
     }

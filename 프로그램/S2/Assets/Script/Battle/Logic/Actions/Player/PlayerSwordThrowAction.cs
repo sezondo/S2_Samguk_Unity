@@ -64,6 +64,24 @@ public class PlayerSwordThrowAction : MonoBehaviour
     }
 
     /// <summary>
+    /// 컴포넌트가 제거될 때 루트에 만든 런타임 미리보기 오브젝트를 정리한다.
+    /// </summary>
+    private void OnDestroy()
+    {
+        if (suspicionAreaHighlighter != null)
+        {
+            Destroy(suspicionAreaHighlighter.gameObject);
+            suspicionAreaHighlighter = null;
+        }
+
+        if (swordWarningHighlighter != null)
+        {
+            Destroy(swordWarningHighlighter.gameObject);
+            swordWarningHighlighter = null;
+        }
+    }
+
+    /// <summary>
     /// 검 투척 행동을 선택한다.
     /// </summary>
     public void SelectSwordThrowAction()
@@ -88,15 +106,15 @@ public class PlayerSwordThrowAction : MonoBehaviour
     /// </summary>
     public void CancelSwordThrowAction()
     {
-        if (!isSwordThrowSelected)
+        bool wasSelected = isSwordThrowSelected;
+        isSwordThrowSelected = false;
+        ClearSuspicionPreview();
+        if (wasSelected)
         {
-            return;
+            SwordThrowCanceled?.Invoke();
         }
 
-        isSwordThrowSelected = false;
-        SwordThrowCanceled?.Invoke();
-
-        if (logActionState)
+        if (wasSelected && logActionState)
         {
             Debug.Log($"{nameof(PlayerSwordThrowAction)}: 검 투척 행동 선택을 취소했습니다.", this);
         }

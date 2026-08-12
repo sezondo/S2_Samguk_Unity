@@ -50,6 +50,14 @@ public class EnemyPatrolGroup : MonoBehaviour
     private int lastExecutedEnemyTurnIndex = -1;
     // 현재 목적지로 연속 이동하지 못한 턴 수다.
     private int blockedTurnCount;
+    // 사망한 리더를 대신해 현재 편대와 경로 기준이 되는 생존 리더다.
+    private EnemyContext activeLeader;
+    // 현재 리더의 원래 직렬화 편대 오프셋이다. 계승 후 생존 편대 오프셋을 다시 맞추는 기준이다.
+    private GridPosition activeLeaderSourceOffset;
+    // 조사 종료 후 재구성할 편대 기준 칸을 찾았는지 나타낸다.
+    private bool hasRegroupAnchor;
+    // 조사 종료 후 생존 구성원이 모일 편대의 기준 칸이다.
+    private GridPosition regroupAnchor;
 
     // 리더의 전체 경로 계산 버퍼다.
     private readonly List<GridPosition> leaderPathBuffer = new();
@@ -63,6 +71,10 @@ public class EnemyPatrolGroup : MonoBehaviour
     private readonly List<EnemyContext> orderedMembers = new();
     // 연결 후보를 재사용하는 버퍼다.
     private readonly List<PatrolPoint> candidatePoints = new();
+    // 조사 후 편대 재구성 경로를 계산할 때 사용하는 버퍼다.
+    private readonly List<GridPosition> regroupPathBuffer = new();
+    // 이번 재구성 행동에서 실제 이동할 경로 구간을 담는 버퍼다.
+    private readonly List<GridPosition> regroupStepBuffer = new();
 
     public PatrolPoint CurrentPoint => currentPoint;
     public PatrolPoint TargetPoint => targetPoint;
@@ -81,6 +93,9 @@ public class EnemyPatrolGroup : MonoBehaviour
 
         currentPoint = startPoint;
         waitTurnsRemaining = startPoint.WaitTurns;
+        activeLeader = leader;
+        activeLeaderSourceOffset = GetConfiguredFormationOffset(activeLeader);
+        EnsureActiveLeader();
     }
 
     /// <summary>
@@ -115,11 +130,12 @@ public class EnemyPatrolGroup : MonoBehaviour
             return false;
         }
 
-        lastExecutedEnemyTurnIndex = enemyTurnIndex;
-        if (!CanPatrol())
+        if (!EnsureActiveLeader() || !CanPatrol())
         {
             return false;
         }
+
+        lastExecutedEnemyTurnIndex = enemyTurnIndex;
 
         if (targetPoint == null && waitTurnsRemaining > 0)
         {
@@ -150,6 +166,304 @@ public class EnemyPatrolGroup : MonoBehaviour
         SpendPatrolActionPoint();
         TryCompleteArrival(context);
         return true;
+    }
+
+    /// <summary>
+    /// 모든 생존 그룹원의 조사가 끝났을 때 가까운 유효 칸에 편대를 다시 구성하고 평상 상태로 복귀시킨다.
+    /// </summary>
+    public bool TryRegroupAfterInvestigation(EnemyContext requester, ActionResolutionContext context)
+    {
+        if (!enabled || requester == null || context == null || !Contains(requester) || TurnManager.Instance == null)
+        {
+            return false;
+        }
+
+        int enemyTurnIndex = TurnManager.Instance.EnemyTurnIndex;
+        if (lastExecutedEnemyTurnIndex == enemyTurnIndex || !EnsureActiveLeader() || !CanRegroupAfterInvestigation())
+        {
+            return false;
+        }
+
+        lastExecutedEnemyTurnIndex = enemyTurnIndex;
+        if (!hasRegroupAnchor && !TrySelectRegroupAnchor())
+        {
+            HandleBlockedRegroupTurn();
+            return false;
+        }
+
+        if (IsRegroupComplete())
+        {
+            CompleteRegroup(context);
+            return true;
+        }
+
+        if (!TryMoveOneMemberForRegroup(context))
+        {
+            HandleBlockedRegroupTurn();
+            return false;
+        }
+
+        blockedTurnCount = 0;
+        if (IsRegroupComplete())
+        {
+            CompleteRegroup(context);
+        }
+
+        return true;
+    }
+
+    /// <summary>
+    /// 모든 생존 구성원이 발각되지 않았고 조사 복귀 단계까지 진행했는지 확인한다.
+    /// </summary>
+    private bool CanRegroupAfterInvestigation()
+    {
+        bool hasReturningMember = false;
+        for (int i = 0; i < members.Count; i++)
+        {
+            EnemyContext enemy = members[i].Enemy;
+            if (enemy == null || !enemy.IsAlive)
+            {
+                continue;
+            }
+
+            if (enemy.AlertState == null || enemy.AlertState.IsAlerted)
+            {
+                return false;
+            }
+
+            if (!enemy.AlertState.IsSuspicious)
+            {
+                continue;
+            }
+
+            if (enemy.AlertState.SuspiciousPhase != SuspiciousBehaviorPhase.ReturningToRoutine)
+            {
+                return false;
+            }
+
+            hasReturningMember = true;
+        }
+
+        return hasReturningMember;
+    }
+
+    /// <summary>
+    /// 현재 생존 편대를 놓을 수 있는 칸 중 전체 이동 거리가 가장 짧은 기준 칸을 선택한다.
+    /// </summary>
+    private bool TrySelectRegroupAnchor()
+    {
+        GridManager gridManager = GridManager.Instance;
+        if (gridManager == null)
+        {
+            return false;
+        }
+
+        memberActorSet.Clear();
+        for (int i = 0; i < members.Count; i++)
+        {
+            EnemyContext enemy = members[i].Enemy;
+            if (enemy != null && enemy.IsAlive)
+            {
+                memberActorSet.Add(enemy.GridActor);
+            }
+        }
+
+        bool found = false;
+        int bestScore = int.MaxValue;
+        GridPosition bestAnchor = GridPosition.Zero;
+        for (int x = 0; x < gridManager.Width; x++)
+        {
+            for (int y = 0; y < gridManager.Height; y++)
+            {
+                GridPosition candidateAnchor = new(x, y);
+                if (!TryScoreRegroupAnchor(candidateAnchor, out int score))
+                {
+                    continue;
+                }
+
+                if (!found || score < bestScore || score == bestScore && ComparePosition(candidateAnchor, bestAnchor) < 0)
+                {
+                    found = true;
+                    bestScore = score;
+                    bestAnchor = candidateAnchor;
+                }
+            }
+        }
+
+        if (!found)
+        {
+            return false;
+        }
+
+        regroupAnchor = bestAnchor;
+        hasRegroupAnchor = true;
+        if (logPatrol)
+        {
+            Debug.Log($"{nameof(EnemyPatrolGroup)}: {name} 그룹이 조사 후 편대 재구성 기준 칸으로 {regroupAnchor}을 선택했습니다.", this);
+        }
+
+        return true;
+    }
+
+    /// <summary>
+    /// 지정한 기준 칸에 생존 편대를 놓을 수 있는지 확인하고 현재 위치부터의 총 거리를 계산한다.
+    /// </summary>
+    private bool TryScoreRegroupAnchor(GridPosition candidateAnchor, out int score)
+    {
+        score = 0;
+        GridManager gridManager = GridManager.Instance;
+        for (int i = 0; i < members.Count; i++)
+        {
+            EnemyContext enemy = members[i].Enemy;
+            if (enemy == null || !enemy.IsAlive)
+            {
+                continue;
+            }
+
+            GridPosition target = candidateAnchor + GetActiveFormationOffset(enemy);
+            if (!gridManager.IsInside(target) || gridManager.IsBlocked(target))
+            {
+                return false;
+            }
+
+            if (gridManager.TryGetActorAt(target, out GridActor occupied) && occupied != enemy.GridActor)
+            {
+                return false;
+            }
+
+            if (enemy.GridActor.GridPosition != target &&
+                !GridPathfinder.TryFindPath(
+                    gridManager,
+                    enemy.GridActor.GridPosition,
+                    target,
+                    gridManager.Width * gridManager.Height,
+                    regroupPathBuffer,
+                    memberActorSet))
+            {
+                return false;
+            }
+
+            score += enemy.GridActor.GridPosition.ManhattanDistanceTo(target);
+        }
+
+        return true;
+    }
+
+    /// <summary>
+    /// 아직 목표 편대 칸에 도착하지 않은 구성원 하나를 이번 조사 복귀 이동 범위만큼 이동시킨다.
+    /// </summary>
+    private bool TryMoveOneMemberForRegroup(ActionResolutionContext context)
+    {
+        GridManager gridManager = GridManager.Instance;
+        int searchDistance = gridManager.Width * gridManager.Height;
+        for (int i = 0; i < members.Count; i++)
+        {
+            EnemyContext enemy = members[i].Enemy;
+            if (enemy == null || !enemy.IsAlive)
+            {
+                continue;
+            }
+
+            GridPosition target = regroupAnchor + GetActiveFormationOffset(enemy);
+            if (enemy.GridActor.GridPosition == target)
+            {
+                continue;
+            }
+
+            // 다른 그룹원이 먼저 비워야 하는 목표 칸은 다음 구성원 또는 다음 적 턴에 다시 시도한다.
+            if (gridManager.TryGetActorAt(target, out GridActor occupied) && occupied != enemy.GridActor)
+            {
+                continue;
+            }
+
+            if (!GridPathfinder.TryFindPath(
+                    gridManager,
+                    enemy.GridActor.GridPosition,
+                    target,
+                    searchDistance,
+                    regroupPathBuffer))
+            {
+                continue;
+            }
+
+            regroupStepBuffer.Clear();
+            int moveRange = Mathf.Min(enemy.EnemyData.PatrolMoveRange, regroupPathBuffer.Count);
+            for (int pathIndex = 0; pathIndex < moveRange; pathIndex++)
+            {
+                regroupStepBuffer.Add(regroupPathBuffer[pathIndex]);
+            }
+
+            if (EnemyMovementUtility.MoveAlongPath(enemy, regroupStepBuffer, context, "적 조사 후 편대 재구성 이동 연출") <= 0)
+            {
+                continue;
+            }
+
+            if (logPatrol)
+            {
+                Debug.Log($"{nameof(EnemyPatrolGroup)}: {enemy.name} 적이 조사 후 편대 칸 {target}으로 복귀 중입니다.", this);
+            }
+
+            return true;
+        }
+
+        return false;
+    }
+
+    /// <summary>
+    /// 모든 생존 구성원이 선택된 편대 칸에 도착했는지 확인한다.
+    /// </summary>
+    private bool IsRegroupComplete()
+    {
+        for (int i = 0; i < members.Count; i++)
+        {
+            EnemyContext enemy = members[i].Enemy;
+            if (enemy != null && enemy.IsAlive &&
+                enemy.GridActor.GridPosition != regroupAnchor + GetActiveFormationOffset(enemy))
+            {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    /// <summary>
+    /// 재구성된 그룹원을 평상 상태로 되돌리고 다음 적 턴부터 기존 순찰 경로를 이어가게 한다.
+    /// </summary>
+    private void CompleteRegroup(ActionResolutionContext context)
+    {
+        for (int i = 0; i < members.Count; i++)
+        {
+            EnemyContext enemy = members[i].Enemy;
+            if (enemy != null && enemy.IsAlive && enemy.AlertState != null && enemy.AlertState.IsSuspicious)
+            {
+                enemy.AlertState.RequestUnaware();
+            }
+        }
+
+        hasRegroupAnchor = false;
+        blockedTurnCount = 0;
+        if (currentPoint != null)
+        {
+            FaceGroup(currentPoint.LookDirection, context);
+        }
+
+        if (logPatrol)
+        {
+            Debug.Log($"{nameof(EnemyPatrolGroup)}: {name} 그룹이 조사 후 편대 재구성을 완료했습니다.", this);
+        }
+    }
+
+    /// <summary>
+    /// 편대 재구성 막힘 횟수를 기록하고 장기 정체 시 원인을 확인할 경고를 남긴다.
+    /// </summary>
+    private void HandleBlockedRegroupTurn()
+    {
+        blockedTurnCount++;
+        if (blockedWarningTurns > 0 && blockedTurnCount >= blockedWarningTurns)
+        {
+            Debug.LogWarning($"{nameof(EnemyPatrolGroup)}: {name} 그룹이 {blockedTurnCount}턴 연속 편대를 재구성하지 못했습니다. 경로의 장애물과 점유 상태를 확인하세요.", this);
+        }
     }
 
     /// <summary>
@@ -236,7 +550,13 @@ public class EnemyPatrolGroup : MonoBehaviour
 
         for (int i = 0; i < members.Count; i++)
         {
-            GridPosition target = anchor + members[i].FormationOffset;
+            EnemyContext enemy = members[i].Enemy;
+            if (enemy == null || !enemy.IsAlive)
+            {
+                continue;
+            }
+
+            GridPosition target = anchor + GetActiveFormationOffset(enemy);
             if (!GridManager.Instance.IsInside(target) || GridManager.Instance.IsBlocked(target))
             {
                 return false;
@@ -253,12 +573,12 @@ public class EnemyPatrolGroup : MonoBehaviour
     {
         sharedStepOffsets.Clear();
         leaderPathBuffer.Clear();
-        if (leader == null || targetPoint == null || !targetPoint.TryGetGridPosition(out GridPosition anchor))
+        if (!EnsureActiveLeader() || targetPoint == null || !targetPoint.TryGetGridPosition(out GridPosition anchor))
         {
             return false;
         }
 
-        GridPosition leaderTarget = anchor + GetFormationOffset(leader);
+        GridPosition leaderTarget = anchor + GetActiveFormationOffset(activeLeader);
         int searchDistance = GridManager.Instance.Width * GridManager.Instance.Height;
         memberActorSet.Clear();
         for (int i = 0; i < members.Count; i++)
@@ -271,7 +591,7 @@ public class EnemyPatrolGroup : MonoBehaviour
 
         if (!GridPathfinder.TryFindPath(
                 GridManager.Instance,
-                leader.GridActor.GridPosition,
+                activeLeader.GridActor.GridPosition,
                 leaderTarget,
                 searchDistance,
                 leaderPathBuffer,
@@ -280,8 +600,8 @@ public class EnemyPatrolGroup : MonoBehaviour
             return false;
         }
 
-        int maxSteps = Mathf.Min(leader.EnemyData.PatrolMoveRange, leaderPathBuffer.Count);
-        GridPosition previous = leader.GridActor.GridPosition;
+        int maxSteps = Mathf.Min(activeLeader.EnemyData.PatrolMoveRange, leaderPathBuffer.Count);
+        GridPosition previous = activeLeader.GridActor.GridPosition;
         GridPosition cumulativeOffset = GridPosition.Zero;
         for (int i = 0; i < maxSteps; i++)
         {
@@ -395,7 +715,7 @@ public class EnemyPatrolGroup : MonoBehaviour
             return;
         }
 
-        if (leader.GridActor.GridPosition != anchor + GetFormationOffset(leader))
+        if (!EnsureActiveLeader() || activeLeader.GridActor.GridPosition != anchor + GetActiveFormationOffset(activeLeader))
         {
             return;
         }
@@ -450,9 +770,47 @@ public class EnemyPatrolGroup : MonoBehaviour
     }
 
     /// <summary>
-    /// 지정한 적의 편대 오프셋을 반환한다.
+    /// 사망한 현재 리더 대신 구성원 목록에서 가장 먼저 등록된 생존 적에게 리더를 계승한다.
     /// </summary>
-    private GridPosition GetFormationOffset(EnemyContext enemy)
+    private bool EnsureActiveLeader()
+    {
+        if (activeLeader != null && activeLeader.IsAlive)
+        {
+            return true;
+        }
+
+        EnemyContext previousLeader = activeLeader;
+        activeLeader = null;
+        for (int i = 0; i < members.Count; i++)
+        {
+            EnemyContext candidate = members[i].Enemy;
+            if (candidate != null && candidate.IsAlive)
+            {
+                activeLeader = candidate;
+                activeLeaderSourceOffset = GetConfiguredFormationOffset(candidate);
+                hasRegroupAnchor = false;
+                break;
+            }
+        }
+
+        if (activeLeader == null)
+        {
+            return false;
+        }
+
+        if (previousLeader != activeLeader && logPatrol)
+        {
+            string previousName = previousLeader != null ? previousLeader.name : "없음";
+            Debug.Log($"{nameof(EnemyPatrolGroup)}: {name} 그룹 리더가 {previousName}에서 {activeLeader.name}(으)로 계승됐습니다.", this);
+        }
+
+        return true;
+    }
+
+    /// <summary>
+    /// 지정한 적의 직렬화된 원래 편대 오프셋을 반환한다.
+    /// </summary>
+    private GridPosition GetConfiguredFormationOffset(EnemyContext enemy)
     {
         for (int i = 0; i < members.Count; i++)
         {
@@ -463,6 +821,23 @@ public class EnemyPatrolGroup : MonoBehaviour
         }
 
         return GridPosition.Zero;
+    }
+
+    /// <summary>
+    /// 현재 생존 리더가 오프셋 0이 되도록 다시 맞춘 지정 구성원의 런타임 편대 오프셋을 반환한다.
+    /// </summary>
+    private GridPosition GetActiveFormationOffset(EnemyContext enemy)
+    {
+        return GetConfiguredFormationOffset(enemy) - activeLeaderSourceOffset;
+    }
+
+    /// <summary>
+    /// 두 칸을 재현 가능한 x, y 좌표 순서로 비교한다.
+    /// </summary>
+    private static int ComparePosition(GridPosition left, GridPosition right)
+    {
+        int xComparison = left.x.CompareTo(right.x);
+        return xComparison != 0 ? xComparison : left.y.CompareTo(right.y);
     }
 
     /// <summary>

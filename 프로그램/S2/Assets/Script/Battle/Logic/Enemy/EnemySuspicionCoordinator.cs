@@ -208,7 +208,7 @@ public class EnemySuspicionCoordinator : MonoBehaviour, IActionLogicEventHandler
     }
 
     /// <summary>
-    /// 적의 의심 정보를 갱신하고 즉시 조사 반응 이벤트를 발행한다.
+    /// 적의 의심 정보를 갱신하고 최초 의심 진입일 때만 즉시 조사 반응 이벤트를 발행한다.
     /// </summary>
     private void ApplySuspicion(
         EnemyContext enemy,
@@ -225,8 +225,19 @@ public class EnemySuspicionCoordinator : MonoBehaviour, IActionLogicEventHandler
 
         int turnIndex = TurnManager.Instance != null ? TurnManager.Instance.EnemyTurnIndex : 0;
         EnemySuspicionInfo info = new(position, SuspicionSource.SwordPresence, detector, turnIndex, sourceObject, role);
+        bool wasSuspicious = enemy.AlertState.IsSuspicious;
         if (!enemy.AlertState.RequestSuspicion(info))
         {
+            return;
+        }
+
+        if (wasSuspicious)
+        {
+            if (logSuspicionSpread)
+            {
+                Debug.Log($"{nameof(EnemySuspicionCoordinator)}: {enemy.name} 적의 남은 조사 턴을 갱신했습니다. 재감지 칸: {position}", this);
+            }
+
             return;
         }
 

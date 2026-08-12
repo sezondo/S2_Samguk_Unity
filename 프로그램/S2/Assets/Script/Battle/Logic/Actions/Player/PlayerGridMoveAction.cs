@@ -96,7 +96,8 @@ public class PlayerGridMoveAction : MonoBehaviour
     /// </summary>
     private void OnDisable()
     {
-        ClearPathPreview();
+        isMoveSelected = false;
+        ClearMoveSelectionPresentation();
     }
 
     /// <summary>
@@ -137,18 +138,11 @@ public class PlayerGridMoveAction : MonoBehaviour
     /// </summary>
     public void CancelMoveAction()
     {
-        if (!isMoveSelected)
-        {
-            return;
-        }
-
+        bool wasSelected = isMoveSelected;
         isMoveSelected = false;
-        movablePositions.Clear();
-        ClearMoveRangeSegments();
-        ClearPathPreview();
-        MoveRangeHidden?.Invoke();
+        ClearMoveSelectionPresentation();
 
-        if (logActionState)
+        if (wasSelected && logActionState)
         {
             Debug.Log($"{nameof(PlayerGridMoveAction)}: 이동 행동 선택을 취소했습니다.", this);
         }
@@ -211,10 +205,7 @@ public class PlayerGridMoveAction : MonoBehaviour
         }
 
         isMoveSelected = false;
-        movablePositions.Clear();
-        ClearMoveRangeSegments();
-        ClearPathPreview();
-        MoveRangeHidden?.Invoke();
+        ClearMoveSelectionPresentation();
         resolutionContext.Publish(new MoveCompletedLogicEvent(actor, actor.GridPosition));
         // 이동 완료 후 목표 달성 같은 후속 논리 이벤트를 연출 큐 재생 전에 확정한다.
         resolutionContext.Resolve();
@@ -357,6 +348,18 @@ public class PlayerGridMoveAction : MonoBehaviour
     public void ClearMovePathPreview()
     {
         ClearPathPreview();
+    }
+
+    /// <summary>
+    /// 이동 선택 여부와 관계없이 이동 범위와 경로 미리보기 표시를 모두 정리한다.
+    /// </summary>
+    private void ClearMoveSelectionPresentation()
+    {
+        movablePositions.Clear();
+        distanceByMovablePosition.Clear();
+        ClearMoveRangeSegments();
+        ClearPathPreview();
+        MoveRangeHidden?.Invoke();
     }
 
     /// <summary>

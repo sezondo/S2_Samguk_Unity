@@ -114,7 +114,6 @@ public class TacticalUnitContext : MonoBehaviour, ITacticalUnit
     public void CancelAllActionSelections()
     {
         gridMoveAction?.CancelMoveAction();
-        gridMoveAction?.ClearMovePathPreview();
         hackAction?.CancelHackAction();
         swordThrowAction?.CancelSwordThrowAction();
         meleeAttackAction?.CancelMeleeAttackAction();
