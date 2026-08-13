@@ -1,6 +1,6 @@
 # S2-T 현재 구현 구조
 
-- 최신 기준: 2026-08-05
+- 최신 기준: 2026-08-13
 - 기준 브랜치: `main`
 - Unity 버전: `6000.0.64f1`
 - 기준 테스트 씬: `Assets/Scenes/Test/BootstrapTest.unity`, `Assets/Scenes/Test/LobbyTest.unity`, `Assets/Scenes/Test/StoryTest.unity`, `Assets/Scenes/Test/BattleTest01.unity`, `Assets/Scenes/Test/BattleTest02.unity`
@@ -956,8 +956,12 @@ SecurityDoor01
 
 ### 적 편대 이동 연출
 
-- 그룹 Patrol은 현재 구성원별 이동 이벤트가 순차 재생된다. 편대 전체가 한 번에 움직여 보이는 동시 이동 연출로 개선한다.
-- 조사 후 Regroup도 현재 적 턴마다 구성원 한 명씩 이동한다. 편대 전체가 한 번에 복귀하는 방식으로 개선한다.
+- 그룹 Patrol 동시 이동 코드가 구현됐다. 한 칸마다 전원 목적지를 검증하고 앞쪽 구성원부터 내부 점유를 갱신한 뒤, 전원 시야 갱신과 등록 순서상 첫 감지자 판정을 수행한다.
+- 실제 확정된 구성원별 경로는 하나의 `GroupMove` 이벤트로 전달되며 `GroupMovePresenter`가 `GroupMovePresentationData`의 공통 시간·곡선으로 모든 Visual을 동시에 이동시킨다.
+- 이동 중 발각되면 해당 칸에서 남은 논리 경로를 중단하고, 그룹 이동 연출 완료 뒤 기존 발각·애드·엄폐 반응 연출을 재생한다.
+- `BattleTest01/EnemySystem/PatrolRoute_Group01`에 그룹 Presenter와 테스트 데이터 연결을 완료했다. 한 칸 이동 시간은 `0.2초`이며 사용자가 현재 편대 동시 이동을 플레이 테스트해 정상 동작을 확인했다.
+- `AlertDetectedPresenter`가 인식 상태 변경을 구독하므로 의심 조사 종료 뒤 `Unaware`의 정상 색상으로 복원되고, 의심 중 발각 시 `Alerted` 색상으로 즉시 전환된다.
+- 조사 후 Regroup은 현재 적 턴마다 구성원 한 명씩 이동한다. 다음 작업에서 Patrol의 그룹 이동 데이터·스냅샷·Presenter를 재사용해 구성원별 경로를 동시에 재생하는 방식으로 개선한다.
 - 동시 이동을 구현할 때 논리 위치, GridActor 점유, 중간 칸 충돌과 적 감지 이벤트의 처리 순서를 함께 확정해야 한다.
 
 ### 전투 연출과 전술 정보 표시

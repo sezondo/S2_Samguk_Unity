@@ -11,6 +11,7 @@ public readonly struct PresentationEvent
     public HackableObject Hackable { get; }
     public SecurityDoorController SecurityDoor { get; }
     public PlayerVisionSnapshot VisionSnapshot { get; }
+    public GroupMovePresentationSnapshot GroupMoveSnapshot { get; }
     public bool ActorVisibility { get; }
     public GridPosition FromPosition { get; }
     public GridPosition ToPosition { get; }
@@ -45,7 +46,8 @@ public readonly struct PresentationEvent
         SwordMoveKind swordMoveKind = SwordMoveKind.None,
         SecurityDoorController securityDoor = null,
         PlayerVisionSnapshot visionSnapshot = null,
-        bool actorVisibility = false)
+        bool actorVisibility = false,
+        GroupMovePresentationSnapshot groupMoveSnapshot = null)
     {
         Type = type;
         Actor = actor;
@@ -54,6 +56,7 @@ public readonly struct PresentationEvent
         Hackable = hackable;
         SecurityDoor = securityDoor;
         VisionSnapshot = visionSnapshot;
+        GroupMoveSnapshot = groupMoveSnapshot;
         ActorVisibility = actorVisibility;
         FromPosition = fromPosition;
         ToPosition = toPosition;
@@ -114,6 +117,33 @@ public readonly struct PresentationEvent
         string message = null)
     {
         return new PresentationEvent(PresentationEventType.Hack, actor, null, null, hackable, default, executionPosition, targetPosition, executionPosition, MovePresentationPhase.None, AttackPresentationKind.None, default, false, message);
+    }
+
+    /// <summary>
+    /// 편대 구성원들의 실제 확정 경로를 동시에 재생할 그룹 이동 연출 이벤트를 만든다.
+    /// </summary>
+    public static PresentationEvent GroupMove(GroupMovePresentationSnapshot snapshot, string message = null)
+    {
+        return new PresentationEvent(
+            PresentationEventType.GroupMove,
+            null,
+            null,
+            null,
+            null,
+            default,
+            default,
+            default,
+            default,
+            MovePresentationPhase.None,
+            AttackPresentationKind.None,
+            default,
+            false,
+            message,
+            SwordMoveKind.None,
+            null,
+            null,
+            false,
+            snapshot);
     }
 
     /// <summary>
@@ -257,6 +287,7 @@ public readonly struct PresentationEvent
         string enemyName = Enemy != null ? Enemy.name : "없음";
         string hackableName = Hackable != null ? Hackable.name : "없음";
         string securityDoorName = SecurityDoor != null ? SecurityDoor.name : "없음";
-        return $"{Type} Actor:{actorName} Target:{targetActorName} Enemy:{enemyName} Hackable:{hackableName} SecurityDoor:{securityDoorName} From:{FromPosition} To:{ToPosition} MovePhase:{MovePhase} SwordMove:{SwordMoveKind} ActorVisibility:{ActorVisibility} Event:{EventPosition} Execution:{ExecutionPosition}";
+        string groupName = GroupMoveSnapshot?.Group != null ? GroupMoveSnapshot.Group.name : "없음";
+        return $"{Type} Actor:{actorName} Target:{targetActorName} Enemy:{enemyName} Group:{groupName} Hackable:{hackableName} SecurityDoor:{securityDoorName} From:{FromPosition} To:{ToPosition} MovePhase:{MovePhase} SwordMove:{SwordMoveKind} ActorVisibility:{ActorVisibility} Event:{EventPosition} Execution:{ExecutionPosition}";
     }
 }

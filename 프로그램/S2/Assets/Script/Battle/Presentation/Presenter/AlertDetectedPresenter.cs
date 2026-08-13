@@ -55,6 +55,7 @@ public class AlertDetectedPresenter : MonoBehaviour, IPresentationEventHandler
             return;
         }
 
+        SubscribeAwarenessState();
         ApplyCurrentStateColor();
         TryRegisterQueue(false);
     }
@@ -72,6 +73,8 @@ public class AlertDetectedPresenter : MonoBehaviour, IPresentationEventHandler
     /// </summary>
     private void OnDisable()
     {
+        UnsubscribeAwarenessState();
+
         if (ActionPresentationQueue.Instance != null)
         {
             ActionPresentationQueue.Instance.Unregister(this);
@@ -93,6 +96,43 @@ public class AlertDetectedPresenter : MonoBehaviour, IPresentationEventHandler
             activeHandle.Complete();
             activeHandle = null;
         }
+    }
+
+    /// <summary>
+    /// 담당 적의 인식 상태 변경 이벤트를 중복 없이 구독한다.
+    /// </summary>
+    private void SubscribeAwarenessState()
+    {
+        EnemyAlertState alertState = targetEnemy != null ? targetEnemy.AlertState : null;
+        if (alertState == null)
+        {
+            return;
+        }
+
+        alertState.AwarenessStateChanged -= HandleAwarenessStateChanged;
+        alertState.AwarenessStateChanged += HandleAwarenessStateChanged;
+    }
+
+    /// <summary>
+    /// 담당 적의 인식 상태 변경 이벤트 구독을 해제한다.
+    /// </summary>
+    private void UnsubscribeAwarenessState()
+    {
+        EnemyAlertState alertState = targetEnemy != null ? targetEnemy.AlertState : null;
+        if (alertState != null)
+        {
+            alertState.AwarenessStateChanged -= HandleAwarenessStateChanged;
+        }
+    }
+
+    /// <summary>
+    /// 논리 인식 상태가 바뀌면 현재 상태에 맞는 정상·의심·발각 색상을 즉시 적용한다.
+    /// </summary>
+    private void HandleAwarenessStateChanged(
+        EnemyAwarenessState previousState,
+        EnemyAwarenessState currentState)
+    {
+        ApplyCurrentStateColor();
     }
 
     /// <summary>

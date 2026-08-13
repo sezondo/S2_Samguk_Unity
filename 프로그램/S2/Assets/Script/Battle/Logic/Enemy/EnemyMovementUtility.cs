@@ -7,6 +7,25 @@ using UnityEngine;
 public static class EnemyMovementUtility
 {
     /// <summary>
+    /// 편대 한 칸 이동이 모두 확정된 뒤 구성원 하나의 방향과 시야를 새 위치에 맞춰 갱신한다.
+    /// 감지 이벤트는 편대 전체 갱신 뒤 그룹이 등록 순서대로 판정한다.
+    /// </summary>
+    public static bool RefreshAfterFormationStep(
+        EnemyContext enemy,
+        GridPosition fromPosition,
+        GridPosition toPosition)
+    {
+        if (enemy == null || enemy.GridActor == null || enemy.GridSight == null)
+        {
+            return false;
+        }
+
+        SetFacingFromMovement(enemy, fromPosition, toPosition);
+        enemy.GridSight.RefreshSight();
+        return true;
+    }
+
+    /// <summary>
     /// 지정한 경로를 따라 적을 이동시키고 실제로 이동한 칸 수를 반환한다.
     /// </summary>
     public static int MoveAlongPath(

@@ -83,6 +83,14 @@ public class EnemyPatrolGroup : MonoBehaviour
     private readonly List<GridPosition> regroupPathBuffer = new();
     // 이번 재구성 행동에서 실제 이동할 경로 구간을 담는 버퍼다.
     private readonly List<GridPosition> regroupStepBuffer = new();
+    // 편대 순찰 한 번의 구성원별 시작 위치를 보관한다.
+    private readonly Dictionary<EnemyContext, GridPosition> groupMoveStartByEnemy = new();
+    // 편대 순찰에서 실제로 확정된 구성원별 한 칸 경로를 보관한다.
+    private readonly Dictionary<EnemyContext, List<GridPosition>> groupMovePathByEnemy = new();
+    // 그룹 이동 연출 이벤트를 만들 때 사용하는 구성원 스냅샷 버퍼다.
+    private readonly List<GroupMovePresentationMemberSnapshot> groupMoveSnapshotBuffer = new();
+    // 편대 이동 단계가 끝난 뒤 감지할 살아 있는 플레이어를 조회하는 버퍼다.
+    private readonly List<ITacticalUnit> playerDetectionBuffer = new();
 
     public PatrolPoint CurrentPoint => currentPoint;
     public PatrolPoint TargetPoint => targetPoint;
@@ -163,7 +171,7 @@ public class EnemyPatrolGroup : MonoBehaviour
             return false;
         }
 
-        int movedSteps = ExecuteSharedSteps(context);
+        int movedSteps = ExecuteSharedSteps(context, out bool alertTriggered);
         if (movedSteps <= 0)
         {
             HandleBlockedTurn();
@@ -172,7 +180,11 @@ public class EnemyPatrolGroup : MonoBehaviour
 
         blockedTurnCount = 0;
         SpendPatrolActionPoint();
-        TryCompleteArrival(context);
+        if (!alertTriggered)
+        {
+            TryCompleteArrival(context);
+        }
+
         return true;
     }
 
@@ -741,35 +753,208 @@ public class EnemyPatrolGroup : MonoBehaviour
     /// <summary>
     /// 공통 이동 단계를 앞쪽 그룹원부터 적용해 그룹 내부 점유 충돌을 피한다.
     /// </summary>
-    private int ExecuteSharedSteps(ActionResolutionContext context)
+    private int ExecuteSharedSteps(ActionResolutionContext context, out bool alertTriggered)
     {
+        alertTriggered = false;
+        PrepareGroupMoveSnapshotBuffers();
+
         int completedSteps = 0;
         for (int stepIndex = 0; stepIndex < sharedStepOffsets.Count; stepIndex++)
         {
             GridPosition offset = sharedStepOffsets[stepIndex];
-            BuildMovementOrder(offset);
-            bool stepCompleted = true;
-            for (int i = 0; i < orderedMembers.Count; i++)
-            {
-                EnemyContext enemy = orderedMembers[i];
-                GridPosition next = enemy.GridActor.GridPosition + offset;
-                GridPosition[] singleStepPath = { next };
-                if (EnemyMovementUtility.MoveAlongPath(enemy, singleStepPath, context, "적 그룹 순찰 이동 연출") != 1)
-                {
-                    stepCompleted = false;
-                    break;
-                }
-            }
-
-            if (!stepCompleted)
+            if (!CanApplyFormationStep(offset))
             {
                 break;
             }
 
+            BuildMovementOrder(offset);
+            for (int i = 0; i < orderedMembers.Count; i++)
+            {
+                EnemyContext enemy = orderedMembers[i];
+                GridPosition next = enemy.GridActor.GridPosition + offset;
+                if (!enemy.GridActor.TryMoveTo(next))
+                {
+                    Debug.LogError(
+                        $"{nameof(EnemyPatrolGroup)}: {name} 그룹의 사전 검증된 편대 이동 중 {enemy.name} 적을 {next} 칸으로 이동시키지 못했습니다.",
+                        enemy);
+                    EnqueueCompletedGroupMove(context);
+                    return completedSteps;
+                }
+            }
+
+            // 내부 점유 갱신은 순차 적용하지만 방향·시야와 외부 이벤트는 전원 위치가 확정된 뒤 공개한다.
+            for (int i = 0; i < members.Count; i++)
+            {
+                EnemyContext enemy = members[i].Enemy;
+                if (enemy == null || !enemy.IsAlive)
+                {
+                    continue;
+                }
+
+                GridPosition toPosition = enemy.GridActor.GridPosition;
+                GridPosition fromPosition = toPosition - offset;
+                if (!EnemyMovementUtility.RefreshAfterFormationStep(enemy, fromPosition, toPosition))
+                {
+                    Debug.LogError($"{nameof(EnemyPatrolGroup)}: {enemy.name} 적의 편대 이동 방향과 시야를 갱신하지 못했습니다.", enemy);
+                    EnqueueCompletedGroupMove(context);
+                    return completedSteps;
+                }
+
+                groupMovePathByEnemy[enemy].Add(toPosition);
+                context.Publish(new MoveStepEnteredLogicEvent(enemy.GridActor, toPosition));
+            }
+
             completedSteps++;
+            if (TryFindFirstPlayerDetector(out EnemyContext detectingEnemy, out GridPosition detectedPosition))
+            {
+                context.Publish(new AlertTriggeredLogicEvent(
+                    detectedPosition,
+                    detectingEnemy,
+                    detectingEnemy.GridSight));
+                alertTriggered = true;
+                break;
+            }
+        }
+
+        if (completedSteps > 0)
+        {
+            for (int i = 0; i < members.Count; i++)
+            {
+                EnemyContext enemy = members[i].Enemy;
+                if (enemy != null && enemy.IsAlive && groupMovePathByEnemy.ContainsKey(enemy))
+                {
+                    context.Publish(new MoveCompletedLogicEvent(enemy.GridActor, enemy.GridActor.GridPosition));
+                }
+            }
+
+            EnqueueCompletedGroupMove(context);
         }
 
         return completedSteps;
+    }
+
+    /// <summary>
+    /// 현재 한 칸 오프셋을 모든 생존 구성원이 함께 적용할 수 있는지 외부 점유까지 먼저 검사한다.
+    /// </summary>
+    private bool CanApplyFormationStep(GridPosition offset)
+    {
+        GridManager gridManager = GridManager.Instance;
+        if (gridManager == null)
+        {
+            return false;
+        }
+
+        for (int i = 0; i < members.Count; i++)
+        {
+            EnemyContext enemy = members[i].Enemy;
+            if (enemy == null || !enemy.IsAlive)
+            {
+                continue;
+            }
+
+            GridPosition target = enemy.GridActor.GridPosition + offset;
+            if (!gridManager.IsInside(target) || gridManager.IsBlocked(target))
+            {
+                return false;
+            }
+
+            if (gridManager.TryGetActorAt(target, out GridActor occupied) &&
+                occupied != enemy.GridActor &&
+                !IsGroupActor(occupied))
+            {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    /// <summary>
+    /// 편대 순찰 시작 시 생존 구성원의 시작 위치와 빈 실제 경로 버퍼를 등록 순서대로 준비한다.
+    /// </summary>
+    private void PrepareGroupMoveSnapshotBuffers()
+    {
+        groupMoveStartByEnemy.Clear();
+        groupMovePathByEnemy.Clear();
+        for (int i = 0; i < members.Count; i++)
+        {
+            EnemyContext enemy = members[i].Enemy;
+            if (enemy == null || !enemy.IsAlive)
+            {
+                continue;
+            }
+
+            groupMoveStartByEnemy.Add(enemy, enemy.GridActor.GridPosition);
+            groupMovePathByEnemy.Add(enemy, new List<GridPosition>(sharedStepOffsets.Count));
+        }
+    }
+
+    /// <summary>
+    /// 모든 구성원의 시야 갱신 뒤 편대 등록 순서상 첫 플레이어 감지자와 감지 칸을 찾는다.
+    /// </summary>
+    private bool TryFindFirstPlayerDetector(out EnemyContext detectingEnemy, out GridPosition detectedPosition)
+    {
+        detectingEnemy = null;
+        detectedPosition = GridPosition.Zero;
+        if (TacticalUnitRegistry.Instance == null)
+        {
+            Debug.LogError($"{nameof(EnemyPatrolGroup)} on {name}에는 편대 이동 감지에 사용할 {nameof(TacticalUnitRegistry)}가 필요합니다.", this);
+            return false;
+        }
+
+        TacticalUnitRegistry.Instance.GetAliveUnits(UnitFaction.Player, playerDetectionBuffer);
+        for (int memberIndex = 0; memberIndex < members.Count; memberIndex++)
+        {
+            EnemyContext enemy = members[memberIndex].Enemy;
+            if (enemy == null || !enemy.IsAlive || enemy.AlertState == null || enemy.AlertState.IsAlerted || enemy.GridSight == null)
+            {
+                continue;
+            }
+
+            for (int playerIndex = 0; playerIndex < playerDetectionBuffer.Count; playerIndex++)
+            {
+                if (playerDetectionBuffer[playerIndex] is not TacticalUnitContext player || player.GridActor == null ||
+                    !enemy.GridSight.CanDetectPlayer(player.GridActor.GridPosition))
+                {
+                    continue;
+                }
+
+                detectingEnemy = enemy;
+                detectedPosition = player.GridActor.GridPosition;
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /// <summary>
+    /// 실제로 확정된 구성원별 경로를 복사해 하나의 편대 이동 연출 이벤트로 추가한다.
+    /// </summary>
+    private void EnqueueCompletedGroupMove(ActionResolutionContext context)
+    {
+        groupMoveSnapshotBuffer.Clear();
+        for (int i = 0; i < members.Count; i++)
+        {
+            EnemyContext enemy = members[i].Enemy;
+            if (enemy == null || !groupMoveStartByEnemy.TryGetValue(enemy, out GridPosition startPosition) ||
+                !groupMovePathByEnemy.TryGetValue(enemy, out List<GridPosition> path) || path.Count == 0)
+            {
+                continue;
+            }
+
+            groupMoveSnapshotBuffer.Add(new GroupMovePresentationMemberSnapshot(
+                enemy.GridActor,
+                startPosition,
+                path));
+        }
+
+        if (groupMoveSnapshotBuffer.Count > 0)
+        {
+            context.EnqueuePresentation(PresentationEvent.GroupMove(
+                new GroupMovePresentationSnapshot(this, groupMoveSnapshotBuffer),
+                "적 그룹 순찰 동시 이동 연출"));
+        }
     }
 
     /// <summary>

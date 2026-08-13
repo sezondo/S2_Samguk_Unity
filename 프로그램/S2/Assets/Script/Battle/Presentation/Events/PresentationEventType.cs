@@ -22,6 +22,7 @@ public enum PresentationEventType
     Interact,
     StageCleared,
     StageFailed,
+    GroupMove,
 }
 
 /// <summary>

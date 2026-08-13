@@ -2845,3 +2845,81 @@
 3. 현재 `ActionPresentationQueue`와 기존 Presenter 흐름을 유지하면서 카메라 연출의 시작·완료 대기 책임을 설계한다.
 4. 적이 현재 바라보는 방향과 시야 방향을 플레이어가 읽을 수 있는 표시를 추가한다.
 5. 적 시야 방향 표시는 실제 `EnemyGridSight` 판정과 어긋나지 않아야 하며 Fog 상태에서 어느 수준까지 공개할지 정한다.
+
+## 2026-08-13 적 편대 순찰 동시 이동 코드 구현
+
+## 확정 규칙
+
+- 편대는 한 칸마다 모든 생존 구성원의 목적지를 먼저 검증하고, 이동 방향에서 앞선 구성원부터 내부 점유를 갱신한다.
+- 방향과 시야는 전원 위치가 확정된 뒤 갱신하며, 편대 등록 순서상 처음 플레이어를 발견한 적 하나를 최초 감지자로 사용한다.
+- 이동 중 발각되면 해당 칸까지만 논리 이동을 확정하고 남은 공통 경로를 취소한다.
+- 화면에서는 실제 확정된 전체 경로를 하나의 그룹 이벤트로 받아 전원이 한 칸씩 동시에 이동한 뒤 발각·애드 연출을 재생한다.
+- 편대 이동 시간과 곡선, 애니메이션 요청값은 개인 이동 데이터에서 자동 선택하지 않고 별도 `GroupMovePresentationData`가 명시적으로 소유한다.
+
+## 구현
+
+- `EnemyPatrolGroup`의 그룹 순찰 이동을 한 칸 단위 전원 사전 검증, 앞쪽 우선 점유 갱신, 전원 시야 갱신과 즉시 감지 순서로 변경했다.
+- 기존 지연 `EnemyPerceptionChangedLogicEvent` 대신 각 편대 이동 단계의 실제 시야에서 최초 감지 결과를 확정해 중간 칸 감지가 최종 위치 시야에 덮이는 문제를 방지했다.
+- 발각 시 PatrolPoint 도착과 도착 방향 적용을 생략하고 실제 이동한 구성원 모두에게 기존 순찰 AP 1을 소비한다.
+- `GroupMovePresentationSnapshot`이 편대와 등록 순서, 구성원별 시작 칸과 실제 확정 경로를 복사해 보관한다.
+- `PresentationEventType.GroupMove`와 그룹 이동 이벤트 생성 함수를 추가했다.
+- `GroupMovePresenter`가 지정 편대 이벤트 하나를 전담하고, `ActorPresentationRegistry`에서 구성원 Visual을 찾아 공통 시간·곡선으로 동시에 이동시킨다.
+- 구성원별 플레이어 시야 시작·목표 알파를 독립적으로 보간하고 전체 편대 이동 완료 뒤 큐 완료 신호를 한 번만 보낸다.
+- 패트롤 이벤트 데이터는 구성원별 경로를 지원하므로 이후 조사 후 Regroup 동시 이동에도 재사용할 수 있다.
+
+## 검증과 BattleTest01 연결
+
+- 신규 런타임 파일을 임시로 프로젝트 빌드 항목에 포함한 `dotnet build S2.slnx --no-restore`: 경고 0개, 오류 0개.
+- `git diff --check` 통과, 신규 `.meta` GUID 중복 0개를 확인했다.
+- 사용자 허가에 따라 `BattleTest01/EnemySystem/PatrolRoute_Group01`에 `GroupMovePresenter`를 추가하고 같은 오브젝트의 `EnemyPatrolGroup`을 처리 대상으로 연결했다.
+- `GroupMovePresentationDataTest` 에셋을 추가해 한 칸 공통 이동 시간 `0.2초`, Ease In/Out 곡선과 기존 테스트 적과 같은 `Move/Idle` 애니메이션 요청값을 설정했다.
+- 씬 로컬 fileID 중복 0개, Presenter 스크립트·대상 그룹·데이터 에셋과 데이터 스크립트 GUID 참조를 확인했다.
+- 연결 전 열린 플레이 세션에서는 새 Presenter가 아직 반영되지 않아 `GroupMove` 미처리 자동 완료 로그가 남았다. `BattleTest01`을 다시 로드한 뒤 동시 이동, 부분 이동, 중간 발각 중단, Fog 경계와 기존 Alert 반응을 플레이 모드에서 검증해야 한다.
+
+## 2026-08-13 적 편대 순찰 동시 이동 사용자 테스트 완료
+
+## 확인
+
+- 사용자가 `BattleTest01`을 다시 로드한 현재 코드와 Inspector 연결로 편대 순찰 동시 이동 테스트를 완료했다.
+- 그룹 이동 이벤트와 `GroupMovePresenter` 연결은 정상 동작하는 상태로 확정했다.
+- 테스트 중 의심 조사가 끝나 논리 상태가 `Suspicious`에서 `Unaware`로 돌아가도 적의 노란 의심 색상이 유지되는 표시 문제를 확인했다.
+- 원인은 `AlertDetectedPresenter`가 `EnemyAlertState.AwarenessStateChanged`를 구독하지 않고, 의심 연출 종료 시점에만 현재 상태 색상을 적용하기 때문이다.
+- 다음 수정에서는 Presenter가 상태 변경 이벤트를 구독해 `Unaware` 복귀 시 `normalColor`, `Alerted` 전환 시 `alertedColor`를 즉시 적용하도록 보강한다.
+
+## 2026-08-13 의심 종료 색상 복원 수정
+
+- `AlertDetectedPresenter`가 활성화될 때 담당 `EnemyAlertState.AwarenessStateChanged`를 구독하고 비활성화될 때 해제하도록 수정했다.
+- 논리 인식 상태가 바뀌면 `ApplyCurrentStateColor()`를 즉시 호출한다.
+- 조사 종료의 `Suspicious → Unaware`에서는 `normalColor`, 의심 중 발각의 `Suspicious → Alerted`에서는 `alertedColor`가 즉시 적용된다.
+- 씬·프리팹·Inspector 직렬화 값은 변경하지 않았다.
+- `dotnet build S2.slnx --no-restore`: 경고 0개, 오류 0개.
+- `git diff --check` 통과.
+
+## 2026-08-13 개발 세션 마감
+
+## 오늘 완료 범위
+
+- `EnemyPatrolGroup`의 그룹 Patrol을 한 칸 단위 원자적 편대 이동으로 변경했다.
+- 전원 목적지 사전 검증, 이동 방향의 앞쪽 구성원 우선 점유 갱신, 전원 시야 갱신과 편대 등록 순서상 첫 감지자 선택 규칙을 적용했다.
+- 이동 중 발각되면 해당 칸에서 남은 경로를 중단하고 실제 확정된 경로만 그룹 이동 연출에 전달한다.
+- `GroupMovePresentationData`, 구성원별 경로 스냅샷과 `GroupMovePresenter`를 추가했다.
+- `BattleTest01/EnemySystem/PatrolRoute_Group01`에 그룹 Presenter와 테스트 데이터 연결을 완료했다.
+- 사용자가 현재 코드로 편대 동시 이동과 연결 상태를 플레이 테스트해 정상 동작을 확인했다.
+- 의심 조사 종료 뒤 노란색이 남던 문제를 `AlertDetectedPresenter`의 인식 상태 변경 구독으로 수정했다.
+- 사용자가 의심 종료 시 정상 색상 복원을 플레이 테스트해 수정 완료를 확인했다.
+- 최신 빌드는 경고 0개, 오류 0개다.
+
+## 다음 개발 세션 시작 지점
+
+1. 조사 종료 후 현재 구성원 한 명씩 이동하는 `EnemyPatrolGroup.TryRegroupAfterInvestigation()`과 `TryMoveOneMemberForRegroup()` 흐름을 다시 읽는다.
+2. Patrol에서 추가한 `GroupMovePresentationSnapshot`, `GroupMovePresenter`, `GroupMovePresentationData`를 Regroup에 재사용한다.
+3. Regroup은 구성원별 경로 길이와 방향이 다르므로 각 동시 이동 단계의 목표 칸 충돌, 서로의 현재 칸 교환·통과와 외부 점유를 먼저 검증한다.
+4. 한 명의 경로만 짧거나 먼저 도착한 경우 도착 구성원은 정지하고 나머지 구성원만 같은 공통 시간으로 다음 단계를 진행한다.
+5. 논리 위치·점유는 각 단계에서 전원 검증 후 확정하고, 실제 확정된 구성원별 경로를 기존 그룹 이동 이벤트에 전달한다.
+6. 전원이 Anchor 편대 칸에 도착한 뒤에만 `RequestUnaware()`와 기존 순찰 목적지 재개를 실행한다.
+7. `BattleTest01`에서 흩어진 조사 위치, 좁은 통로, 일부 경로 막힘, 리더 계승 상태와 편대 복귀 완료를 플레이 테스트한다.
+
+## 상태
+
+- 오늘 목표였던 편대 순찰 동시 이동과 후속 의심 색상 복원은 코드·Inspector 연결·사용자 플레이 테스트까지 완료했다.
+- 다음 우선 작업은 조사 후 Regroup 편대 동시 이동이다.
