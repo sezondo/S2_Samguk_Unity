@@ -13,6 +13,8 @@ public class GroupMovePresenter : MonoBehaviour, IPresentationEventHandler
         public GroupMovePresentationMemberSnapshot Snapshot { get; }
         // 현재 구성원의 스프라이트와 애니메이션을 제어할 시각 컴포넌트다.
         public ActorVisualController VisualController { get; }
+        // 이동 전에 시야 방향을 회전할 선택적 방향 표시 Presenter다.
+        public EnemyFacingIndicatorPresenter FacingIndicator { get; }
         // 실제 월드 위치를 보간할 구성원의 표시 루트다.
         public Transform VisualRoot => VisualController.transform;
 
@@ -21,10 +23,12 @@ public class GroupMovePresenter : MonoBehaviour, IPresentationEventHandler
         /// </summary>
         public MemberPresentationState(
             GroupMovePresentationMemberSnapshot snapshot,
-            ActorVisualController visualController)
+            ActorVisualController visualController,
+            EnemyFacingIndicatorPresenter facingIndicator)
         {
             Snapshot = snapshot;
             VisualController = visualController;
+            FacingIndicator = facingIndicator;
         }
     }
 
@@ -42,6 +46,8 @@ public class GroupMovePresenter : MonoBehaviour, IPresentationEventHandler
 
     // 현재 이벤트의 구성원별 Visual과 경로를 보관하는 버퍼다.
     private readonly List<MemberPresentationState> memberStates = new();
+    // 현재 편대 방향 전환 완료를 함께 기다릴 방향 표시 Presenter 버퍼다.
+    private readonly List<EnemyFacingIndicatorPresenter> facingIndicators = new();
     // 현재 실행 중인 편대 이동 코루틴이다.
     private Coroutine moveCoroutine;
     // 현재 처리 중인 큐 이벤트 완료 핸들이다.
@@ -86,6 +92,7 @@ public class GroupMovePresenter : MonoBehaviour, IPresentationEventHandler
         }
 
         memberStates.Clear();
+        facingIndicators.Clear();
         if (activeHandle != null && !activeHandle.IsCompleted)
         {
             activeHandle.Complete();
@@ -115,12 +122,16 @@ public class GroupMovePresenter : MonoBehaviour, IPresentationEventHandler
     }
 
     /// <summary>
-    /// 지정한 편대의 그룹 이동 이벤트만 처리 대상으로 선택한다.
+    /// 지정한 편대의 그룹 이동과 공통 방향 전환 이벤트만 처리 대상으로 선택한다.
     /// </summary>
     public bool CanHandle(PresentationEvent presentationEvent)
     {
-        return presentationEvent.Type == PresentationEventType.GroupMove &&
-            presentationEvent.GroupMoveSnapshot?.Group == targetGroup;
+        return presentationEvent.Type switch
+        {
+            PresentationEventType.GroupMove => presentationEvent.GroupMoveSnapshot?.Group == targetGroup,
+            PresentationEventType.GroupFacingTurn => presentationEvent.GroupFacingTurnSnapshot?.Group == targetGroup,
+            _ => false,
+        };
     }
 
     /// <summary>
@@ -135,8 +146,22 @@ public class GroupMovePresenter : MonoBehaviour, IPresentationEventHandler
             return;
         }
 
+        if (!HasValidReference() || !HasValidData())
+        {
+            handle.Complete();
+            return;
+        }
+
+        if (presentationEvent.Type == PresentationEventType.GroupFacingTurn)
+        {
+            moveCoroutine = StartCoroutine(PlayGroupFacingTurn(
+                presentationEvent.GroupFacingTurnSnapshot,
+                handle));
+            return;
+        }
+
         GroupMovePresentationSnapshot snapshot = presentationEvent.GroupMoveSnapshot;
-        if (!HasValidReference() || !HasValidData() || !TryBuildMemberStates(snapshot))
+        if (!TryBuildMemberStates(snapshot))
         {
             handle.Complete();
             return;
@@ -182,7 +207,10 @@ public class GroupMovePresenter : MonoBehaviour, IPresentationEventHandler
                 return false;
             }
 
-            memberStates.Add(new MemberPresentationState(member, visualController));
+            registry.TryGetFacingIndicator(
+                member.Actor,
+                out EnemyFacingIndicatorPresenter facingIndicator);
+            memberStates.Add(new MemberPresentationState(member, visualController, facingIndicator));
         }
 
         return memberStates.Count > 0;
@@ -250,6 +278,7 @@ public class GroupMovePresenter : MonoBehaviour, IPresentationEventHandler
     private IEnumerator PlayStep(GridManager gridManager, int stepIndex)
     {
         PlayerVisionPresenter visionPresenter = PlayerVisionPresenter.Instance;
+        facingIndicators.Clear();
         for (int i = 0; i < memberStates.Count; i++)
         {
             MemberPresentationState state = memberStates[i];
@@ -263,8 +292,36 @@ public class GroupMovePresenter : MonoBehaviour, IPresentationEventHandler
                 : state.Snapshot.Path[stepIndex - 1];
             GridPosition to = state.Snapshot.Path[stepIndex];
             state.VisualRoot.position = gridManager.GridToWorld(from);
-            state.VisualController.FaceFromTo(from, to);
             ApplyVisionAlpha(state, visionPresenter, from, false);
+
+            if (state.FacingIndicator != null)
+            {
+                GridDirection movementDirection = EnemyMovementUtility.GetDirectionFromMovement(from, to);
+                if (!state.FacingIndicator.TryStartPresentationTurn(movementDirection))
+                {
+                    Debug.LogError($"{nameof(GroupMovePresenter)}: {state.Snapshot.Actor.name} 적의 이동 전 시야 방향 회전을 시작하지 못했습니다.", this);
+                }
+
+                AddFacingIndicatorToWait(state.FacingIndicator);
+            }
+        }
+
+        // 모든 구성원의 제자리 방향 회전이 완전히 끝난 뒤에만 이번 한 칸 이동을 시작한다.
+        yield return WaitForFacingTurns();
+
+        for (int i = 0; i < memberStates.Count; i++)
+        {
+            MemberPresentationState state = memberStates[i];
+            if (stepIndex >= state.Snapshot.Path.Count)
+            {
+                continue;
+            }
+
+            GridPosition from = stepIndex == 0
+                ? state.Snapshot.StartPosition
+                : state.Snapshot.Path[stepIndex - 1];
+            GridPosition to = state.Snapshot.Path[stepIndex];
+            state.VisualController.FaceFromTo(from, to);
         }
 
         float elapsed = 0f;
@@ -307,6 +364,82 @@ public class GroupMovePresenter : MonoBehaviour, IPresentationEventHandler
             state.VisualRoot.position = gridManager.GridToWorld(to);
             ApplyVisionAlpha(state, visionPresenter, to, true);
         }
+    }
+
+    /// <summary>
+    /// PatrolPoint 도착처럼 이동과 분리된 편대 공통 시야 방향 전환을 동시에 재생한다.
+    /// </summary>
+    private IEnumerator PlayGroupFacingTurn(
+        GroupFacingTurnPresentationSnapshot snapshot,
+        PresentationEventHandle handle)
+    {
+        activeHandle = handle;
+        facingIndicators.Clear();
+        ActorPresentationRegistry registry = ActorPresentationRegistry.Instance;
+        if (snapshot == null || snapshot.Group != targetGroup || snapshot.Members.Count == 0 || registry == null)
+        {
+            Debug.LogError($"{nameof(GroupMovePresenter)} on {name}이 올바르지 않은 편대 방향 전환 스냅샷 또는 연출 등록소를 받았습니다.", this);
+            CompleteActiveMove(handle);
+            yield break;
+        }
+
+        for (int i = 0; i < snapshot.Members.Count; i++)
+        {
+            GroupFacingTurnPresentationMemberSnapshot member = snapshot.Members[i];
+            if (member?.Actor == null ||
+                !registry.TryGetFacingIndicator(member.Actor, out EnemyFacingIndicatorPresenter indicator))
+            {
+                continue;
+            }
+
+            if (!indicator.TryStartPresentationTurn(member.ToDirection))
+            {
+                Debug.LogError($"{nameof(GroupMovePresenter)}: {member.Actor.name} 적의 편대 시야 방향 회전을 시작하지 못했습니다.", this);
+            }
+
+            AddFacingIndicatorToWait(indicator);
+        }
+
+        yield return WaitForFacingTurns();
+        CompleteActiveMove(handle);
+    }
+
+    /// <summary>
+    /// 중복 없이 현재 완료를 기다릴 방향 표시 Presenter를 추가한다.
+    /// </summary>
+    private void AddFacingIndicatorToWait(EnemyFacingIndicatorPresenter indicator)
+    {
+        if (indicator != null && !facingIndicators.Contains(indicator))
+        {
+            facingIndicators.Add(indicator);
+        }
+    }
+
+    /// <summary>
+    /// 등록된 모든 방향 표시 Presenter의 회전 연출이 끝날 때까지 기다린다.
+    /// </summary>
+    private IEnumerator WaitForFacingTurns()
+    {
+        bool isAnyTurning = true;
+        while (isAnyTurning)
+        {
+            isAnyTurning = false;
+            for (int i = 0; i < facingIndicators.Count; i++)
+            {
+                if (facingIndicators[i] != null && facingIndicators[i].IsTurning)
+                {
+                    isAnyTurning = true;
+                    break;
+                }
+            }
+
+            if (isAnyTurning)
+            {
+                yield return null;
+            }
+        }
+
+        facingIndicators.Clear();
     }
 
     /// <summary>
@@ -371,6 +504,7 @@ public class GroupMovePresenter : MonoBehaviour, IPresentationEventHandler
         moveCoroutine = null;
         activeHandle = null;
         memberStates.Clear();
+        facingIndicators.Clear();
         handle.Complete();
     }
 

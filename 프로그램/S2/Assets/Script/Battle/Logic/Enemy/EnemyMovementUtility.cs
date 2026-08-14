@@ -50,8 +50,19 @@ public static class EnemyMovementUtility
                 break;
             }
 
-            SetFacingFromMovement(enemy, previousPosition, nextPosition);
+            GridDirection previousDirection = enemy.GridSight.FacingDirection;
+            GridDirection movementDirection = GetDirectionFromMovement(previousPosition, nextPosition);
+            enemy.GridSight.SetFacingDirection(movementDirection);
             enemy.GridSight.RefreshSight();
+            if (previousDirection != movementDirection && CanPresentFacing(enemy))
+            {
+                context.EnqueuePresentation(PresentationEvent.EnemyFacingTurn(
+                    enemy,
+                    previousDirection,
+                    movementDirection,
+                    "적 이동 전 시야 방향 전환 연출"));
+            }
+
             context.Publish(new MoveStepEnteredLogicEvent(enemy.GridActor, nextPosition));
             context.Publish(new EnemyPerceptionChangedLogicEvent(enemy));
             context.EnqueuePresentation(PresentationEvent.EnemyReactionMove(
@@ -83,9 +94,38 @@ public static class EnemyMovementUtility
             return;
         }
 
+        GridDirection previousDirection = enemy.GridSight.FacingDirection;
+        if (!RefreshFacingDirection(enemy, direction))
+        {
+            return;
+        }
+
+        if (previousDirection != direction && CanPresentFacing(enemy))
+        {
+            context.EnqueuePresentation(PresentationEvent.EnemyFacingTurn(
+                enemy,
+                previousDirection,
+                direction,
+                "적 제자리 시야 방향 전환 연출"));
+        }
+
+        context.Publish(new EnemyPerceptionChangedLogicEvent(enemy));
+    }
+
+    /// <summary>
+    /// 적의 논리 시야 방향을 지정하고 현재 위치에서 시야 칸을 다시 계산한다.
+    /// 감지 논리 이벤트와 방향 전환 연출은 호출자가 필요한 순서로 별도 생성한다.
+    /// </summary>
+    public static bool RefreshFacingDirection(EnemyContext enemy, GridDirection direction)
+    {
+        if (enemy == null || enemy.GridSight == null)
+        {
+            return false;
+        }
+
         enemy.GridSight.SetFacingDirection(direction);
         enemy.GridSight.RefreshSight();
-        context.Publish(new EnemyPerceptionChangedLogicEvent(enemy));
+        return true;
     }
 
     /// <summary>
@@ -115,14 +155,29 @@ public static class EnemyMovementUtility
     /// </summary>
     private static void SetFacingFromMovement(EnemyContext enemy, GridPosition fromPosition, GridPosition toPosition)
     {
+        enemy.GridSight.SetFacingDirection(GetDirectionFromMovement(fromPosition, toPosition));
+    }
+
+    /// <summary>
+    /// 인접한 두 칸의 차이를 이동 시야에 사용할 상하좌우 방향으로 변환한다.
+    /// </summary>
+    public static GridDirection GetDirectionFromMovement(GridPosition fromPosition, GridPosition toPosition)
+    {
         GridPosition offset = toPosition - fromPosition;
-        GridDirection direction = offset switch
+        return offset switch
         {
             var value when value == GridPosition.Up => GridDirection.Up,
             var value when value == GridPosition.Down => GridDirection.Down,
             var value when value == GridPosition.Left => GridDirection.Left,
             _ => GridDirection.Right,
         };
-        enemy.GridSight.SetFacingDirection(direction);
+    }
+
+    /// <summary>
+    /// 전방 시야 표시를 사용하는 평상 또는 의심 상태인지 확인한다.
+    /// </summary>
+    private static bool CanPresentFacing(EnemyContext enemy)
+    {
+        return enemy != null && enemy.AlertState != null && !enemy.AlertState.IsAlerted;
     }
 }

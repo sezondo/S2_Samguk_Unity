@@ -12,6 +12,7 @@ public readonly struct PresentationEvent
     public SecurityDoorController SecurityDoor { get; }
     public PlayerVisionSnapshot VisionSnapshot { get; }
     public GroupMovePresentationSnapshot GroupMoveSnapshot { get; }
+    public GroupFacingTurnPresentationSnapshot GroupFacingTurnSnapshot { get; }
     public bool ActorVisibility { get; }
     public GridPosition FromPosition { get; }
     public GridPosition ToPosition { get; }
@@ -22,6 +23,8 @@ public readonly struct PresentationEvent
     public AttackPresentationKind AttackKind { get; }
     public DamageResult DamageResult { get; }
     public bool HasDamageResult { get; }
+    public GridDirection FromFacingDirection { get; }
+    public GridDirection ToFacingDirection { get; }
     public string Message { get; }
 
     /// <summary>
@@ -47,7 +50,10 @@ public readonly struct PresentationEvent
         SecurityDoorController securityDoor = null,
         PlayerVisionSnapshot visionSnapshot = null,
         bool actorVisibility = false,
-        GroupMovePresentationSnapshot groupMoveSnapshot = null)
+        GroupMovePresentationSnapshot groupMoveSnapshot = null,
+        GridDirection fromFacingDirection = GridDirection.Up,
+        GridDirection toFacingDirection = GridDirection.Up,
+        GroupFacingTurnPresentationSnapshot groupFacingTurnSnapshot = null)
     {
         Type = type;
         Actor = actor;
@@ -57,6 +63,7 @@ public readonly struct PresentationEvent
         SecurityDoor = securityDoor;
         VisionSnapshot = visionSnapshot;
         GroupMoveSnapshot = groupMoveSnapshot;
+        GroupFacingTurnSnapshot = groupFacingTurnSnapshot;
         ActorVisibility = actorVisibility;
         FromPosition = fromPosition;
         ToPosition = toPosition;
@@ -67,6 +74,8 @@ public readonly struct PresentationEvent
         AttackKind = attackKind;
         DamageResult = damageResult;
         HasDamageResult = hasDamageResult;
+        FromFacingDirection = fromFacingDirection;
+        ToFacingDirection = toFacingDirection;
         Message = message;
     }
 
@@ -143,6 +152,71 @@ public readonly struct PresentationEvent
             null,
             null,
             false,
+            snapshot);
+    }
+
+    /// <summary>
+    /// 적 하나가 제자리에서 시야 방향을 바꾸는 연출 이벤트를 만든다.
+    /// </summary>
+    public static PresentationEvent EnemyFacingTurn(
+        EnemyContext enemy,
+        GridDirection fromDirection,
+        GridDirection toDirection,
+        string message = null)
+    {
+        return new PresentationEvent(
+            PresentationEventType.EnemyFacingTurn,
+            enemy != null ? enemy.GridActor : null,
+            null,
+            enemy,
+            null,
+            default,
+            default,
+            default,
+            default,
+            MovePresentationPhase.None,
+            AttackPresentationKind.None,
+            default,
+            false,
+            message,
+            SwordMoveKind.None,
+            null,
+            null,
+            false,
+            null,
+            fromDirection,
+            toDirection);
+    }
+
+    /// <summary>
+    /// 편대 구성원들이 제자리에서 시야 방향을 동시에 바꾸는 연출 이벤트를 만든다.
+    /// </summary>
+    public static PresentationEvent GroupFacingTurn(
+        GroupFacingTurnPresentationSnapshot snapshot,
+        string message = null)
+    {
+        return new PresentationEvent(
+            PresentationEventType.GroupFacingTurn,
+            null,
+            null,
+            null,
+            null,
+            default,
+            default,
+            default,
+            default,
+            MovePresentationPhase.None,
+            AttackPresentationKind.None,
+            default,
+            false,
+            message,
+            SwordMoveKind.None,
+            null,
+            null,
+            false,
+            null,
+            GridDirection.Up,
+            GridDirection.Up,
             snapshot);
     }
 
@@ -288,6 +362,7 @@ public readonly struct PresentationEvent
         string hackableName = Hackable != null ? Hackable.name : "없음";
         string securityDoorName = SecurityDoor != null ? SecurityDoor.name : "없음";
         string groupName = GroupMoveSnapshot?.Group != null ? GroupMoveSnapshot.Group.name : "없음";
-        return $"{Type} Actor:{actorName} Target:{targetActorName} Enemy:{enemyName} Group:{groupName} Hackable:{hackableName} SecurityDoor:{securityDoorName} From:{FromPosition} To:{ToPosition} MovePhase:{MovePhase} SwordMove:{SwordMoveKind} ActorVisibility:{ActorVisibility} Event:{EventPosition} Execution:{ExecutionPosition}";
+        string facingGroupName = GroupFacingTurnSnapshot?.Group != null ? GroupFacingTurnSnapshot.Group.name : "없음";
+        return $"{Type} Actor:{actorName} Target:{targetActorName} Enemy:{enemyName} Group:{groupName} FacingGroup:{facingGroupName} Hackable:{hackableName} SecurityDoor:{securityDoorName} From:{FromPosition} To:{ToPosition} Facing:{FromFacingDirection}->{ToFacingDirection} MovePhase:{MovePhase} SwordMove:{SwordMoveKind} ActorVisibility:{ActorVisibility} Event:{EventPosition} Execution:{ExecutionPosition}";
     }
 }

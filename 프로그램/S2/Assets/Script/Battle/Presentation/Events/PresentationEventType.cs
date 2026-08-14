@@ -23,6 +23,8 @@ public enum PresentationEventType
     StageCleared,
     StageFailed,
     GroupMove,
+    EnemyFacingTurn,
+    GroupFacingTurn,
 }
 
 /// <summary>

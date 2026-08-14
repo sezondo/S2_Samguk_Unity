@@ -11,6 +11,8 @@ public class ActorPresentationRegistry : MonoBehaviour
 
     // 논리 Actor를 기준으로 등록된 시각 제어 컴포넌트를 찾는 맵이다.
     private readonly Dictionary<GridActor, ActorVisualController> visualByActor = new();
+    // 논리 Actor를 기준으로 등록된 적 시야 방향 표시 Presenter를 찾는 맵이다.
+    private readonly Dictionary<GridActor, EnemyFacingIndicatorPresenter> facingIndicatorByActor = new();
 
     // 새 Actor와 Visual 연결이 등록됐을 때 발생한다.
     public event Action<GridActor, ActorVisualController> ActorRegistered;
@@ -38,6 +40,7 @@ public class ActorPresentationRegistry : MonoBehaviour
     private void OnDestroy()
     {
         visualByActor.Clear();
+        facingIndicatorByActor.Clear();
         if (Instance == this)
         {
             Instance = null;
@@ -95,5 +98,57 @@ public class ActorPresentationRegistry : MonoBehaviour
     {
         visualController = null;
         return actor != null && visualByActor.TryGetValue(actor, out visualController) && visualController != null;
+    }
+
+    /// <summary>
+    /// 지정한 논리 Actor와 적 시야 방향 표시 Presenter의 연결을 등록한다.
+    /// </summary>
+    public bool RegisterFacingIndicator(GridActor actor, EnemyFacingIndicatorPresenter indicatorPresenter)
+    {
+        if (actor == null || indicatorPresenter == null)
+        {
+            Debug.LogError($"{nameof(ActorPresentationRegistry)}: 등록할 {nameof(GridActor)} 또는 {nameof(EnemyFacingIndicatorPresenter)} 참조가 비어 있습니다.", this);
+            return false;
+        }
+
+        if (facingIndicatorByActor.TryGetValue(actor, out EnemyFacingIndicatorPresenter registeredIndicator) &&
+            registeredIndicator != indicatorPresenter)
+        {
+            Debug.LogError($"{nameof(ActorPresentationRegistry)}: {actor.name} Actor에 서로 다른 시야 방향 표시 Presenter가 중복 등록되었습니다.", this);
+            return false;
+        }
+
+        facingIndicatorByActor[actor] = indicatorPresenter;
+        return true;
+    }
+
+    /// <summary>
+    /// 지정한 논리 Actor와 적 시야 방향 표시 Presenter의 연결을 해제한다.
+    /// </summary>
+    public void UnregisterFacingIndicator(GridActor actor, EnemyFacingIndicatorPresenter indicatorPresenter)
+    {
+        if (actor == null || indicatorPresenter == null)
+        {
+            return;
+        }
+
+        if (facingIndicatorByActor.TryGetValue(actor, out EnemyFacingIndicatorPresenter registeredIndicator) &&
+            registeredIndicator == indicatorPresenter)
+        {
+            facingIndicatorByActor.Remove(actor);
+        }
+    }
+
+    /// <summary>
+    /// 지정한 논리 Actor에 연결된 적 시야 방향 표시 Presenter를 찾는다.
+    /// </summary>
+    public bool TryGetFacingIndicator(
+        GridActor actor,
+        out EnemyFacingIndicatorPresenter indicatorPresenter)
+    {
+        indicatorPresenter = null;
+        return actor != null &&
+            facingIndicatorByActor.TryGetValue(actor, out indicatorPresenter) &&
+            indicatorPresenter != null;
     }
 }

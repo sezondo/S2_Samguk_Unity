@@ -66,6 +66,12 @@ public class EnemyPatrolGroup : MonoBehaviour
     private GridPosition regroupAnchor;
     // 현재 편대 복귀 Anchor로 연속 이동하지 못한 적 턴 수다.
     private int regroupBlockedTurnCount;
+    // 현재 위치에서 동시 이동을 시작할 수 없어 다음 Anchor 탐색에서 제외할 기준 칸들이다.
+    private readonly HashSet<GridPosition> rejectedRegroupAnchors = new();
+    // 현재 재구성 단계에서 일부 구성원이 충돌 회피를 위해 기다려야 하는지 나타낸다.
+    private bool regroupStepHasWaitingMember;
+    // 마지막 재구성 경로 또는 동시 이동 실패 원인이다.
+    private string lastRegroupFailureReason;
 
     // 리더의 전체 경로 계산 버퍼다.
     private readonly List<GridPosition> leaderPathBuffer = new();
@@ -99,6 +105,8 @@ public class EnemyPatrolGroup : MonoBehaviour
     private readonly Dictionary<EnemyContext, List<GridPosition>> groupMovePathByEnemy = new();
     // 그룹 이동 연출 이벤트를 만들 때 사용하는 구성원 스냅샷 버퍼다.
     private readonly List<GroupMovePresentationMemberSnapshot> groupMoveSnapshotBuffer = new();
+    // 편대 동시 방향 전환 연출을 만들 때 사용하는 구성원 스냅샷 버퍼다.
+    private readonly List<GroupFacingTurnPresentationMemberSnapshot> groupFacingTurnSnapshotBuffer = new();
     // 편대 이동 단계가 끝난 뒤 감지할 살아 있는 플레이어를 조회하는 버퍼다.
     private readonly List<ITacticalUnit> playerDetectionBuffer = new();
 
@@ -311,6 +319,11 @@ public class EnemyPatrolGroup : MonoBehaviour
                     continue;
                 }
 
+                if (rejectedRegroupAnchors.Contains(candidateAnchor))
+                {
+                    continue;
+                }
+
                 if (!TryScoreRegroupAnchor(candidateAnchor, out int score))
                 {
                     continue;
@@ -327,6 +340,8 @@ public class EnemyPatrolGroup : MonoBehaviour
 
         if (!found)
         {
+            // 현재 위치에서 가능한 후보를 모두 제외했다면 다음 복귀 턴에 전체 후보를 다시 평가한다.
+            rejectedRegroupAnchors.Clear();
             return false;
         }
 
@@ -455,6 +470,7 @@ public class EnemyPatrolGroup : MonoBehaviour
     private bool TryMoveMembersForRegroup(ActionResolutionContext context, out bool alertTriggered)
     {
         alertTriggered = false;
+        lastRegroupFailureReason = null;
         if (!TryBuildRegroupPaths(out int maxStepCount))
         {
             return false;
@@ -463,9 +479,20 @@ public class EnemyPatrolGroup : MonoBehaviour
         int completedSteps = ExecuteRegroupSteps(context, maxStepCount, out alertTriggered);
         if (completedSteps <= 0)
         {
+            if (hasRegroupAnchor)
+            {
+                rejectedRegroupAnchors.Add(regroupAnchor);
+                string reason = string.IsNullOrWhiteSpace(lastRegroupFailureReason)
+                    ? "첫 동시 이동 단계를 안전하게 구성하지 못했습니다."
+                    : lastRegroupFailureReason;
+                InvalidateRegroupAnchor($"{reason} 이 Anchor는 현재 위치의 다음 후보 탐색에서 제외합니다.");
+            }
+
             return false;
         }
 
+        // 한 칸이라도 이동해 배치가 달라졌다면 이전 위치에서 실패한 Anchor 제외 기록은 더 이상 유효하지 않다.
+        rejectedRegroupAnchors.Clear();
         if (logPatrol)
         {
             Debug.Log($"{nameof(EnemyPatrolGroup)}: {name} 그룹이 조사 후 편대 칸으로 {completedSteps}단계 동시 복귀했습니다.", this);
@@ -493,6 +520,12 @@ public class EnemyPatrolGroup : MonoBehaviour
         }
 
         GridManager gridManager = GridManager.Instance;
+        if (gridManager == null)
+        {
+            lastRegroupFailureReason = "편대 재구성 경로를 계산할 GridManager가 없습니다.";
+            return false;
+        }
+
         for (int i = 0; i < members.Count; i++)
         {
             EnemyContext enemy = members[i].Enemy;
@@ -515,12 +548,14 @@ public class EnemyPatrolGroup : MonoBehaviour
                     regroupPathBuffer,
                     memberActorSet))
             {
+                lastRegroupFailureReason = $"{enemy.name} 적이 현재 칸에서 목표 편대 칸 {target}까지 경로를 찾지 못했습니다.";
                 return false;
             }
 
             int moveRange = Mathf.Min(enemy.EnemyData.PatrolMoveRange, regroupPathBuffer.Count);
             if (moveRange <= 0)
             {
+                lastRegroupFailureReason = $"{enemy.name} 적의 이번 편대 복귀 이동 가능 거리가 0입니다.";
                 return false;
             }
 
@@ -534,7 +569,13 @@ public class EnemyPatrolGroup : MonoBehaviour
             maxStepCount = Mathf.Max(maxStepCount, movementPath.Count);
         }
 
-        return regroupPathByEnemy.Count > 0;
+        if (regroupPathByEnemy.Count <= 0)
+        {
+            lastRegroupFailureReason = "목표 편대 칸에 도착하지 않은 구성원의 복귀 경로가 없습니다.";
+            return false;
+        }
+
+        return true;
     }
 
     /// <summary>
@@ -603,6 +644,20 @@ public class EnemyPatrolGroup : MonoBehaviour
                 alertTriggered = true;
                 break;
             }
+
+            if (regroupStepHasWaitingMember)
+            {
+                // 기다린 구성원의 남은 경로는 현재 위치와 달라졌으므로 다음 적 턴에 전부 다시 계산한다.
+                if (logPatrol)
+                {
+                    string reason = string.IsNullOrWhiteSpace(lastRegroupFailureReason)
+                        ? "구성원 사이의 다음 칸 충돌"
+                        : lastRegroupFailureReason;
+                    Debug.Log($"{nameof(EnemyPatrolGroup)}: {name} 그룹이 {reason} 때문에 안전한 구성원만 먼저 이동했습니다. 기다린 구성원은 다음 적 턴에 경로를 다시 계산합니다.", this);
+                }
+
+                break;
+            }
         }
 
         if (completedSteps > 0)
@@ -624,8 +679,10 @@ public class EnemyPatrolGroup : MonoBehaviour
         regroupMovementOrder.Clear();
         regroupMoveVisiting.Clear();
         regroupMoveVisited.Clear();
+        regroupStepHasWaitingMember = false;
 
         GridManager gridManager = GridManager.Instance;
+        int requestedMoveCount = 0;
         for (int i = 0; i < members.Count; i++)
         {
             EnemyContext enemy = members[i].Enemy;
@@ -635,10 +692,19 @@ public class EnemyPatrolGroup : MonoBehaviour
                 continue;
             }
 
+            requestedMoveCount++;
             GridPosition target = path[stepIndex];
-            if (!gridManager.IsInside(target) || gridManager.IsBlocked(target) || !regroupTargetPositions.Add(target))
+            if (!gridManager.IsInside(target) || gridManager.IsBlocked(target))
             {
-                return false;
+                lastRegroupFailureReason = $"{enemy.name} 적의 다음 복귀 칸 {target}이 보드 밖이거나 장애물 칸입니다.";
+                continue;
+            }
+
+            if (!regroupTargetPositions.Add(target))
+            {
+                // 같은 칸을 원하는 후순위 구성원은 이번 단계에 기다리고 다음 턴에 새 경로를 계산한다.
+                lastRegroupFailureReason = $"둘 이상의 편대 구성원이 다음 복귀 칸 {target}을 동시에 선택했습니다.";
+                continue;
             }
 
             regroupNextPositionByEnemy.Add(enemy, target);
@@ -646,25 +712,47 @@ public class EnemyPatrolGroup : MonoBehaviour
 
         if (regroupNextPositionByEnemy.Count == 0)
         {
+            if (string.IsNullOrWhiteSpace(lastRegroupFailureReason))
+            {
+                lastRegroupFailureReason = "이번 단계에 이동할 수 있는 편대 구성원이 없습니다.";
+            }
+
             return false;
         }
 
         for (int i = 0; i < members.Count; i++)
         {
             EnemyContext enemy = members[i].Enemy;
-            if (enemy == null || !regroupNextPositionByEnemy.ContainsKey(enemy) ||
-                !TryAddRegroupMovementOrder(enemy, gridManager))
+            if (enemy == null || !regroupNextPositionByEnemy.ContainsKey(enemy))
             {
-                if (enemy != null && regroupNextPositionByEnemy.ContainsKey(enemy))
-                {
-                    return false;
-                }
-
                 continue;
+            }
+
+            TryAddRegroupMovementOrder(enemy, gridManager);
+        }
+
+        // 의존 관계나 자리 교환 때문에 움직일 수 없는 구성원은 이번 단계 목표에서 제외한다.
+        for (int i = 0; i < members.Count; i++)
+        {
+            EnemyContext enemy = members[i].Enemy;
+            if (enemy != null && regroupNextPositionByEnemy.ContainsKey(enemy) && !regroupMoveVisited.Contains(enemy))
+            {
+                regroupNextPositionByEnemy.Remove(enemy);
             }
         }
 
-        return regroupMovementOrder.Count == regroupNextPositionByEnemy.Count;
+        regroupStepHasWaitingMember = regroupMovementOrder.Count < requestedMoveCount;
+        if (regroupMovementOrder.Count <= 0)
+        {
+            if (string.IsNullOrWhiteSpace(lastRegroupFailureReason))
+            {
+                lastRegroupFailureReason = "편대 구성원 사이의 점유 의존 관계 때문에 안전하게 먼저 움직일 구성원이 없습니다.";
+            }
+
+            return false;
+        }
+
+        return true;
     }
 
     /// <summary>
@@ -679,6 +767,7 @@ public class EnemyPatrolGroup : MonoBehaviour
 
         if (!regroupMoveVisiting.Add(enemy))
         {
+            lastRegroupFailureReason = $"{enemy.name} 적을 포함한 편대 구성원 사이에 직접 자리 교환 순환이 발생했습니다.";
             return false;
         }
 
@@ -686,8 +775,21 @@ public class EnemyPatrolGroup : MonoBehaviour
         if (gridManager.TryGetActorAt(target, out GridActor occupied) && occupied != enemy.GridActor)
         {
             EnemyContext occupyingMember = FindAliveMember(occupied);
-            if (occupyingMember == null || !regroupNextPositionByEnemy.ContainsKey(occupyingMember) ||
-                !TryAddRegroupMovementOrder(occupyingMember, gridManager))
+            if (occupyingMember == null)
+            {
+                lastRegroupFailureReason = $"{enemy.name} 적의 다음 복귀 칸 {target}을 외부 Actor {occupied.name}이 점유하고 있습니다.";
+                regroupMoveVisiting.Remove(enemy);
+                return false;
+            }
+
+            if (!regroupNextPositionByEnemy.ContainsKey(occupyingMember))
+            {
+                lastRegroupFailureReason = $"{enemy.name} 적의 다음 복귀 칸 {target}을 이번 단계에 기다리는 {occupyingMember.name} 적이 점유하고 있습니다.";
+                regroupMoveVisiting.Remove(enemy);
+                return false;
+            }
+
+            if (!TryAddRegroupMovementOrder(occupyingMember, gridManager))
             {
                 regroupMoveVisiting.Remove(enemy);
                 return false;
@@ -767,6 +869,7 @@ public class EnemyPatrolGroup : MonoBehaviour
 
         hasRegroupAnchor = false;
         regroupBlockedTurnCount = 0;
+        rejectedRegroupAnchors.Clear();
         if (currentPoint != null)
         {
             FaceGroup(currentPoint.LookDirection, context);
@@ -1250,12 +1353,43 @@ public class EnemyPatrolGroup : MonoBehaviour
     /// </summary>
     private void FaceGroup(GridDirection direction, ActionResolutionContext context)
     {
+        groupFacingTurnSnapshotBuffer.Clear();
         for (int i = 0; i < members.Count; i++)
         {
             EnemyContext enemy = members[i].Enemy;
             if (enemy != null && enemy.IsAlive)
             {
-                EnemyMovementUtility.FaceDirection(enemy, direction, context);
+                GridDirection previousDirection = enemy.GridSight.FacingDirection;
+                if (!EnemyMovementUtility.RefreshFacingDirection(enemy, direction))
+                {
+                    Debug.LogError($"{nameof(EnemyPatrolGroup)}: {enemy.name} 적의 편대 공통 시야 방향을 갱신하지 못했습니다.", enemy);
+                    continue;
+                }
+
+                if (previousDirection != direction)
+                {
+                    groupFacingTurnSnapshotBuffer.Add(new GroupFacingTurnPresentationMemberSnapshot(
+                        enemy.GridActor,
+                        previousDirection,
+                        direction));
+                }
+            }
+        }
+
+        if (groupFacingTurnSnapshotBuffer.Count > 0)
+        {
+            context.EnqueuePresentation(PresentationEvent.GroupFacingTurn(
+                new GroupFacingTurnPresentationSnapshot(this, groupFacingTurnSnapshotBuffer),
+                "적 편대 공통 시야 방향 전환 연출"));
+        }
+
+        // 방향 전환 연출을 먼저 큐에 넣은 뒤 새 시야의 감지 논리 이벤트를 편대 등록 순서대로 발행한다.
+        for (int i = 0; i < members.Count; i++)
+        {
+            EnemyContext enemy = members[i].Enemy;
+            if (enemy != null && enemy.IsAlive && enemy.GridSight != null)
+            {
+                context.Publish(new EnemyPerceptionChangedLogicEvent(enemy));
             }
         }
     }

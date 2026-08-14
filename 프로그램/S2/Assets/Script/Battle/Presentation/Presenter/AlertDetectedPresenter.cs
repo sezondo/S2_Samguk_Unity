@@ -231,6 +231,16 @@ public class AlertDetectedPresenter : MonoBehaviour, IPresentationEventHandler
             visualController.TryPlayAnimationState(idleAnimationStateName, 0f, false);
         }
 
+        if (targetEnemy.AlertState.IsAlerted &&
+            ActorPresentationRegistry.Instance != null &&
+            ActorPresentationRegistry.Instance.TryGetFacingIndicator(
+                targetEnemy.GridActor,
+                out EnemyFacingIndicatorPresenter facingIndicator))
+        {
+            // 이동과 발각 연출이 끝난 시점부터 Alerted 적의 전방 시야 표시는 숨긴다.
+            facingIndicator.SetAwarenessPresentationVisible(false);
+        }
+
         alertCoroutine = null;
         activeHandle = null;
         handle.Complete();

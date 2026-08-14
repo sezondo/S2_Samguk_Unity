@@ -71,3 +71,59 @@ public sealed class GroupMovePresentationSnapshot
         StepCount = stepCount;
     }
 }
+
+/// <summary>
+/// 편대 방향 전환 구성원 하나의 Actor와 논리 방향 변화를 보관한다.
+/// </summary>
+public sealed class GroupFacingTurnPresentationMemberSnapshot
+{
+    // 방향 전환을 연출할 논리 Actor다.
+    public GridActor Actor { get; }
+    // 방향 전환 전 논리 시야 방향이다.
+    public GridDirection FromDirection { get; }
+    // 방향 전환 후 논리 시야 방향이다.
+    public GridDirection ToDirection { get; }
+
+    /// <summary>
+    /// 편대 구성원 하나의 방향 전환 결과를 연출 시점까지 고정한다.
+    /// </summary>
+    public GroupFacingTurnPresentationMemberSnapshot(
+        GridActor actor,
+        GridDirection fromDirection,
+        GridDirection toDirection)
+    {
+        Actor = actor;
+        FromDirection = fromDirection;
+        ToDirection = toDirection;
+    }
+}
+
+/// <summary>
+/// 편대 구성원들의 동시 방향 전환 결과를 연출 시점까지 보관한다.
+/// </summary>
+public sealed class GroupFacingTurnPresentationSnapshot
+{
+    // 이번 방향 전환을 실행한 편대다.
+    public EnemyPatrolGroup Group { get; }
+    // 편대 등록 순서를 유지하는 구성원별 방향 전환 결과다.
+    public IReadOnlyList<GroupFacingTurnPresentationMemberSnapshot> Members { get; }
+
+    /// <summary>
+    /// 편대와 구성원별 방향 변화를 복사해 동시 방향 전환 스냅샷을 만든다.
+    /// </summary>
+    public GroupFacingTurnPresentationSnapshot(
+        EnemyPatrolGroup group,
+        IReadOnlyList<GroupFacingTurnPresentationMemberSnapshot> members)
+    {
+        Group = group;
+
+        GroupFacingTurnPresentationMemberSnapshot[] copiedMembers =
+            new GroupFacingTurnPresentationMemberSnapshot[members?.Count ?? 0];
+        for (int i = 0; i < copiedMembers.Length; i++)
+        {
+            copiedMembers[i] = members[i];
+        }
+
+        Members = Array.AsReadOnly(copiedMembers);
+    }
+}

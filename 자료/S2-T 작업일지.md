@@ -2957,3 +2957,132 @@
 - `dotnet build S2.slnx --no-restore`: 경고 0개, 오류 0개.
 - 코드와 로컬 문서만 수정했다. 씬·프리팹·ScriptableObject와 Inspector 직렬화 값은 변경하지 않았다.
 - `BattleTest01`에서 흩어진 조사 위치, 서로 다른 경로 길이, 좁은 통로, 내부·외부 점유 막힘, 리더 계승과 Regroup 이동 중 플레이어 발각을 플레이 모드로 확인해야 한다.
+
+## 2026-08-14 적 시야 방향 발밑 표시 1차 구현
+
+## 방향
+
+- 캐릭터 SpriteRenderer와 Animator는 변경하지 않고 발밑에 별도의 방향 표시를 둔다.
+- 실제 시야 범위 전체가 아니라 현재 상하좌우 방향을 읽는 전술 정보 표시로 한정한다.
+- 회색 전체 원 위에 현재 정면을 중심으로 한 `90도` 주황색 호를 겹쳐 표시한다.
+- 숨은 적의 위치와 방향이 노출되지 않도록 기존 적 Visual의 플레이어 시야 알파를 그대로 따른다.
+
+## 구현
+
+- `EnemyFacingIndicatorPresenter`를 추가했다.
+- 기존 `PlayerUnitSelectionPresenter`와 같은 `Sprites/Default`·`LineRenderer` 런타임 생성 방식을 사용해 별도 이미지 에셋을 추가하지 않았다.
+- Presenter는 `EnemyGridSight.SightRefreshed`를 구독하고 현재 `FacingDirection`을 상하좌우 원형 각도로 변환한다.
+- 표시 루트는 캐릭터 Animator 계층과 별도로 생성하며 `LateUpdate()`에서 `ActorVisualController`의 화면 위치를 따라간다. 따라서 개인 이동과 그룹 이동 보간을 모두 그대로 추적한다.
+- `ActorVisualController.VisionAlpha`와 적 생존 여부에 따라 두 LineRenderer의 활성 상태와 알파를 갱신한다.
+- 기존 적 논리, 방향 계산, Animator와 이동 Presenter 코드는 수정하지 않았다.
+
+## BattleTest01 연결
+
+- 사용자 허가에 따라 `BattleTest01`의 두 적 `ActorPresentation`에 Presenter를 추가했다.
+- 각 Presenter에 자기 `EnemyContext`와 `ActorVisualController`를 명시적으로 연결했다.
+- 공통 테스트 값은 월드 반지름 `0.42`, 발밑 Y 오프셋 `-0.32`, 기본 선 굵기 `0.055`, 방향 선 굵기 `0.085`, 방향 호 `90도`다.
+- 회색 기본 원과 주황색 방향 호를 적 Sprite보다 Sorting Order 한 단계 아래에 표시한다.
+- `BattleTest02`, 적 프리팹과 공용 데이터는 변경하지 않았다.
+
+## 검증과 남은 작업
+
+- `dotnet build S2.slnx --no-restore`: 경고 0개, 오류 0개.
+- `git diff --check`: 공백 오류 없음.
+- `BattleTest01` 씬 YAML의 로컬 fileID 중복 0개, 누락 로컬 참조 0개와 새 스크립트 GUID 중복 0개를 확인했다.
+- Unity 플레이 모드에서 실제 원 크기와 발밑 위치, 상하좌우 방향 전환, 순찰·Regroup 이동 추적, Fog 진입·이탈과 사망 시 숨김을 확인해야 한다.
+
+## 2026-08-14 적 시야 방향 회전 연출과 상태별 표시
+
+## 확정 규칙
+
+- 논리 이동과 시야 판정 순서는 기존대로 `위치 이동 → 이동 방향 적용 → 새 위치 시야 판정`을 유지한다.
+- 화면 연출은 반대로 `시야 방향 회전 완료 → 한 칸 이동` 순서로 재생하며 회전과 이동을 동시에 진행하지 않는다.
+- 여러 칸 경로가 꺾이면 현재 칸 이동을 마친 뒤 다음 칸 방향 회전을 완료하고 다음 이동을 시작한다.
+- PatrolPoint 도착 뒤 `LookDirection` 적용과 조사 수색의 90도 회전도 같은 부드러운 방향 전환 연출을 사용한다.
+- 시야 방향 표시는 `Unaware`, `Suspicious` 상태에서만 보이며 `Alerted` 발각 연출이 끝나면 숨긴다.
+
+## 구현
+
+- `PresentationEventType`과 `PresentationEvent`에 개인 `EnemyFacingTurn`, 편대 `GroupFacingTurn` 이벤트와 방향 스냅샷을 추가했다.
+- `EnemyFacingIndicatorPresenter`가 논리 `SightRefreshed`를 즉시 따라가던 방식을 제거하고 별도의 연출 각도를 `0.18초` Ease In/Out 곡선으로 보간하도록 변경했다.
+- `EnemyMovementUtility`는 개인 이동 방향이 달라질 때 이동 이벤트보다 먼저 방향 전환 이벤트를 큐에 추가한다. 논리 위치·시야 계산과 감지 판정 순서는 변경하지 않았다.
+- `GroupMovePresenter`는 순찰·Regroup 경로의 각 단계에서 이동할 구성원들의 방향 회전을 동시에 시작하고 전원 완료 후에만 한 칸 동시 이동을 재생한다.
+- `EnemyPatrolGroup.FaceGroup()`은 PatrolPoint 도착과 Regroup 완료 방향을 구성원별 순차 이벤트가 아닌 하나의 편대 동시 방향 전환 이벤트로 만든다.
+- `ActorPresentationRegistry`에 Actor별 방향 표시 Presenter 연결을 추가해 편대 이동과 발각 Presenter가 명시적으로 방향 표시를 찾도록 했다.
+- `AlertDetectedPresenter`가 발각 점멸 연출을 완료하면 해당 적의 방향 표시를 숨긴다. Alerted 적의 후속 이동에는 보이지 않는 방향 회전 대기를 만들지 않는다.
+
+## BattleTest01 적용과 검증
+
+- 기존 두 적의 `EnemyFacingIndicatorPresenter` 연결과 사용자가 조정한 발밑 오프셋 `(-0.05, -0.2, -0.05)`을 유지했다.
+- 두 Presenter에 방향 회전 시간 `0.18초`와 Ease In/Out 회전 곡선을 명시적으로 저장했다.
+- `dotnet build S2.slnx --no-restore`: 경고 0개, 오류 0개.
+- `git diff --check`: 공백 오류 없음.
+- `BattleTest01` 씬 YAML의 로컬 fileID 중복 0개, 누락 로컬 참조 0개, 방향 표시 컴포넌트 2개와 회전 시간 필드 2개를 확인했다.
+- Unity 플레이 모드에서 첫 이동 전 회전, 경로 꺾임, PatrolPoint 도착 회전, Suspicious 90도 수색 회전, Regroup과 Alerted 숨김 시점을 확인해야 한다.
+
+## 2026-08-14 제자리 시야 회전 좌우 비주얼 동기화
+
+- 사용자가 시야 방향 회전과 이동 분리 연출을 플레이 테스트했다.
+- 제자리 회전에서는 발밑 방향 원만 바뀌고 캐릭터 좌우 비주얼이 이전 방향을 유지하는 문제를 확인했다.
+- `EnemyFacingIndicatorPresenter`가 목표 방향이 `Left` 또는 `Right`일 때 회전 곡선 진행률 50% 지점에서 `ActorVisualController.FaceLeft()` 또는 `FaceRight()`를 호출하도록 수정했다.
+- 목표 방향이 `Up`, `Down`이면 기존 좌우 비주얼 방향을 유지한다.
+- 프레임 건너뜀이나 회전 생략 상황에서도 회전 종료 시 목표 좌우 방향을 다시 보장한다.
+- 개인 이동 전 회전, 편대 단계별 회전, PatrolPoint 도착과 Suspicious 수색 회전이 같은 처리를 공유한다.
+- `dotnet build S2.slnx --no-restore`: 경고 0개, 오류 0개.
+- 수정된 좌우 전환 시점은 Unity 플레이 모드에서 다시 확인해야 한다.
+
+## 2026-08-14 Regroup 첫 단계 교착 수정
+
+## 확인된 원인
+
+- 사용자가 방향 회전 수정 테스트 중 조사 종료 뒤 편대 재구성이 3턴 연속 실패하고 같은 Anchor를 폐기하는 현상을 확인했다.
+- 호출 스택이 `TryRegroupAfterInvestigation()`의 Anchor 탐색 실패 분기가 아니라 `TryMoveMembersForRegroup()` 실패 분기를 가리켜 Anchor 선정 자체는 성공했음을 확인했다.
+- Anchor 평가는 구성원별 독립 경로의 도달 가능성과 총거리만 검사했다. 실제 첫 동시 단계에서 두 경로가 같은 칸을 선택하거나 편대원 점유 의존 순환을 만들면 전체 단계를 취소했다.
+- 아무도 이동하지 않아 다음 턴에도 같은 Anchor와 결정적 최단 경로가 반복되고, 3턴 뒤 Anchor를 폐기해도 같은 후보가 다시 선택되는 교착이었다.
+
+## 수정
+
+- 같은 다음 칸을 여러 구성원이 선택하면 편대 등록 순서상 선행 구성원만 안전한 이동 후보로 유지하고 나머지는 이번 단계에 기다리도록 변경했다.
+- 점유 의존 관계를 통과한 구성원만 실제 목표 맵과 이동 순서에 남겨 안전한 부분 집합을 한 칸 이동시킨다.
+- 한 명이라도 기다린 단계에서는 더 긴 사전 경로를 이어서 사용하지 않고 즉시 이번 Regroup 이동을 끝낸다. 다음 적 턴에 변경된 현재 위치에서 구성원별 경로를 전부 다시 계산한다.
+- 직접 자리 교환 순환처럼 안전하게 먼저 움직일 구성원이 한 명도 없으면 현재 Anchor를 즉시 제외하고 다음 복귀 턴에 다른 Anchor를 선택한다.
+- 한 칸이라도 이동해 배치가 달라지거나 Regroup이 완료되면 이전 위치의 Anchor 제외 기록을 초기화한다. 가능한 후보를 전부 소진한 경우에도 다음 복귀 턴을 위해 제외 기록을 초기화한다.
+- 경로 생성 실패, 다음 칸 중복, 외부 Actor 점유, 기다리는 편대원 점유와 직접 자리 교환 순환의 구체적인 원인을 로그에 남기도록 보강했다.
+
+## 검증과 남은 테스트
+
+- `dotnet build S2.slnx --no-restore`: 경고 0개, 오류 0개.
+- Unity 플레이 모드에서 기존 재현 배치의 부분 이동·다음 턴 재경로·최종 편대 완성과 직접 자리 교환 시 대체 Anchor 선택을 확인해야 한다.
+
+## 2026-08-14 사용자 테스트 완료 및 개발 세션 마감
+
+## 사용자 확인 완료
+
+- 적 시야 방향 표시의 크기와 발밑 위치를 `BattleTest01`에서 확인했다.
+- 첫 이동 전 방향 회전 완료, 경로가 꺾일 때 제자리 회전 후 다음 칸 이동, PatrolPoint 도착 후 `LookDirection` 회전을 확인했다.
+- 제자리 방향 전환 중 목표가 `Left`, `Right`이면 회전 중간에 캐릭터 좌우 비주얼도 함께 바뀌고, `Up`, `Down`은 기존 좌우 방향을 유지하는 동작을 확인했다.
+- 방향 표시가 `Unaware`, `Suspicious`에서 보이고 `Alerted` 발각 연출 뒤 숨는 흐름을 확인했다.
+- 조사 종료 뒤 기존 재현 배치에서 Regroup이 같은 첫 칸 충돌로 3턴 동안 정지하던 문제를 수정한 현재 코드로 재테스트했다.
+- 충돌 시 안전한 구성원 우선 이동, 다음 적 턴 재경로와 최종 편대 완성까지 정상 동작해 Regroup 교착 수정을 통과 처리했다.
+
+## 오늘 완료 범위
+
+- 조사 후 Regroup 구성원별 동시 이동과 충돌 시 부분 이동·재경로를 완료했다.
+- 적 발밑 시야 방향 표시와 부드러운 제자리 회전 이벤트를 구현했다.
+- 방향 회전 완료 후 이동, 편대 동시 회전, PatrolPoint 도착 방향과 Suspicious 수색 회전을 연결했다.
+- 좌우 방향 회전 중 캐릭터 비주얼 반전과 `Alerted` 상태 방향 표시 숨김을 완료했다.
+- `BattleTest01` 사용자 플레이 테스트까지 완료했다.
+- 최신 정적 빌드는 경고 0개, 오류 0개이며 `git diff --check`를 통과했다.
+
+## 다음 개발 세션 시작 지점
+
+1. `CombatActionPresenter`, `ActionPresentationQueue`, 공격·피격 이벤트 순서를 다시 읽는다.
+2. 현재 전투 카메라와 `CameraKeyboardMover`, 전투 입장 카메라 이동 연출의 참조·입력 차단 방식을 확인한다.
+3. 공격 시작 시 공격자·대상 중심 이동 또는 줌, 짧은 정지, 공격 종료 후 원위치·줌 복귀 규칙을 논의한다.
+4. 카메라 연출을 별도 큐 이벤트로 둘지 `CombatAction` 내부 단계로 포함할지 책임을 확정한다.
+5. 연속 공격, 시야 밖 공격자 임시 노출, 사망 연출과 카메라 복귀 순서를 테스트 항목으로 잡는다.
+
+## 상태
+
+- 2026-08-14 작업은 코드, BattleTest01 연결, 정적 검증과 사용자 플레이 테스트까지 완료했다.
+- 다음 우선 작업은 컴뱃 카메라 연출이다.
