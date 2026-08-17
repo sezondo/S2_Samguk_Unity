@@ -35,6 +35,8 @@ public sealed class DamageResolutionCoordinator : IActionLogicEventHandler
 
         if (!TryResolveDamage(applyDamage, out DamageResult damageResult))
         {
+            // 공격 행동이 미리 잡아 둔 카메라가 남지 않도록 실패 흐름에서도 복귀시킨다.
+            context.EnqueuePresentation(PresentationEvent.CombatCameraRestore("피해 처리 실패 카메라 복귀"));
             return;
         }
 
@@ -73,6 +75,8 @@ public sealed class DamageResolutionCoordinator : IActionLogicEventHandler
             applyDamage.PresentationKind,
             damageResult,
             applyDamage.Message));
+
+        context.EnqueuePresentation(PresentationEvent.CombatCameraRestore("전투 카메라 복귀"));
 
         if (temporarilyRevealAttacker)
         {

@@ -1,6 +1,6 @@
 # S2-T 현재 구현 구조
 
-- 최신 기준: 2026-08-14
+- 최신 기준: 2026-08-17
 - 기준 브랜치: `main`
 - Unity 버전: `6000.0.64f1`
 - 기준 테스트 씬: `Assets/Scenes/Test/BootstrapTest.unity`, `Assets/Scenes/Test/LobbyTest.unity`, `Assets/Scenes/Test/StoryTest.unity`, `Assets/Scenes/Test/BattleTest01.unity`, `Assets/Scenes/Test/BattleTest02.unity`
@@ -985,8 +985,26 @@ SecurityDoor01
 - 방향 호는 논리 `SightRefreshed`를 즉시 따라가지 않고 연출 큐와 그룹 이동 단계가 전달한 방향을 별도 각도로 재생한다. `ActorVisualController.VisionAlpha`와 생존 여부를 따라 숨은 적의 위치·방향을 노출하지 않는다.
 - `BattleTest01` 두 적에만 연결했고 사용자가 크기·발밑 위치, 상하좌우 회전, 이동 전 회전 완료, 좌우 비주얼 반전과 `Alerted` 숨김을 플레이 테스트했다. 공용 프리팹과 다른 Battle 씬 확장은 아직 하지 않았다.
 
-### 다음 우선 작업: 컴뱃 카메라 연출
+### 컴뱃 카메라 연출 1차 구현
 
-- 다음 개발 세션은 공격 연출 중 카메라 이동·줌·정지·원위치 복귀 흐름을 기존 `ActionPresentationQueue`에 맞춰 설계하는 것부터 시작한다.
-- 기존 `CombatActionPresenter`, 공격자·대상 Visual 연결, 현재 카메라 이동 컴포넌트와 전투 입장 카메라 연출의 책임 경계를 먼저 확인한다.
-- 카메라 연출 중 플레이어 입력과 수동 카메라 이동 차단, 공격 연출 완료 뒤 정확한 위치·Orthographic Size 복원, 연속 공격 이벤트 순서를 핵심 검증 항목으로 둔다.
+- `CombatCameraFocus`, `CombatCameraRestore` 연출 이벤트와 이를 전담하는 `CombatCameraPresenter`를 추가했다.
+- 카메라는 캐릭터 Visual을 별도 전투 무대로 옮기지 않고 실제 공격 시작 칸과 대상 칸의 중점·거리·화면 비율을 사용해 위치와 Orthographic Size를 계산한다.
+- 공격 시작 시 현재 카메라 위치와 Orthographic Size를 저장하고, Focus 완료 뒤 공격 연출을 재생하며, CombatAction 완료 뒤 저장 상태로 복귀한다.
+- 일반 근접·총·적 공격은 `CombatCameraFocus → CombatAction → CombatCameraRestore` 순서다.
+- 적이 있는 칸으로 검을 투척하면 `CombatCameraFocus → SwordMove → CombatAction → CombatCameraRestore` 순서다. 회수 상태는 플레이어 칸, 배치 상태는 검의 기존 칸을 공격 시작점으로 사용한다.
+- 빈 칸으로 검만 이동할 때는 전투 카메라를 사용하지 않는다.
+- `CameraKeyboardMover`는 기존처럼 `ActionPresentationQueue.IsPlaying` 동안 수동 입력을 차단한다.
+- Presenter 비활성화 또는 복귀 이벤트 누락으로 큐가 끝나는 예외 흐름에서도 저장된 카메라 상태를 즉시 복구한다.
+- `BattleTest01/BattleRoot/BattlePresentation`에 Presenter를 연결하고 Main Camera와 BattleCore의 GridManager를 명시적으로 참조했다.
+- 현재 조정값은 좌우 여백 `2`, 상하 여백 `1.5`, 최소 줌 `3.5`, 최대 줌 `8.5`, 진입 `0.2초`, 안정 `0.08초`, 복귀 `0.25초`다.
+- 명중·빗나감·엄폐 판정과 결과별 흔들림·히트 스톱은 이번 범위에 포함하지 않았다. 향후 엄폐 계산과 대미지 판정 결과가 확정되면 확장한다.
+- 2026-08-17 사용자가 현재 코드로 `BattleTest01` 플레이 테스트를 완료했으며 컴뱃 카메라 1차 구현을 통과 처리했다.
+
+### 다음 우선 작업과 확정 규칙
+
+- 검은 행동 1회당 최대 `6칸` 이동하고 플레이어 주변 최대 제어 거리 안에서만 이동·공격할 수 있도록 제한할 예정이다.
+- 플레이어 이동으로 검이 최대 제어 거리 밖에 놓이면 검 이동·공격은 막고 회수만 허용한다. 최대 제어 거리 N의 실제 값은 별도로 튜닝한다.
+- 다음 개발일인 2026-08-18에는 XCOM식 엄폐 계산과 `DamageManager`를 한 세트로 설계·구현하는 작업을 시작한다.
+- 엄폐 시스템은 공격 방향 기준 엄폐 유무·종류와 명중률 보정 결과를 계산한다.
+- `DamageManager`는 공격자·대상·공격 정보와 엄폐 계산 결과를 받아 최종 명중률을 만들고 적중·빗나감을 판정한 뒤, 적중했을 때만 피해를 대상에게 전달하는 책임을 맡는다.
+- 명중률 공식, 반엄폐·완전엄폐 단계, 최소·최대 명중률, 난수 처리와 결과 스냅샷 구조는 구현 전에 먼저 확정한다.

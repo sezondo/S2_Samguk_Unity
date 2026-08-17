@@ -138,6 +138,11 @@ public class PlayerMeleeAttackAction : MonoBehaviour
             damage,
             attackKind,
             "근접 공격 연출"));
+        // 논리 피해 결과가 연출 큐에 추가되기 전에 실제 공격 구도를 먼저 잡는다.
+        resolutionContext.EnqueuePresentation(PresentationEvent.CombatCameraFocus(
+            attackerPosition,
+            targetPosition,
+            "근접 공격 카메라 포커스"));
 
         if (logActionState)
         {

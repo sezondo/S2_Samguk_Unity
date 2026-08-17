@@ -25,6 +25,8 @@ public enum PresentationEventType
     GroupMove,
     EnemyFacingTurn,
     GroupFacingTurn,
+    CombatCameraFocus,
+    CombatCameraRestore,
 }
 
 /// <summary>

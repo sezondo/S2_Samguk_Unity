@@ -296,6 +296,53 @@ public readonly struct PresentationEvent
     }
 
     /// <summary>
+    /// 공격 시작 위치와 대상 위치를 함께 보여 주는 전투 카메라 포커스 이벤트를 만든다.
+    /// </summary>
+    public static PresentationEvent CombatCameraFocus(
+        GridPosition sourcePosition,
+        GridPosition targetPosition,
+        string message = null)
+    {
+        return new PresentationEvent(
+            PresentationEventType.CombatCameraFocus,
+            null,
+            null,
+            null,
+            null,
+            sourcePosition,
+            targetPosition,
+            targetPosition,
+            targetPosition,
+            MovePresentationPhase.None,
+            AttackPresentationKind.None,
+            default,
+            false,
+            message);
+    }
+
+    /// <summary>
+    /// 전투 카메라를 포커스 시작 전 위치와 줌으로 복귀시키는 이벤트를 만든다.
+    /// </summary>
+    public static PresentationEvent CombatCameraRestore(string message = null)
+    {
+        return new PresentationEvent(
+            PresentationEventType.CombatCameraRestore,
+            null,
+            null,
+            null,
+            null,
+            default,
+            default,
+            default,
+            default,
+            MovePresentationPhase.None,
+            AttackPresentationKind.None,
+            default,
+            false,
+            message);
+    }
+
+    /// <summary>
     /// 검 Visual 이동 연출 이벤트를 만든다.
     /// FromPosition은 이동 전 검 위치, ToPosition은 이동 뒤 검 위치다.
     /// </summary>

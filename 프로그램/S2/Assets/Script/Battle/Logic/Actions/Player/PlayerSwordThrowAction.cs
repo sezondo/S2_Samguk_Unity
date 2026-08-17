@@ -161,7 +161,16 @@ public class PlayerSwordThrowAction : MonoBehaviour
 
         // 검 위치 변경을 피해 요청보다 먼저 처리해 검 이동 뒤 새 시야가 열린 다음 타격 연출이 이어지게 한다.
         resolutionContext.Publish(new SwordThrownLogicEvent(playerContext.GridActor, fromPosition, targetPosition));
-        TryRequestDamageAtTarget(fromPosition, targetPosition, resolutionContext);
+        bool requestedDamage = TryRequestDamageAtTarget(fromPosition, targetPosition, resolutionContext);
+        if (requestedDamage)
+        {
+            // 회수 상태면 플레이어 칸, 배치 상태면 검의 기존 칸부터 대상을 함께 잡는다.
+            resolutionContext.EnqueuePresentation(PresentationEvent.CombatCameraFocus(
+                fromPosition,
+                targetPosition,
+                "검 투척 공격 카메라 포커스"));
+        }
+
         // 피해 여부와 관계없이 검 이동을 먼저 보여주고, 피해가 있으면 CombatAction이 뒤이어 재생된다.
         resolutionContext.EnqueuePresentation(PresentationEvent.SwordMove(
             playerContext.GridActor,

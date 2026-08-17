@@ -100,6 +100,11 @@ public class EnemyAttackAction : MonoBehaviour
             AttackDamage,
             AttackPresentationKind.EnemyRanged,
             "적 원거리 공격 연출"));
+        // 시야 밖 공격자 표시와 전투 연출보다 먼저 실제 공격 구도를 잡는다.
+        resolutionContext.EnqueuePresentation(PresentationEvent.CombatCameraFocus(
+            attackerPosition,
+            targetPosition,
+            "적 원거리 공격 카메라 포커스"));
 
         if (logAttack)
         {
