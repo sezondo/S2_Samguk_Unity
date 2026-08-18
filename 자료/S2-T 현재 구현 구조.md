@@ -1,6 +1,6 @@
 # S2-T 현재 구현 구조
 
-- 최신 기준: 2026-08-17
+- 최신 기준: 2026-08-18
 - 기준 브랜치: `main`
 - Unity 버전: `6000.0.64f1`
 - 기준 테스트 씬: `Assets/Scenes/Test/BootstrapTest.unity`, `Assets/Scenes/Test/LobbyTest.unity`, `Assets/Scenes/Test/StoryTest.unity`, `Assets/Scenes/Test/BattleTest01.unity`, `Assets/Scenes/Test/BattleTest02.unity`
@@ -593,18 +593,35 @@ PlayerInputReader
 
 ## 10. 피해와 사망
 
-모든 플레이어·적 공격은 같은 피해 통로를 사용한다.
+공격 종류에 따라 적중 판정을 거치되, 실제 피해 적용과 결과 연출 생성은 모두 `DamageResolutionCoordinator`로 합류한다.
 
 ```text
-공격 행동
-→ ApplyDamageLogicEvent
+근접·검 공격 등 확정 명중 공격
+→ ApplyDamageLogicEvent(확정 명중)
 → DamageResolutionCoordinator
 → ActorHealth.TakeDamage()
 → DamageAppliedLogicEvent
 → 필요 시 ActorDiedLogicEvent
 → CombatAction 연출
+
+플레이어 총·적 원거리 공격
+→ ResolveAttackLogicEvent
+→ AttackResolutionCoordinator
+→ CoverCalculator
+→ AttackResolvedLogicEvent
+→ DamageResolutionCoordinator
+→ 적중 시에만 ActorHealth.TakeDamage()와 피해·사망 논리 이벤트
+→ 적중·빗나감 공통 CombatAction 연출
 ```
 
+- `CoverCalculator`는 대상의 동·서·남·북 인접 칸에 있는 `LowObstacleLogicTilemap`만 엄폐 후보로 인정하고, 대상에서 공격자 방향과 엄폐물 방향 사이 각도로 효과를 계산한다.
+- 엄폐 정면 각도 `22.5도` 이하는 낮은 엄폐 효과를 전부 적용하고, `67.5도` 이상은 측면 공격으로 보아 엄폐를 무시한다. 그 사이는 각도에 따라 선형 보간한다.
+- `ControllableUnitData.GunAttackAccuracy`와 `EnemyData.RangedAttackAccuracy`가 유닛별 기본·최소·최대 명중률과 낮은 엄폐 최대 페널티를 보관한다.
+- `ResolveAttackLogicEvent`는 공격 행동이 읽은 유닛별 명중 수치를 값으로 복사해 판정 당시 스냅샷으로 전달한다.
+- `AttackResolutionCoordinator`는 유닛별 명중 수치와 공통 엄폐 각도 규칙을 결합해 최종 명중률을 만든 뒤 `0~99` 난수로 적중 여부를 확정한다.
+- `AttackResult`와 `CoverResult`는 판정 당시 명중률·난수·엄폐 칸·방향·각도·보정을 보관하는 불변 결과 스냅샷이다.
+- 근접 공격과 검 공격은 현재 확정 명중이며, 거리·무기별 명중 보정은 적용하지 않는다.
+- 빗나가면 AP·탄약은 이미 소비된 상태를 유지하고 HP·피해·사망 논리는 실행하지 않지만, 공격자 공격 연출과 대상의 빗나감 반응 연출은 재생한다.
 - `DamageResult`가 피해 적용 전후 HP와 이번 피해로 사망했는지를 보관한다.
 - `EnemyAlertCoordinator`는 적의 `DamageAppliedLogicEvent`를 경계 원인으로 사용할 수 있다.
 - `ActorDeathCoordinator`는 사망 Actor의 칸 점유를 해제한다.
@@ -845,13 +862,20 @@ SecurityDoor01
 - 사용자가 현재 코드로 두 Battle 씬의 시야·전투·캠페인 흐름을 플레이 테스트했고 문제없이 동작함을 확인했다.
 - 플레이어 주변 8칸 근접 시야, 도깨비검 정찰·눈먼 투척, 검 이동·시야 개방·피해 연출 순서, 검 회수·해킹 뒤 시야 갱신을 확인했다.
 - 보이는 적 기반 발각 예상 경고, 숨은 적의 실제 이동 발각과 `LowObstacleLogicTilemap`의 이동 차단·시야 통과를 확인했다.
+- 방향·각도 기반 낮은 엄폐 판정, 적중·빗나감 결과 스냅샷과 피해 적용 책임 분리 코드를 포함해 `dotnet build S2.slnx --no-restore`에서 경고 0개, 오류 0개를 확인했다.
+- 수정된 `BattleTest01` 씬 YAML에서 fileID 중복 0개, 누락 로컬 참조 0개를 확인했다.
+- Unity AssetDatabase가 신규 스크립트와 변경 씬·데이터를 인식했으며, 사용자가 `BattleTest01`에서 현재 엄폐·명중·빗나감과 유닛별 명중 데이터 적용을 플레이 테스트해 완료 처리했다.
 
 ## 17. 현재 한계
 
 - 입력은 임시 키·마우스 매핑이며 정식 UI와 Input Action Map은 아직 없다.
 - 플레이어 이동은 논리적으로 즉시 확정되며 발각 시 중간 정지나 카메라 컷은 없다.
 - 적 애드는 단일 단계 전파이며 연쇄 전파는 없다.
-- 엄폐 평가는 벽 인접과 노출·거리 중심의 1차 점수 구조다.
+- 적 AI의 이동 엄폐 평가는 벽 인접과 노출·거리 중심의 기존 1차 점수 구조이며, 공격 명중 판정용 `CoverCalculator`와는 아직 통합하지 않았다.
+- 공격 엄폐는 낮은 엄폐만 지원한다. 높은 엄폐, 거리·무기별 명중 보정, 치명타와 방어도는 아직 없다.
+- 엄폐 명중 판정은 현재 Unity 난수를 사용하며 고정 시드 기반 전투 재현 기능은 아직 없다.
+- 실제 빗나감 전용 애니메이션이 없어 `CombatPresentationData`의 별도 빗나감 상태 슬롯이 현재 `Hit` 상태를 가리킨다.
+- 모든 플레이어 총과 적 원거리 공격은 엄폐 명중 판정을 필수로 사용한다. `AttackResolutionCoordinator`가 없는 씬에서는 오류를 출력하고 해당 원거리 공격 컴포넌트를 비활성화하며 확정 명중으로 우회하지 않는다.
 - 해킹 연출은 시간 대기와 로그, 문 열림은 비주얼 비활성화 수준이다.
 - 검 경로, 총격, 근접 타격, 적 공격의 최종 VFX가 없다.
 - 선택 표시는 런타임 LineRenderer 임시 링이다.
@@ -997,14 +1021,28 @@ SecurityDoor01
 - Presenter 비활성화 또는 복귀 이벤트 누락으로 큐가 끝나는 예외 흐름에서도 저장된 카메라 상태를 즉시 복구한다.
 - `BattleTest01/BattleRoot/BattlePresentation`에 Presenter를 연결하고 Main Camera와 BattleCore의 GridManager를 명시적으로 참조했다.
 - 현재 조정값은 좌우 여백 `2`, 상하 여백 `1.5`, 최소 줌 `3.5`, 최대 줌 `8.5`, 진입 `0.2초`, 안정 `0.08초`, 복귀 `0.25초`다.
-- 명중·빗나감·엄폐 판정과 결과별 흔들림·히트 스톱은 이번 범위에 포함하지 않았다. 향후 엄폐 계산과 대미지 판정 결과가 확정되면 확장한다.
+- 컴뱃 카메라가 전달받는 `CombatAction`에는 현재 명중·빗나감·엄폐 판정 결과가 포함된다. 결과별 카메라 흔들림과 히트 스톱은 아직 없다.
 - 2026-08-17 사용자가 현재 코드로 `BattleTest01` 플레이 테스트를 완료했으며 컴뱃 카메라 1차 구현을 통과 처리했다.
+
+### 방향·각도 엄폐와 명중·빗나감 1차 구현
+
+- `CoverCalculator`, `AttackResolutionCoordinator`, `AttackResult`, `CoverResult`를 새로 추가했다.
+- `RangedAttackAccuracyData`를 추가해 기본·최소·최대 명중률과 낮은 엄폐 최대 페널티를 유닛 데이터 안에 묶었다.
+- `DamageResolutionCoordinator`는 적중 확률을 계산하지 않고, 확정된 공격 결과를 받아 적중 시 피해를 적용하거나 빗나감 결과 연출만 생성하는 기존 책임을 유지한다.
+- `BattleTest01/BattleRoot/BattleCore`에 `AttackResolutionCoordinator`를 연결하고 GridManager를 명시적으로 참조했다.
+- 임시 `useCoverHitResolution` 스위치와 원거리 공격의 직접 `ApplyDamageLogicEvent` 분기를 제거했다. 모든 원거리 공격은 필수로 `ResolveAttackLogicEvent`를 사용하고, 근접·검 공격만 확정 명중이다.
+- `AttackResolutionCoordinator`에는 GridManager와 정면 `22.5도`, 측면 `67.5도` 공통 각도 규칙만 남겼다.
+- `BattleTest01`에서 사용하는 유진·적 데이터의 현재 튜닝은 기본 `80%`, 낮은 엄폐 최대 `-20%`, 최소 `5%`, 최대 `95%`다. 따라서 엄폐 방향에서 정확히 `45도`인 대각선 공격은 `-10%`를 받는다.
+- `AttackResolutionCoordinator`가 없거나 유닛별 명중 데이터가 잘못되면 오류를 남기고 원거리 공격 흐름을 중단한다. 기존 확정 명중 fallback은 없다.
+- `BattleTest02` 등 아직 Coordinator가 없는 씬은 원거리 공격이 오류로 비활성화되며, 해당 씬에 적용할 때 Coordinator를 명시적으로 연결해야 한다.
+- 실제 빗나감 애니메이션을 나중에 교체할 수 있도록 별도 상태명을 추가했으며, 현재 테스트 데이터에서는 기존 `Hit` 애니메이션을 사용한다.
+- 정적 빌드와 씬 참조 검사를 통과했고, 사용자가 현재 코드의 `BattleTest01` 플레이 테스트를 완료했다.
 
 ### 다음 우선 작업과 확정 규칙
 
 - 검은 행동 1회당 최대 `6칸` 이동하고 플레이어 주변 최대 제어 거리 안에서만 이동·공격할 수 있도록 제한할 예정이다.
 - 플레이어 이동으로 검이 최대 제어 거리 밖에 놓이면 검 이동·공격은 막고 회수만 허용한다. 최대 제어 거리 N의 실제 값은 별도로 튜닝한다.
-- 다음 개발일인 2026-08-18에는 XCOM식 엄폐 계산과 `DamageManager`를 한 세트로 설계·구현하는 작업을 시작한다.
-- 엄폐 시스템은 공격 방향 기준 엄폐 유무·종류와 명중률 보정 결과를 계산한다.
-- `DamageManager`는 공격자·대상·공격 정보와 엄폐 계산 결과를 받아 최종 명중률을 만들고 적중·빗나감을 판정한 뒤, 적중했을 때만 피해를 대상에게 전달하는 책임을 맡는다.
-- 명중률 공식, 반엄폐·완전엄폐 단계, 최소·최대 명중률, 난수 처리와 결과 스냅샷 구조는 구현 전에 먼저 확정한다.
+- `BattleTest01`의 방향·각도 엄폐, 유닛별 명중률, 적중·빗나감과 피해 미적용 흐름은 사용자 플레이 테스트를 완료했다.
+- 다음 개발 후보는 적 공격 행동을 근접 공격과 원거리 공격으로 분리하는 작업이다.
+- 공격 유형 분리와 함께 적 AI 구조도 검토할 수 있지만, 실제 수정 여부·범위·행동 선택 정책은 다음 개발일에 사용자와 상의한 뒤 확정한다.
+- 이후 확장 시 높은 엄폐, 거리·무기별 보정, 고정 시드와 결과별 카메라 흔들림·히트 스톱을 각각 현재 결과 스냅샷과 연출 계층에 추가한다.

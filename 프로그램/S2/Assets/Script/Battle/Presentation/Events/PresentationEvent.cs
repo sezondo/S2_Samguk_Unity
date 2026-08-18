@@ -21,6 +21,8 @@ public readonly struct PresentationEvent
     public MovePresentationPhase MovePhase { get; }
     public SwordMoveKind SwordMoveKind { get; }
     public AttackPresentationKind AttackKind { get; }
+    public AttackResult AttackResult { get; }
+    public bool HasAttackResult { get; }
     public DamageResult DamageResult { get; }
     public bool HasDamageResult { get; }
     public GridDirection FromFacingDirection { get; }
@@ -53,7 +55,9 @@ public readonly struct PresentationEvent
         GroupMovePresentationSnapshot groupMoveSnapshot = null,
         GridDirection fromFacingDirection = GridDirection.Up,
         GridDirection toFacingDirection = GridDirection.Up,
-        GroupFacingTurnPresentationSnapshot groupFacingTurnSnapshot = null)
+        GroupFacingTurnPresentationSnapshot groupFacingTurnSnapshot = null,
+        AttackResult attackResult = default,
+        bool hasAttackResult = false)
     {
         Type = type;
         Actor = actor;
@@ -72,6 +76,8 @@ public readonly struct PresentationEvent
         MovePhase = movePhase;
         SwordMoveKind = swordMoveKind;
         AttackKind = attackKind;
+        AttackResult = attackResult;
+        HasAttackResult = hasAttackResult;
         DamageResult = damageResult;
         HasDamageResult = hasDamageResult;
         FromFacingDirection = fromFacingDirection;
@@ -368,7 +374,7 @@ public readonly struct PresentationEvent
     }
 
     /// <summary>
-    /// 공격, 피격, 사망 여부를 한 번에 처리할 통합 전투 연출 이벤트를 만든다.
+    /// 공격의 명중·빗나감과 선택적 피해·사망 결과를 한 번에 처리할 통합 전투 연출 이벤트를 만든다.
     /// </summary>
     public static PresentationEvent CombatAction(
         GridActor attacker,
@@ -376,10 +382,36 @@ public readonly struct PresentationEvent
         GridPosition fromPosition,
         GridPosition targetPosition,
         AttackPresentationKind attackKind,
+        AttackResult attackResult,
         DamageResult damageResult,
+        bool hasDamageResult,
         string message = null)
     {
-        return new PresentationEvent(PresentationEventType.CombatAction, attacker, targetActor, null, null, fromPosition, targetPosition, targetPosition, targetPosition, MovePresentationPhase.None, attackKind, damageResult, true, message);
+        return new PresentationEvent(
+            PresentationEventType.CombatAction,
+            attacker,
+            targetActor,
+            null,
+            null,
+            fromPosition,
+            targetPosition,
+            targetPosition,
+            targetPosition,
+            MovePresentationPhase.None,
+            attackKind,
+            damageResult,
+            hasDamageResult,
+            message,
+            SwordMoveKind.None,
+            null,
+            null,
+            false,
+            null,
+            GridDirection.Up,
+            GridDirection.Up,
+            null,
+            attackResult,
+            true);
     }
 
     /// <summary>

@@ -3,7 +3,7 @@ using UnityEngine;
 
 /// <summary>
 /// 플레이어 현재 칸 기준 원거리 총 공격 판정과 실행을 담당한다.
-/// 총 공격은 AP와 총알을 각각 1회분 소비하고, 기존 표준 피해 이벤트 통로로 피해를 요청한다.
+/// 총 공격은 AP와 총알을 각각 1회분 소비하고, 필수 공격 판정 조정자에 엄폐·명중 판정을 요청한다.
 /// </summary>
 public class PlayerGunAttackAction : MonoBehaviour
 {
@@ -41,6 +41,20 @@ public class PlayerGunAttackAction : MonoBehaviour
         {
             enabled = false;
         }
+    }
+
+    /// <summary>
+    /// 모든 Awake가 끝난 뒤 필수 공격 판정 조정자가 활성화됐는지 확인한다.
+    /// </summary>
+    private void Start()
+    {
+        if (AttackResolutionCoordinator.Instance != null)
+        {
+            return;
+        }
+
+        Debug.LogError($"{nameof(PlayerGunAttackAction)} on {name}에는 활성 {nameof(AttackResolutionCoordinator)}가 반드시 필요합니다. 총 공격 컴포넌트를 비활성화합니다.", this);
+        enabled = false;
     }
 
     /// <summary>
@@ -141,12 +155,13 @@ public class PlayerGunAttackAction : MonoBehaviour
 
         GridPosition attackerPosition = playerContext.GridActor.GridPosition;
         int damage = playerContext.UnitData.GunAttackDamage;
-        resolutionContext.Publish(new ApplyDamageLogicEvent(
+        resolutionContext.Publish(new ResolveAttackLogicEvent(
             playerContext.GridActor,
             targetActor,
             attackerPosition,
             targetPosition,
             damage,
+            playerContext.UnitData.GunAttackAccuracy,
             AttackPresentationKind.PlayerGun,
             "총 공격 연출"));
         // 논리 피해 결과가 연출 큐에 추가되기 전에 실제 공격 구도를 먼저 잡는다.
@@ -157,7 +172,7 @@ public class PlayerGunAttackAction : MonoBehaviour
 
         if (logActionState)
         {
-            Debug.Log($"{nameof(PlayerGunAttackAction)}: {targetActor.name} 대상에게 총 공격 피해 적용을 요청했습니다. 피해량: {damage}, 남은 총알: {gunAmmo.CurrentAmmo}/{gunAmmo.MaxAmmo}", this);
+            Debug.Log($"{nameof(PlayerGunAttackAction)}: {targetActor.name} 대상에게 총 공격 엄폐·명중 판정을 요청했습니다. 피해량: {damage}, 남은 총알: {gunAmmo.CurrentAmmo}/{gunAmmo.MaxAmmo}", this);
         }
 
         return true;
@@ -178,6 +193,16 @@ public class PlayerGunAttackAction : MonoBehaviour
             if (logBlockedTarget)
             {
                 Debug.LogError($"{nameof(PlayerGunAttackAction)} on {name}에는 목표 칸을 검사할 {nameof(GridManager)}가 필요합니다.", this);
+            }
+
+            return false;
+        }
+
+        if (AttackResolutionCoordinator.Instance == null)
+        {
+            if (logBlockedTarget)
+            {
+                Debug.LogError($"{nameof(PlayerGunAttackAction)} on {name}에는 활성 {nameof(AttackResolutionCoordinator)}가 반드시 필요합니다.", this);
             }
 
             return false;
@@ -259,6 +284,16 @@ public class PlayerGunAttackAction : MonoBehaviour
         if (distance > GunAttackRange)
         {
             LogBlockedTarget(targetPosition, $"총 공격 사거리 밖입니다. 거리: {distance}, 최대 거리: {GunAttackRange}");
+            return false;
+        }
+
+        if (AttackResolutionCoordinator.Instance == null)
+        {
+            if (logBlockedTarget)
+            {
+                Debug.LogError($"{nameof(PlayerGunAttackAction)} on {name}에는 활성 {nameof(AttackResolutionCoordinator)}가 필요합니다.", this);
+            }
+
             return false;
         }
 
@@ -363,9 +398,43 @@ public class PlayerGunAttackAction : MonoBehaviour
             return false;
         }
 
+        RangedAttackAccuracyData accuracyData = unitData.GunAttackAccuracy;
+        if (!HasValidAccuracyData(accuracyData))
+        {
+            return false;
+        }
+
         if (unitData.MaxGunAmmo <= 0)
         {
             Debug.LogError($"{nameof(PlayerGunAttackAction)} on {name}의 {nameof(ControllableUnitData)} 최대 총알 수는 0보다 커야 합니다.", this);
+            return false;
+        }
+
+        return true;
+    }
+
+    /// <summary>
+    /// 총 공격에 필요한 유닛별 명중률과 엄폐 페널티 값이 유효한지 확인한다.
+    /// </summary>
+    private bool HasValidAccuracyData(RangedAttackAccuracyData accuracyData)
+    {
+        if (accuracyData == null)
+        {
+            Debug.LogError($"{nameof(PlayerGunAttackAction)} on {name}의 {nameof(ControllableUnitData)}에 총 공격 명중 데이터가 필요합니다.", this);
+            return false;
+        }
+
+        if (accuracyData.BaseHitChance < 0 || accuracyData.BaseHitChance > 100 ||
+            accuracyData.LowCoverHitPenalty < 0 || accuracyData.LowCoverHitPenalty > 100)
+        {
+            Debug.LogError($"{nameof(PlayerGunAttackAction)} on {name}의 기본 명중률과 낮은 엄폐 페널티는 0~100이어야 합니다.", this);
+            return false;
+        }
+
+        if (accuracyData.MinimumHitChance < 0 || accuracyData.MaximumHitChance > 100 ||
+            accuracyData.MinimumHitChance > accuracyData.MaximumHitChance)
+        {
+            Debug.LogError($"{nameof(PlayerGunAttackAction)} on {name}의 최소·최대 명중률 범위가 올바르지 않습니다.", this);
             return false;
         }
 

@@ -46,6 +46,8 @@ public class EnemyData : ScriptableObject
     [SerializeField] private int rangedAttackRange = 4;
     // 적 원거리 공격이 적용할 피해량이다.
     [SerializeField] private int rangedAttackDamage = 1;
+    // 이 적의 원거리 공격 기본 명중률과 엄폐 대응 수치다.
+    [SerializeField] private RangedAttackAccuracyData rangedAttackAccuracy = new();
 
     public int SightRange => sightRange;
     public bool UseAdjacentDetection => useAdjacentDetection;
@@ -63,4 +65,5 @@ public class EnemyData : ScriptableObject
     public int TurnMoveRange => turnMoveRange;
     public int RangedAttackRange => rangedAttackRange;
     public int RangedAttackDamage => rangedAttackDamage;
+    public RangedAttackAccuracyData RangedAttackAccuracy => rangedAttackAccuracy;
 }

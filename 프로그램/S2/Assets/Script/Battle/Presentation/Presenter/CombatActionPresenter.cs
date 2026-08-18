@@ -31,6 +31,8 @@ public class CombatActionPresenter : MonoBehaviour, IPresentationEventHandler
     private ActorVisualController activeTargetVisual;
     // 현재 피격자가 이번 피해로 사망했는지 나타낸다.
     private bool activeTargetKilled;
+    // 현재 공격이 빗나가 대상에게 피해가 적용되지 않았는지 나타낸다.
+    private bool activeAttackMissed;
     // 현재 전투 시작 알림을 보냈는지 나타낸다.
     private bool combatPresentationStarted;
     // 현재 시작·종료 알림에 전달할 전투 연출 이벤트다.
@@ -151,9 +153,15 @@ public class CombatActionPresenter : MonoBehaviour, IPresentationEventHandler
             return false;
         }
 
-        if (presentationEvent.Actor == null || presentationEvent.TargetActor == null || !presentationEvent.HasDamageResult)
+        if (presentationEvent.Actor == null || presentationEvent.TargetActor == null || !presentationEvent.HasAttackResult)
         {
-            Debug.LogError($"{nameof(CombatActionPresenter)}: 전투 연출 이벤트에 공격자, 피격자 또는 피해 결과가 없습니다. 이벤트: {presentationEvent}", this);
+            Debug.LogError($"{nameof(CombatActionPresenter)}: 전투 연출 이벤트에 공격자, 대상 또는 공격 판정 결과가 없습니다. 이벤트: {presentationEvent}", this);
+            return false;
+        }
+
+        if (presentationEvent.AttackResult.IsHit && !presentationEvent.HasDamageResult)
+        {
+            Debug.LogError($"{nameof(CombatActionPresenter)}: 명중 전투 연출 이벤트에 피해 결과가 없습니다. 이벤트: {presentationEvent}", this);
             return false;
         }
 
@@ -182,7 +190,8 @@ public class CombatActionPresenter : MonoBehaviour, IPresentationEventHandler
             return false;
         }
 
-        activeTargetKilled = presentationEvent.DamageResult.KilledByThisDamage;
+        activeAttackMissed = !presentationEvent.AttackResult.IsHit;
+        activeTargetKilled = presentationEvent.HasDamageResult && presentationEvent.DamageResult.KilledByThisDamage;
         return true;
     }
 
@@ -206,9 +215,11 @@ public class CombatActionPresenter : MonoBehaviour, IPresentationEventHandler
             entry.AttackerAnimationStateName,
             presentationData.CrossFadeDuration);
 
-        string targetStateName = activeTargetKilled
-            ? presentationData.DeathAnimationStateName
-            : presentationData.HitAnimationStateName;
+        string targetStateName = activeAttackMissed
+            ? presentationData.MissAnimationStateName
+            : activeTargetKilled
+                ? presentationData.DeathAnimationStateName
+                : presentationData.HitAnimationStateName;
         activeTargetVisual.TryPlayAnimationState(targetStateName, presentationData.CrossFadeDuration);
 
         combatPresentationStarted = true;
@@ -216,7 +227,8 @@ public class CombatActionPresenter : MonoBehaviour, IPresentationEventHandler
 
         if (logCombatFlow)
         {
-            Debug.Log($"{nameof(CombatActionPresenter)}: {presentationEvent.AttackKind} 전투 연출을 시작합니다. 공격자: {presentationEvent.Actor.name}, 대상: {presentationEvent.TargetActor.name}, 사망 여부: {activeTargetKilled}", this);
+            string resultText = activeAttackMissed ? "빗나감" : activeTargetKilled ? "명중·사망" : "명중";
+            Debug.Log($"{nameof(CombatActionPresenter)}: {presentationEvent.AttackKind} 전투 연출을 시작합니다. 공격자: {presentationEvent.Actor.name}, 대상: {presentationEvent.TargetActor.name}, 결과: {resultText}", this);
         }
 
         yield return new WaitForSeconds(entry.PresentationDuration);
@@ -275,6 +287,7 @@ public class CombatActionPresenter : MonoBehaviour, IPresentationEventHandler
         activeAttackerVisual = null;
         activeTargetVisual = null;
         activeTargetKilled = false;
+        activeAttackMissed = false;
         combatPresentationStarted = false;
         activePresentationEvent = default;
     }
@@ -325,10 +338,11 @@ public class CombatActionPresenter : MonoBehaviour, IPresentationEventHandler
         }
 
         if (string.IsNullOrWhiteSpace(presentationData.HitAnimationStateName) ||
+            string.IsNullOrWhiteSpace(presentationData.MissAnimationStateName) ||
             string.IsNullOrWhiteSpace(presentationData.DeathAnimationStateName) ||
             string.IsNullOrWhiteSpace(presentationData.IdleAnimationStateName))
         {
-            Debug.LogError($"{nameof(CombatActionPresenter)} on {name}의 피격, 사망 또는 대기 애니메이션 상태 이름이 비어 있습니다.", this);
+            Debug.LogError($"{nameof(CombatActionPresenter)} on {name}의 피격, 빗나감, 사망 또는 대기 애니메이션 상태 이름이 비어 있습니다.", this);
             return false;
         }
 

@@ -247,6 +247,68 @@ public sealed class ApplyDamageLogicEvent : IActionLogicEvent
 }
 
 /// <summary>
+/// 대상 인접 엄폐 방향과 각도를 반영한 원거리 공격 명중 판정을 요청하는 논리 이벤트다.
+/// </summary>
+public sealed class ResolveAttackLogicEvent : IActionLogicEvent
+{
+    public GridActor Attacker { get; }
+    public GridActor Target { get; }
+    public GridPosition FromPosition { get; }
+    public GridPosition TargetPosition { get; }
+    public int Damage { get; }
+    public int BaseHitChance { get; }
+    public int MinimumHitChance { get; }
+    public int MaximumHitChance { get; }
+    public int LowCoverHitPenalty { get; }
+    public AttackPresentationKind PresentationKind { get; }
+    public string Message { get; }
+
+    /// <summary>
+    /// 지정한 원거리 공격의 엄폐·명중 판정 요청을 만든다.
+    /// </summary>
+    public ResolveAttackLogicEvent(
+        GridActor attacker,
+        GridActor target,
+        GridPosition fromPosition,
+        GridPosition targetPosition,
+        int damage,
+        RangedAttackAccuracyData accuracyData,
+        AttackPresentationKind presentationKind,
+        string message)
+    {
+        Attacker = attacker;
+        Target = target;
+        FromPosition = fromPosition;
+        TargetPosition = targetPosition;
+        Damage = damage;
+        BaseHitChance = accuracyData.BaseHitChance;
+        MinimumHitChance = accuracyData.MinimumHitChance;
+        MaximumHitChance = accuracyData.MaximumHitChance;
+        LowCoverHitPenalty = accuracyData.LowCoverHitPenalty;
+        PresentationKind = presentationKind;
+        Message = message;
+    }
+}
+
+/// <summary>
+/// 엄폐와 난수 계산을 마치고 명중·빗나감이 확정된 공격 논리 이벤트다.
+/// </summary>
+public sealed class AttackResolvedLogicEvent : IActionLogicEvent
+{
+    public ResolveAttackLogicEvent Attack { get; }
+    public AttackResult Result { get; }
+
+    /// <summary>
+    /// 원본 공격 요청과 확정된 명중 판정 결과를 묶는다.
+    /// </summary>
+    public AttackResolvedLogicEvent(ResolveAttackLogicEvent attack, AttackResult result)
+    {
+        Attack = attack;
+        Result = result;
+    }
+}
+
+/// <summary>
 /// 피해 가능 대상에게 피해 적용을 시도했음을 알리는 논리 이벤트다.
 /// </summary>
 public sealed class DamageAppliedLogicEvent : IActionLogicEvent

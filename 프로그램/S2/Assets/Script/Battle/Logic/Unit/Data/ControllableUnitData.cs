@@ -71,6 +71,8 @@ public class ControllableUnitData : ScriptableObject
     [SerializeField] private int gunAttackRange = 5;
     // 총 공격으로 적용할 피해량이다.
     [SerializeField] private int gunAttackDamage = 2;
+    // 이 유닛의 총 공격 기본 명중률과 엄폐 대응 수치다.
+    [SerializeField] private RangedAttackAccuracyData gunAttackAccuracy = new();
     // 플레이어가 보유할 수 있는 총알 수다. 현재 총알은 PlayerGunAmmo가 런타임 상태로 보관한다.
     [SerializeField] private int maxGunAmmo = 3;
 
@@ -96,6 +98,7 @@ public class ControllableUnitData : ScriptableObject
     public int GunAttackActionPointCost => gunAttackActionPointCost;
     public int GunAttackRange => gunAttackRange;
     public int GunAttackDamage => gunAttackDamage;
+    public RangedAttackAccuracyData GunAttackAccuracy => gunAttackAccuracy;
     public int MaxGunAmmo => maxGunAmmo;
 
     /// <summary>

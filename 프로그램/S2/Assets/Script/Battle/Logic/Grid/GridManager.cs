@@ -147,6 +147,14 @@ public class GridManager : MonoBehaviour
     }
 
     /// <summary>
+    /// 지정한 칸이 이동은 막지만 시야는 통과시키는 낮은 장애물 칸인지 확인한다.
+    /// </summary>
+    public bool IsLowObstacle(GridPosition position)
+    {
+        return IsInside(position) && HasTileAt(lowObstacleLogicTilemap, position);
+    }
+
+    /// <summary>
     /// 지정한 칸이 다른 GridActor에게 점유되어 있는지 확인한다.
     /// </summary>
     public bool IsOccupied(GridPosition position)

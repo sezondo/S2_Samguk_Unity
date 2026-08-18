@@ -29,6 +29,20 @@ public class EnemyAttackAction : MonoBehaviour
     }
 
     /// <summary>
+    /// 모든 Awake가 끝난 뒤 필수 공격 판정 조정자가 활성화됐는지 확인한다.
+    /// </summary>
+    private void Start()
+    {
+        if (AttackResolutionCoordinator.Instance != null)
+        {
+            return;
+        }
+
+        Debug.LogError($"{nameof(EnemyAttackAction)} on {name}에는 활성 {nameof(AttackResolutionCoordinator)}가 반드시 필요합니다. 원거리 공격 컴포넌트를 비활성화합니다.", this);
+        enabled = false;
+    }
+
+    /// <summary>
     /// 지정한 위치에서 대상 칸을 원거리 공격할 수 있는지 확인한다.
     /// </summary>
     public bool CanAttackFrom(GridPosition attackerPosition, GridPosition targetPosition)
@@ -65,6 +79,12 @@ public class EnemyAttackAction : MonoBehaviour
             return false;
         }
 
+        if (AttackResolutionCoordinator.Instance == null)
+        {
+            Debug.LogError($"{nameof(EnemyAttackAction)} on {name}에는 활성 {nameof(AttackResolutionCoordinator)}가 필요합니다.", this);
+            return false;
+        }
+
         if (targetActor == null)
         {
             LogBlockedAttack("공격 대상이 없습니다");
@@ -92,12 +112,13 @@ public class EnemyAttackAction : MonoBehaviour
 
         GridPosition attackerPosition = enemyContext.GridActor.GridPosition;
         GridPosition targetPosition = targetActor.GridPosition;
-        resolutionContext.Publish(new ApplyDamageLogicEvent(
+        resolutionContext.Publish(new ResolveAttackLogicEvent(
             enemyContext.GridActor,
             targetActor,
             attackerPosition,
             targetPosition,
             AttackDamage,
+            enemyContext.EnemyData.RangedAttackAccuracy,
             AttackPresentationKind.EnemyRanged,
             "적 원거리 공격 연출"));
         // 시야 밖 공격자 표시와 전투 연출보다 먼저 실제 공격 구도를 잡는다.
@@ -108,7 +129,7 @@ public class EnemyAttackAction : MonoBehaviour
 
         if (logAttack)
         {
-            Debug.Log($"{nameof(EnemyAttackAction)}: {enemyContext.name} 적이 {targetActor.name} 대상에게 원거리 공격 피해 {AttackDamage} 적용을 요청했습니다.", this);
+            Debug.Log($"{nameof(EnemyAttackAction)}: {enemyContext.name} 적이 {targetActor.name} 대상에게 원거리 공격 엄폐·명중 판정을 요청했습니다. 피해량: {AttackDamage}", this);
         }
 
         return true;
@@ -159,6 +180,40 @@ public class EnemyAttackAction : MonoBehaviour
         if (enemyData.RangedAttackDamage <= 0)
         {
             Debug.LogError($"{nameof(EnemyAttackAction)} on {name}의 원거리 공격 피해량은 0보다 커야 합니다.", this);
+            return false;
+        }
+
+        RangedAttackAccuracyData accuracyData = enemyData.RangedAttackAccuracy;
+        if (!HasValidAccuracyData(accuracyData))
+        {
+            return false;
+        }
+
+        return true;
+    }
+
+    /// <summary>
+    /// 적 원거리 공격의 유닛별 명중률과 엄폐 페널티 값이 유효한지 확인한다.
+    /// </summary>
+    private bool HasValidAccuracyData(RangedAttackAccuracyData accuracyData)
+    {
+        if (accuracyData == null)
+        {
+            Debug.LogError($"{nameof(EnemyAttackAction)} on {name}의 {nameof(EnemyData)}에 원거리 공격 명중 데이터가 필요합니다.", this);
+            return false;
+        }
+
+        if (accuracyData.BaseHitChance < 0 || accuracyData.BaseHitChance > 100 ||
+            accuracyData.LowCoverHitPenalty < 0 || accuracyData.LowCoverHitPenalty > 100)
+        {
+            Debug.LogError($"{nameof(EnemyAttackAction)} on {name}의 기본 명중률과 낮은 엄폐 페널티는 0~100이어야 합니다.", this);
+            return false;
+        }
+
+        if (accuracyData.MinimumHitChance < 0 || accuracyData.MaximumHitChance > 100 ||
+            accuracyData.MinimumHitChance > accuracyData.MaximumHitChance)
+        {
+            Debug.LogError($"{nameof(EnemyAttackAction)} on {name}의 최소·최대 명중률 범위가 올바르지 않습니다.", this);
             return false;
         }
 

@@ -3166,4 +3166,82 @@
 ## 상태
 
 - 컴뱃 카메라 1차 구현과 `BattleTest01` 사용자 플레이 테스트를 완료했다.
-- 다음 우선 작업은 2026-08-18 XCOM식 엄폐 계산과 `DamageManager` 설계·구현이다.
+- 위 항목의 초기 `DamageManager` 명칭과 책임안은 아래 실제 구현에서 `AttackResolutionCoordinator`와 기존 `DamageResolutionCoordinator`의 분리 구조로 확정했다.
+
+## 2026-08-18 방향·각도 엄폐와 명중·빗나감 1차 구현
+
+## 확정 규칙
+
+- 대상의 동·서·남·북 인접 `LowObstacleLogicTilemap`만 엄폐로 인정하고 대각선 공격은 공격 방향과 엄폐 방향 사이 각도로 푼다.
+- 정면 `22.5도` 이하는 낮은 엄폐 효과 전부, 측면 `67.5도` 이상은 엄폐 없음, 중간은 선형 보간한다.
+- 기본 명중률은 `80%`, 낮은 엄폐 최대 보정은 `-20%`, 최종 명중률 범위는 `5~95%`다.
+- 플레이어·적 원거리 공격만 명중 판정을 사용하고 근접·검 공격은 현재 확정 명중으로 둔다.
+- 거리·무기별 보정, 높은 엄폐, 치명타, 방어도와 고정 난수 시드는 이번 범위에서 제외한다.
+- 빗나감도 AP·탄약과 공격 연출은 소비하며 피해·사망 논리만 생성하지 않는다. 전용 애니메이션이 생길 때까지 대상은 기존 `Hit` 상태를 별도 빗나감 슬롯으로 재사용한다.
+
+## 구현
+
+- `CoverCalculator`가 대상 인접 낮은 장애물 후보의 방향·각도와 명중 보정을 계산한다.
+- `AttackResolutionCoordinator`가 `ResolveAttackLogicEvent`를 받아 최종 명중률과 난수 결과를 확정하고 `AttackResolvedLogicEvent`를 발행한다.
+- `AttackResult`, `CoverResult` 불변 스냅샷으로 명중률·난수·엄폐 위치·방향·각도·보정을 연출 계층까지 전달한다.
+- 기존 `DamageResolutionCoordinator`는 확정 결과만 받아 적중 시 피해·사망 논리를 적용하고, 빗나감 시 피해 없이 `CombatAction`과 카메라 복귀·시야 보정 연출만 생성하도록 유지했다.
+- `CombatPresentationData`에 빗나감 애니메이션 상태명을 분리하고 `CombatActionPresenter`가 명중과 빗나감을 구분해 재생하도록 확장했다.
+- `GridManager`에는 낮은 장애물 칸을 질의하는 공개 함수를 추가했다.
+
+## BattleTest01 적용
+
+- `BattleRoot/BattleCore`에 `AttackResolutionCoordinator`를 추가하고 기존 GridManager를 명시적으로 연결했다.
+- 플레이어 총 공격과 두 적 원거리 공격에만 엄폐 명중 판정을 활성화했다.
+- 근접·검 공격과 `BattleTest02`를 포함한 다른 씬은 기존 확정 명중 동작을 유지한다.
+- 테스트 전투 연출 데이터의 빗나감 상태는 현재 `Hit`로 연결했다.
+
+## 검증과 남은 작업
+
+- `dotnet build S2.slnx --no-restore`: 경고 0개, 오류 0개.
+- `BattleTest01` YAML 정적 검사: fileID 중복 0개, 누락 로컬 참조 0개.
+- Unity AssetDatabase가 신규 스크립트 4개와 변경된 씬·데이터를 인식하고 스크립트 컴파일을 요청한 것을 확인했다.
+- Unity 편집기 연결이 컴파일 대기 중 시간 초과되어 Console 오류 0건과 플레이 모드 동작은 아직 최종 확인하지 못했다.
+- 다음 테스트는 정면 엄폐 `60%`, 대각선 `70%`, 측면·무엄폐 `80%` 로그와 결과, 빗나감 시 HP 불변·AP/탄약 소모·임시 피격 반응·카메라 복귀를 확인한다.
+
+## 2026-08-18 원거리 명중 판정 필수화와 유닛별 데이터 분리
+
+## 변경
+
+- 임시 전환 필드 `useCoverHitResolution`을 플레이어 총·적 원거리 공격과 `BattleTest01` 씬에서 완전히 제거했다.
+- 플레이어 총과 적 원거리 공격은 이제 항상 `ResolveAttackLogicEvent`를 발행하며 직접 `ApplyDamageLogicEvent`로 확정 명중하는 fallback 경로가 없다.
+- `RangedAttackAccuracyData`를 추가하고 기본 명중률, 최소·최대 명중률과 낮은 엄폐 최대 페널티를 하나의 유닛별 데이터 묶음으로 구성했다.
+- `ControllableUnitData`에는 `GunAttackAccuracy`, `EnemyData`에는 `RangedAttackAccuracy`로 포함했다.
+- 공격 행동은 데이터 에셋 참조 자체가 아니라 네 명중 수치를 `ResolveAttackLogicEvent`에 복사하며, 판정 중 데이터가 바뀌어도 현재 요청 결과는 영향을 받지 않는다.
+- `AttackResolutionCoordinator`에서는 유닛별 명중 수치를 제거하고 GridManager, 엄폐 정면 최대 효과 각도와 측면 판정 각도만 공통 규칙으로 유지했다.
+- 필수 Coordinator가 없으면 씬 시작 시 오류를 출력하고 원거리 공격 컴포넌트를 비활성화한다. 실행 시점에도 다시 검사하며 확정 명중으로 우회하지 않는다.
+- 명중 데이터가 없거나 범위가 잘못되면 사용하는 공격 행동의 `HasValidData()`에서 오류를 출력하고 컴포넌트를 비활성화한다. Coordinator도 이벤트에 복사된 값을 다시 검증한다.
+
+## BattleTest01 적용
+
+- `BattleTest01`의 기존 `AttackResolutionCoordinator` 연결과 공통 각도 `22.5도/67.5도`는 유지했다.
+- 씬에 직렬화돼 있던 공용 기본 명중률·엄폐 페널티·최소·최대 명중률은 제거했다.
+- BattleTest01에서 사용하는 `유진 AI 회귀 테스트 데이터`와 `EnemyDataTest`에 기본 `80%`, 최소 `5%`, 최대 `95%`, 낮은 엄폐 최대 페널티 `20%`를 명시했다.
+- 같은 데이터 형식의 누락을 막기 위해 현재 플레이어 전술 유닛 데이터 에셋에도 동일한 초기 명중 수치를 명시했다.
+- 다른 Battle 씬도 코드상 새 판정 경로를 사용하지만 Coordinator가 아직 연결되지 않은 씬에서는 의도적으로 오류가 발생하고 원거리 공격이 비활성화된다.
+
+## 검증
+
+- `dotnet build S2.slnx --no-restore`: 경고 0개, 오류 0개.
+- `BattleTest01` YAML 정적 검사: fileID 중복 0개, 누락 로컬 참조 0개.
+- 플레이어 총·적 원거리 공격 코드에서 직접 `ApplyDamageLogicEvent` 생성과 `useCoverHitResolution` 참조가 남지 않은 것을 확인했다.
+- 사용자가 현재 코드로 `BattleTest01` 플레이 테스트를 완료해 유닛별 명중 데이터, 필수 Coordinator 정책과 실제 적중·빗나감 흐름을 완료 처리했다.
+
+## 2026-08-18 엄폐·명중 시스템 사용자 테스트 완료 및 작업 마감
+
+## 사용자 확인
+
+- 사용자가 오늘 구현한 현재 코드로 `BattleTest01` 플레이 테스트를 완료했다.
+- 방향·각도 기반 인접 낮은 엄폐, 유닛별 기본·최소·최대 명중률과 낮은 엄폐 페널티 적용을 통과 처리했다.
+- 플레이어 총과 적 원거리 공격이 필수 `AttackResolutionCoordinator` 경로를 사용하고, 적중·빗나감 결과가 피해·연출 흐름으로 이어지는 현재 구조를 완료 상태로 기록한다.
+- 빗나감 전용 애니메이션은 아직 없으므로 기존 `Hit` 상태를 별도 슬롯으로 재사용하는 현재 임시 연출은 유지한다.
+
+## 다음 개발일 논의 후보
+
+- 다음 우선 후보는 적 공격 행동을 근접 공격과 원거리 공격으로 분리하는 작업이다.
+- 공격 유형 분리에 맞춰 적 AI의 공격 선택과 이동 판단도 함께 손볼 수 있다.
+- 적 AI 수정은 아직 확정하지 않았으며, 실제 작업 여부와 범위·선택 정책은 다음 개발일에 사용자와 먼저 상의한 뒤 결정한다.
