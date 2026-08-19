@@ -5,6 +5,11 @@ using UnityEngine;
 /// </summary>
 public sealed class CoverCalculator
 {
+    // 낮은 엄폐 효과를 전부 적용하는 기본 최대 각도다.
+    public const float DefaultFullEffectMaximumAngle = 22.5f;
+    // 낮은 엄폐 효과가 사라지는 기본 측면 판정 각도다.
+    public const float DefaultFlankMinimumAngle = 67.5f;
+
     private static readonly GridDirection[] CardinalDirections =
     {
         GridDirection.Up,
@@ -28,6 +33,27 @@ public sealed class CoverCalculator
     /// 공격자와 대상 위치를 기준으로 가장 강하게 적용되는 인접 낮은 엄폐 결과를 반환한다.
     /// </summary>
     public CoverResult Calculate(
+        GridPosition attackerPosition,
+        GridPosition targetPosition,
+        int lowCoverHitPenalty,
+        float fullEffectMaximumAngle,
+        float flankMinimumAngle)
+    {
+        return Calculate(
+            gridManager,
+            attackerPosition,
+            targetPosition,
+            lowCoverHitPenalty,
+            fullEffectMaximumAngle,
+            flankMinimumAngle);
+    }
+
+    /// <summary>
+    /// 지정한 그리드와 공격 방향으로 가장 강하게 적용되는 인접 낮은 엄폐 결과를 계산한다.
+    /// 반복 후보 평가는 계산기 인스턴스를 만들지 않고 이 함수를 사용할 수 있다.
+    /// </summary>
+    public static CoverResult Calculate(
+        GridManager gridManager,
         GridPosition attackerPosition,
         GridPosition targetPosition,
         int lowCoverHitPenalty,

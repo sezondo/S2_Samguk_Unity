@@ -1,6 +1,6 @@
 # S2-T 현재 구현 구조
 
-- 최신 기준: 2026-08-18
+- 최신 기준: 2026-08-19
 - 기준 브랜치: `main`
 - Unity 버전: `6000.0.64f1`
 - 기준 테스트 씬: `Assets/Scenes/Test/BootstrapTest.unity`, `Assets/Scenes/Test/LobbyTest.unity`, `Assets/Scenes/Test/StoryTest.unity`, `Assets/Scenes/Test/BattleTest01.unity`, `Assets/Scenes/Test/BattleTest02.unity`
@@ -574,7 +574,10 @@ PlayerInputReader
 `EnemyAlertReactionCoordinator`는 새로 경계 상태가 된 적을 한 번만 반응시킨다.
 
 - 가장 가까운 살아 있는 플레이어를 기준으로 엄폐 후보를 계산한다.
-- `EnemyTacticalPositionScorer` 점수로 벽 인접·차폐·거리 조건을 평가한다.
+- `EnemyTacticalPositionScorer`는 공격 판정과 같은 `CoverCalculator`를 사용해 플레이어 방향에서 후보 칸이 받는 실제 낮은 엄폐 효과를 계산한다.
+- 정면 `22.5도` 이하는 최대 엄폐 점수, 측면 `67.5도` 이상은 엄폐 후보 제외, 중간 각도는 효과 비율만큼 부분 점수를 적용한다.
+- 기본 점수는 최대 엄폐 효과 `60`, 현재 위치보다 엄폐도가 좋아지면 `25`, 플레이어에게 가까워지는 거리마다 `-20`, 이동 거리마다 `-3`이다.
+- 단순 벽 인접 수와 차폐 벽 수는 더 이상 중복 가산하지 않는다.
 - 선택한 경로로 논리 이동한 뒤 `EnemyReactionMove` 연출을 추가한다.
 
 ### 적 턴
@@ -865,13 +868,15 @@ SecurityDoor01
 - 방향·각도 기반 낮은 엄폐 판정, 적중·빗나감 결과 스냅샷과 피해 적용 책임 분리 코드를 포함해 `dotnet build S2.slnx --no-restore`에서 경고 0개, 오류 0개를 확인했다.
 - 수정된 `BattleTest01` 씬 YAML에서 fileID 중복 0개, 누락 로컬 참조 0개를 확인했다.
 - Unity AssetDatabase가 신규 스크립트와 변경 씬·데이터를 인식했으며, 사용자가 `BattleTest01`에서 현재 엄폐·명중·빗나감과 유닛별 명중 데이터 적용을 플레이 테스트해 완료 처리했다.
+- 적 위치 선정을 실제 낮은 엄폐 효과 기반 점수로 교체한 뒤 `dotnet build S2.slnx --no-restore`에서 경고 0개, 오류 0개와 `git diff --check` 통과를 확인했다.
+- 사용자가 Unity 플레이 모드에서 변경된 AI 위치 선정으로 경계 반응·적 턴·공격 흐름이 오류 없이 유지되는 것을 확인해 회귀 테스트를 완료했다. 후보별 엄폐도 우선순위의 시각적 비교 테스트는 필요할 때 전용 배치와 후보 점수 로그로 진행한다.
 
 ## 17. 현재 한계
 
 - 입력은 임시 키·마우스 매핑이며 정식 UI와 Input Action Map은 아직 없다.
 - 플레이어 이동은 논리적으로 즉시 확정되며 발각 시 중간 정지나 카메라 컷은 없다.
 - 적 애드는 단일 단계 전파이며 연쇄 전파는 없다.
-- 적 AI의 이동 엄폐 평가는 벽 인접과 노출·거리 중심의 기존 1차 점수 구조이며, 공격 명중 판정용 `CoverCalculator`와는 아직 통합하지 않았다.
+- 적 AI의 이동 엄폐 평가는 낮은 엄폐 효과만 사용한다. 높은 엄폐와 완전한 LOS 차단 위치의 별도 방어 가치는 아직 평가하지 않는다.
 - 공격 엄폐는 낮은 엄폐만 지원한다. 높은 엄폐, 거리·무기별 명중 보정, 치명타와 방어도는 아직 없다.
 - 엄폐 명중 판정은 현재 Unity 난수를 사용하며 고정 시드 기반 전투 재현 기능은 아직 없다.
 - 실제 빗나감 전용 애니메이션이 없어 `CombatPresentationData`의 별도 빗나감 상태 슬롯이 현재 `Hit` 상태를 가리킨다.

@@ -1,38 +1,57 @@
 using UnityEngine;
 
 /// <summary>
-/// 적 전술 위치 평가에 사용하는 점수 가중치 묶음이다.
+/// 적 전술 위치 평가에 사용하는 점수 가중치와 공통 엄폐 각도 규칙이다.
 /// </summary>
 [System.Serializable]
 public struct EnemyTacticalPositionScoreSettings
 {
-    // 후보 칸이 플레이어와 같은 직선축에 있고 사이를 막는 벽이 없을 때 적용할 감점이다.
-    public int frontalExposurePenalty;
+    // 낮은 엄폐 효과가 100%일 때 후보 칸에 더하는 최대 점수다.
+    public int maximumCoverEffectScore;
+    // 후보 칸의 실제 엄폐 효과가 현재 위치보다 좋아졌을 때 더하는 점수다.
+    public int improvedCoverScore;
     // 후보 칸이 현재 위치보다 플레이어에게 가까워질 때 거리 차이마다 적용할 감점이다.
     public int closerToPlayerPenalty;
-    // 후보 칸 주변 벽이 적과 플레이어 사이를 실제로 막는다고 볼 수 있을 때 벽 1개마다 더하는 점수다.
-    public int blockingCoverWallScore;
-    // 후보 칸 주변 4방향에 인접한 벽 1개마다 더하는 기본 엄폐 점수다.
-    public int adjacentWallScore;
-    // 후보 칸의 엄폐 품질이 현재 위치보다 좋아졌을 때 더하는 점수다.
-    public int improvedCoverScore;
     // 적 현재 위치에서 가까운 후보를 선호하기 위해 이동 거리마다 적용할 감점이다.
     public int moveDistancePenalty;
+    // 이 각도 이하에서는 낮은 엄폐 효과를 전부 적용한다.
+    public float fullEffectMaximumAngle;
+    // 이 각도 이상에서는 측면 엄폐로 보고 엄폐 효과를 적용하지 않는다.
+    public float flankMinimumAngle;
+
+    // 새 엄폐도 점수 필드가 직렬화 데이터에 초기화됐는지 나타낸다.
+    public bool IsInitialized =>
+        maximumCoverEffectScore > 0 &&
+        flankMinimumAngle > 0f;
 
     /// <summary>
-    /// 경계 반응 엄폐 이동에서 사용할 기본 점수 설정을 만든다.
+    /// 경계 반응과 적 턴 엄폐 이동에서 사용할 기본 점수 설정을 만든다.
     /// </summary>
     public static EnemyTacticalPositionScoreSettings CreateDefaultCoverReactionSettings()
     {
         return new EnemyTacticalPositionScoreSettings
         {
-            frontalExposurePenalty = 60,
-            closerToPlayerPenalty = 20,
-            blockingCoverWallScore = 45,
-            adjacentWallScore = 8,
+            maximumCoverEffectScore = 60,
             improvedCoverScore = 25,
+            closerToPlayerPenalty = 20,
             moveDistancePenalty = 3,
+            fullEffectMaximumAngle = CoverCalculator.DefaultFullEffectMaximumAngle,
+            flankMinimumAngle = CoverCalculator.DefaultFlankMinimumAngle,
         };
+    }
+
+    /// <summary>
+    /// 점수와 엄폐 각도 설정이 계산에 사용할 수 있는 범위인지 확인한다.
+    /// </summary>
+    public bool HasValidData()
+    {
+        return maximumCoverEffectScore > 0 &&
+            improvedCoverScore >= 0 &&
+            closerToPlayerPenalty >= 0 &&
+            moveDistancePenalty >= 0 &&
+            fullEffectMaximumAngle >= 0f &&
+            flankMinimumAngle <= 180f &&
+            fullEffectMaximumAngle < flankMinimumAngle;
     }
 }
 
@@ -45,11 +64,11 @@ public readonly struct EnemyTacticalPositionScoreResult
     public int Score { get; }
     public int MoveDistance { get; }
     public int DistanceToPlayer { get; }
-    public int CurrentCoverQuality { get; }
-    public int CandidateCoverQuality { get; }
-    public int AdjacentWallCount { get; }
-    public int BlockingWallCount { get; }
-    public bool IsExposedToPlayer { get; }
+    public CoverResult CurrentCover { get; }
+    public CoverResult CandidateCover { get; }
+    public int CoverEffectScore { get; }
+    // 후보 칸이 공격 방향에서 실제 낮은 엄폐 효과를 받는지 나타낸다.
+    public bool HasEffectiveCover => CandidateCover.Type != CoverType.None && CandidateCover.Effectiveness > 0f;
 
     /// <summary>
     /// 지정한 값으로 전술 위치 평가 결과를 만든다.
@@ -59,21 +78,17 @@ public readonly struct EnemyTacticalPositionScoreResult
         int score,
         int moveDistance,
         int distanceToPlayer,
-        int currentCoverQuality,
-        int candidateCoverQuality,
-        int adjacentWallCount,
-        int blockingWallCount,
-        bool isExposedToPlayer)
+        CoverResult currentCover,
+        CoverResult candidateCover,
+        int coverEffectScore)
     {
         Position = position;
         Score = score;
         MoveDistance = moveDistance;
         DistanceToPlayer = distanceToPlayer;
-        CurrentCoverQuality = currentCoverQuality;
-        CandidateCoverQuality = candidateCoverQuality;
-        AdjacentWallCount = adjacentWallCount;
-        BlockingWallCount = blockingWallCount;
-        IsExposedToPlayer = isExposedToPlayer;
+        CurrentCover = currentCover;
+        CandidateCover = candidateCover;
+        CoverEffectScore = coverEffectScore;
     }
 
     /// <summary>
@@ -82,27 +97,22 @@ public readonly struct EnemyTacticalPositionScoreResult
     public override string ToString()
     {
         return $"{Position} 점수 {Score}. 이동:{MoveDistance}, 플레이어거리:{DistanceToPlayer}, " +
-            $"차단벽:{BlockingWallCount}, 인접벽:{AdjacentWallCount}, 정면노출:{IsExposedToPlayer}, " +
-            $"현재엄폐품질:{CurrentCoverQuality}, 후보엄폐품질:{CandidateCoverQuality}";
+            $"엄폐방향:{CandidateCover.CoverDirection}, 엄폐각도:{CandidateCover.Angle:F1}, " +
+            $"현재엄폐도:{CurrentCover.Effectiveness:F2}, 후보엄폐도:{CandidateCover.Effectiveness:F2}, " +
+            $"엄폐점수:{CoverEffectScore}";
     }
 }
 
 /// <summary>
-/// 격자 기반 적 전술 위치 후보의 엄폐 품질과 위험 점수를 계산한다.
+/// 실제 원거리 공격과 같은 방향·각도 규칙으로 적 전술 위치의 엄폐 효과를 점수화한다.
 /// </summary>
 public static class EnemyTacticalPositionScorer
 {
-    // 엄폐 판정에 사용하는 상하좌우 4방향이다.
-    private static readonly GridPosition[] CardinalDirections =
-    {
-        GridPosition.Up,
-        GridPosition.Down,
-        GridPosition.Left,
-        GridPosition.Right,
-    };
+    // 엄폐 유무와 효과 비율만 계산할 때 사용하는 기준 페널티다.
+    private const int CoverEvaluationPenalty = 100;
 
     /// <summary>
-    /// 경계 반응 엄폐 이동 후보 칸의 전술 점수를 계산한다.
+    /// 경계 반응과 적 턴 이동 후보 칸의 전술 점수를 계산한다.
     /// </summary>
     public static EnemyTacticalPositionScoreResult ScoreCoverReactionPosition(
         GridManager gridManager,
@@ -114,26 +124,19 @@ public static class EnemyTacticalPositionScorer
     {
         int startDistanceToPlayer = startPosition.ManhattanDistanceTo(knownPlayerPosition);
         int candidateDistanceToPlayer = candidatePosition.ManhattanDistanceTo(knownPlayerPosition);
-        CoverInfo currentCover = EvaluateCover(gridManager, startPosition, knownPlayerPosition);
-        CoverInfo candidateCover = EvaluateCover(gridManager, candidatePosition, knownPlayerPosition);
+        CoverResult currentCover = EvaluateCover(gridManager, startPosition, knownPlayerPosition, settings);
+        CoverResult candidateCover = EvaluateCover(gridManager, candidatePosition, knownPlayerPosition, settings);
+        int coverEffectScore = Mathf.RoundToInt(candidateCover.Effectiveness * settings.maximumCoverEffectScore);
 
-        int score = 0;
-        if (candidateCover.IsExposedToPlayer)
+        int score = coverEffectScore;
+        if (candidateCover.Effectiveness > currentCover.Effectiveness + Mathf.Epsilon)
         {
-            score -= settings.frontalExposurePenalty;
+            score += settings.improvedCoverScore;
         }
 
         if (candidateDistanceToPlayer < startDistanceToPlayer)
         {
             score -= (startDistanceToPlayer - candidateDistanceToPlayer) * settings.closerToPlayerPenalty;
-        }
-
-        score += candidateCover.BlockingWallCount * settings.blockingCoverWallScore;
-        score += candidateCover.AdjacentWallCount * settings.adjacentWallScore;
-
-        if (candidateCover.Quality > currentCover.Quality)
-        {
-            score += settings.improvedCoverScore;
         }
 
         score -= moveDistance * settings.moveDistancePenalty;
@@ -143,101 +146,63 @@ public static class EnemyTacticalPositionScorer
             score,
             moveDistance,
             candidateDistanceToPlayer,
-            currentCover.Quality,
-            candidateCover.Quality,
-            candidateCover.AdjacentWallCount,
-            candidateCover.BlockingWallCount,
-            candidateCover.IsExposedToPlayer);
+            currentCover,
+            candidateCover,
+            coverEffectScore);
     }
 
     /// <summary>
-    /// 지정한 칸이 엄폐 후보로 사용할 수 있는지 확인한다.
+    /// 지정한 칸이 공격 방향에서 실제 낮은 엄폐 효과를 받는 후보인지 확인한다.
     /// </summary>
-    public static bool IsCoverCandidate(GridManager gridManager, GridPosition position, GridPosition playerPosition)
+    public static bool IsCoverCandidate(
+        GridManager gridManager,
+        GridPosition position,
+        GridPosition playerPosition,
+        float fullEffectMaximumAngle = CoverCalculator.DefaultFullEffectMaximumAngle,
+        float flankMinimumAngle = CoverCalculator.DefaultFlankMinimumAngle)
     {
-        return EvaluateCover(gridManager, position, playerPosition).AdjacentWallCount > 0;
+        CoverResult cover = EvaluateCover(
+            gridManager,
+            position,
+            playerPosition,
+            fullEffectMaximumAngle,
+            flankMinimumAngle);
+        return cover.Type != CoverType.None && cover.Effectiveness > 0f;
     }
 
     /// <summary>
-    /// 지정한 칸의 엄폐 정보를 계산한다.
+    /// 플레이어를 공격자로 보고 지정한 적 위치가 받는 낮은 엄폐 결과를 계산한다.
     /// </summary>
-    private static CoverInfo EvaluateCover(GridManager gridManager, GridPosition position, GridPosition playerPosition)
+    private static CoverResult EvaluateCover(
+        GridManager gridManager,
+        GridPosition enemyPosition,
+        GridPosition playerPosition,
+        EnemyTacticalPositionScoreSettings settings)
     {
-        int adjacentWallCount = 0;
-        int blockingWallCount = 0;
-        int positionDistanceToPlayer = position.ManhattanDistanceTo(playerPosition);
-
-        for (int i = 0; i < CardinalDirections.Length; i++)
-        {
-            GridPosition wallPosition = position + CardinalDirections[i];
-            if (!gridManager.IsBlocked(wallPosition))
-            {
-                continue;
-            }
-
-            adjacentWallCount++;
-            if (wallPosition.ManhattanDistanceTo(playerPosition) < positionDistanceToPlayer)
-            {
-                blockingWallCount++;
-            }
-        }
-
-        bool isExposedToPlayer = HasOpenStraightLineToPlayer(gridManager, position, playerPosition);
-        return new CoverInfo(adjacentWallCount, blockingWallCount, isExposedToPlayer);
+        return EvaluateCover(
+            gridManager,
+            enemyPosition,
+            playerPosition,
+            settings.fullEffectMaximumAngle,
+            settings.flankMinimumAngle);
     }
 
     /// <summary>
-    /// 플레이어와 후보 칸이 같은 직선축에 있고 사이에 벽이 없는지 확인한다.
+    /// 지정한 공통 각도 규칙으로 적 위치의 낮은 엄폐 결과를 계산한다.
     /// </summary>
-    private static bool HasOpenStraightLineToPlayer(GridManager gridManager, GridPosition position, GridPosition playerPosition)
+    private static CoverResult EvaluateCover(
+        GridManager gridManager,
+        GridPosition enemyPosition,
+        GridPosition playerPosition,
+        float fullEffectMaximumAngle,
+        float flankMinimumAngle)
     {
-        if (position.x != playerPosition.x && position.y != playerPosition.y)
-        {
-            return false;
-        }
-
-        GridPosition direction = GridPosition.Zero;
-        if (position.x == playerPosition.x)
-        {
-            direction = playerPosition.y > position.y ? GridPosition.Up : GridPosition.Down;
-        }
-        else if (position.y == playerPosition.y)
-        {
-            direction = playerPosition.x > position.x ? GridPosition.Right : GridPosition.Left;
-        }
-
-        GridPosition current = position + direction;
-        while (current != playerPosition)
-        {
-            if (gridManager.IsBlocked(current))
-            {
-                return false;
-            }
-
-            current += direction;
-        }
-
-        return true;
-    }
-
-    /// <summary>
-    /// 엄폐 후보의 품질 정보를 담는다.
-    /// </summary>
-    private readonly struct CoverInfo
-    {
-        public int AdjacentWallCount { get; }
-        public int BlockingWallCount { get; }
-        public bool IsExposedToPlayer { get; }
-        public int Quality => BlockingWallCount * 2 + AdjacentWallCount - (IsExposedToPlayer ? 1 : 0);
-
-        /// <summary>
-        /// 지정한 값으로 엄폐 품질 정보를 만든다.
-        /// </summary>
-        public CoverInfo(int adjacentWallCount, int blockingWallCount, bool isExposedToPlayer)
-        {
-            AdjacentWallCount = adjacentWallCount;
-            BlockingWallCount = blockingWallCount;
-            IsExposedToPlayer = isExposedToPlayer;
-        }
+        return CoverCalculator.Calculate(
+            gridManager,
+            playerPosition,
+            enemyPosition,
+            CoverEvaluationPenalty,
+            fullEffectMaximumAngle,
+            flankMinimumAngle);
     }
 }

@@ -77,7 +77,6 @@ public sealed class EnemyTacticalMovePlanner
         {
             GridPosition candidate = pair.Key;
             if ((!includeStartPosition && candidate == startPosition) ||
-                !EnemyTacticalPositionScorer.IsCoverCandidate(gridManager, candidate, knownPlayerPosition) ||
                 (candidateFilter != null && !candidateFilter(candidate)))
             {
                 continue;
@@ -90,6 +89,12 @@ public sealed class EnemyTacticalMovePlanner
                 knownPlayerPosition,
                 pair.Value,
                 scoreSettings);
+
+            if (!result.HasEffectiveCover)
+            {
+                continue;
+            }
+
             scoreResults?.Add(result);
 
             if (!found || IsBetterScoredCandidate(result, bestResult))

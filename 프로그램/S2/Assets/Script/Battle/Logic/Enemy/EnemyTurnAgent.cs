@@ -376,6 +376,12 @@ public class EnemyTurnAgent : MonoBehaviour
             return false;
         }
 
+        if (!scoreSettings.HasValidData())
+        {
+            Debug.LogError($"{nameof(EnemyTurnAgent)} on {name}의 엄폐 점수 또는 각도 설정이 올바르지 않습니다.", this);
+            return false;
+        }
+
         return true;
     }
 
@@ -384,12 +390,7 @@ public class EnemyTurnAgent : MonoBehaviour
     /// </summary>
     private void EnsureScoreSettingsInitialized()
     {
-        if (scoreSettings.frontalExposurePenalty != 0 ||
-            scoreSettings.closerToPlayerPenalty != 0 ||
-            scoreSettings.blockingCoverWallScore != 0 ||
-            scoreSettings.adjacentWallScore != 0 ||
-            scoreSettings.improvedCoverScore != 0 ||
-            scoreSettings.moveDistancePenalty != 0)
+        if (scoreSettings.IsInitialized)
         {
             return;
         }

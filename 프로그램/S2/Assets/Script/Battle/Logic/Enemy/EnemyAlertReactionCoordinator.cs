@@ -39,7 +39,7 @@ public class EnemyAlertReactionCoordinator : MonoBehaviour, IActionLogicEventHan
     {
         EnsureScoreSettingsInitialized();
 
-        if (!HasValidReference())
+        if (!HasValidReference() || !HasValidScoreSettings())
         {
             enabled = false;
         }
@@ -208,6 +208,20 @@ public class EnemyAlertReactionCoordinator : MonoBehaviour, IActionLogicEventHan
     }
 
     /// <summary>
+    /// 경계 반응의 엄폐 점수와 각도 설정이 올바른지 확인한다.
+    /// </summary>
+    private bool HasValidScoreSettings()
+    {
+        if (scoreSettings.HasValidData())
+        {
+            return true;
+        }
+
+        Debug.LogError($"{nameof(EnemyAlertReactionCoordinator)} on {name}의 엄폐 점수 또는 각도 설정이 올바르지 않습니다.", this);
+        return false;
+    }
+
+    /// <summary>
     /// 경계 반응에 필요한 필수 참조가 연결되어 있는지 확인한다.
     /// </summary>
     private bool HasValidReference()
@@ -231,12 +245,7 @@ public class EnemyAlertReactionCoordinator : MonoBehaviour, IActionLogicEventHan
     /// </summary>
     private void EnsureScoreSettingsInitialized()
     {
-        if (scoreSettings.frontalExposurePenalty != 0 ||
-            scoreSettings.closerToPlayerPenalty != 0 ||
-            scoreSettings.blockingCoverWallScore != 0 ||
-            scoreSettings.adjacentWallScore != 0 ||
-            scoreSettings.improvedCoverScore != 0 ||
-            scoreSettings.moveDistancePenalty != 0)
+        if (scoreSettings.IsInitialized)
         {
             return;
         }

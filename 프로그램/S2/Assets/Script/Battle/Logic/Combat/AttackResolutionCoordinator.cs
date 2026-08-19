@@ -12,9 +12,9 @@ public sealed class AttackResolutionCoordinator : MonoBehaviour, IActionLogicEve
 
     [Header("Cover Angle Rule")]
     // 이 각도 이하에서는 낮은 엄폐 효과를 전부 적용한다.
-    [SerializeField, Range(0f, 90f)] private float fullEffectMaximumAngle = 22.5f;
+    [SerializeField, Range(0f, 90f)] private float fullEffectMaximumAngle = CoverCalculator.DefaultFullEffectMaximumAngle;
     // 이 각도 이상에서는 측면 공격으로 보고 엄폐를 적용하지 않는다.
-    [SerializeField, Range(0f, 180f)] private float flankMinimumAngle = 67.5f;
+    [SerializeField, Range(0f, 180f)] private float flankMinimumAngle = CoverCalculator.DefaultFlankMinimumAngle;
 
     [Header("Log")]
     // true면 엄폐 방향·각도와 최종 명중 판정을 Unity 콘솔에 출력한다.
