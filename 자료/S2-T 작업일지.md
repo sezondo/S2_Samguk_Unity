@@ -3285,3 +3285,54 @@
 - 기존 경계 반응, 적 턴 이동과 공격 흐름에서 오류나 진행 중단 없이 정상 동작하는 것을 확인해 회귀 테스트를 통과 처리했다.
 - 이번 변경은 새 행동이 아니라 후보 위치의 내부 점수 우선순위를 교체한 작업이므로 일반 배치에서는 눈에 띄는 차이가 작을 수 있다.
 - 정면·대각선·측면 엄폐 후보를 동시에 배치한 정밀 비교와 `logCandidateScores` 수치 확인은 실제 선택 결과를 세부 튜닝할 필요가 생길 때 진행한다.
+
+## 2026-08-21 유진 8동작 스프라이트 교체와 회피 연출 분리
+
+## 목적
+
+- 유진 전투 비주얼을 `유진_유니티_최종_8동작` 원화로 전부 교체한다.
+- 원거리 공격 빗나감 때 임시로 `Hit`을 재생하던 연출을 전용 회피 동작으로 분리한다.
+- 참조되지 않는 구형 유진 Sprite를 제거해 현재 사용 에셋을 명확히 한다.
+
+## 변경
+
+- 기존 512×512 Sprite 7장의 `.meta`와 GUID를 유지한 채 전투 대기·달리기·검 근접 공격·일반 근접 공격·총·피격·사망 PNG를 새 원화로 교체했다.
+- `유진 회피.png`, `유진 회피.anim`을 추가하고 `YuJin.controller`에 `Dodge` 상태를 연결했다.
+- `CombatPresentationData`의 기본 빗나감 상태와 `CombatPresentationDataTest` 직렬화 값을 `Hit`에서 `Dodge`로 변경했다.
+- `CombatActionPresenter`의 기존 적중·빗나감 분기 구조는 유지한다. 명중은 `Hit`, 빗나감은 `Dodge`, 사망은 `Death` 상태를 선택한다.
+- 공용 `CombatPresentationDataTest`를 사용하는 적 Animator의 상태 누락을 막기 위해 `TestNPC1.controller`에도 `Dodge` 상태를 추가했다. 적 전용 회피 원화는 없으므로 기존 `NPC1 Hit` Clip을 공유한다.
+- 참조가 없던 대형 구버전 `유진 검.png`, `유진 근접공격.png`, `유진 일반.png`와 `Assets/Character` 아래 저해상도 구버전 유진 Sprite 2장을 `.meta`와 함께 삭제했다.
+
+## 검증
+
+- 새 8개 PNG와 원본 파일의 SHA-256 해시 일치를 확인했다.
+- Unity AssetDatabase 강제 Refresh와 스크립트 컴파일 뒤 회피 Texture2D·AnimationClip의 GUID 인식을 확인했다.
+- `YuJin.controller`는 9개 상태를 가지며 `Dodge`가 `유진 회피` Clip을 참조한다.
+- Unity Console의 프로젝트 에셋·컴파일 오류 0개와 `.meta` GUID 중복 0개를 확인했다. 검증 도중 MCP 연결 재시작 경고 1건은 프로젝트 코드·에셋과 무관하다.
+- `dotnet build S2.slnx --no-restore`에서 경고 0개, 오류 0개를 확인했다.
+- 사용자가 Unity 플레이 모드에서 유진의 전투 대기·달리기·검 근접 공격·일반 근접 공격·총·피격·회피·사망 동작을 확인했다.
+- 원거리 공격 빗나감 때 유진에게 전용 `Dodge` 회피 동작이 재생되는 것을 확인해 유진 8동작 교체와 회피 연출 분리를 완료 처리했다.
+- 별도 회피 원화가 없는 `TestNPC1`은 `Dodge` 상태에서 기존 `NPC1 Hit` Clip을 공유하는 현재 임시 구성이 의도한 상태임을 다시 확인했다.
+
+## 2026-08-21 유진 아트 에셋 폴더·이름 통일
+
+## 목적
+
+- 한 폴더에 섞여 있던 Sprite, AnimationClip과 AnimatorController를 종류별로 분리한다.
+- Sprite 파일명과 AnimationClip 파일명·내부 표시 이름을 같은 8동작 명칭으로 통일한다.
+
+## 변경
+
+- 유진 PNG 8장을 `Assets/Art/Character/Yujin/Sprites`로 이동했다.
+- AnimationClip 8개와 AnimatorController를 `Assets/Art/Character/Yujin/Animations`로 이동했다.
+- `유진 일반`은 `유진 전투 대기`, `유진 검`은 `유진 근접공격(검)`, `유진 근접공격`은 `유진 근접공격(일반)`, `유진 사격`은 `유진 총`으로 파일명과 Clip 내부 이름을 맞췄다.
+- `YuJin.controller`는 `유진.controller`로 파일명과 내부 표시 이름을 통일했다.
+- `.meta`를 에셋과 함께 이동해 기존 Sprite·Clip·Controller GUID와 씬 참조를 보존했다.
+- 코드와 연출 데이터가 문자열로 요청하는 영문 Animator 상태 이름은 동작 계약이므로 변경하지 않았다.
+
+## 검증
+
+- Unity AssetDatabase Refresh·컴파일 뒤 `유진.controller`와 9개 상태, 8개 Motion 이름이 정상 인식됐다.
+- Unity Console 오류·경고 0개를 확인했다.
+- Sprite와 AnimationClip의 8개 기본 이름 집합이 정확히 일치하고, 이동 전 17개 Sprite·Clip·Controller GUID가 새 경로에 각각 한 번씩 유지된 것을 확인했다.
+- `dotnet build S2.slnx --no-restore`에서 경고 0개, 오류 0개를 확인했다.

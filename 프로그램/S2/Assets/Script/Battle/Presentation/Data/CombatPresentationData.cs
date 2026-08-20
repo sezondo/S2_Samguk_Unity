@@ -32,8 +32,8 @@ public class CombatPresentationData : ScriptableObject
     [SerializeField] private List<CombatPresentationEntry> entries = new();
     // 피해를 받고 살아 있는 대상에게 재생할 Animator 상태 이름이다.
     [SerializeField] private string hitAnimationStateName = "Hit";
-    // 빗나간 공격의 대상에게 재생할 Animator 상태 이름이다. 전용 애니메이션 전까지 Hit 상태를 사용한다.
-    [SerializeField] private string missAnimationStateName = "Hit";
+    // 빗나간 공격을 회피한 대상에게 재생할 Animator 상태 이름이다.
+    [SerializeField] private string missAnimationStateName = "Dodge";
     // 이번 피해로 사망한 대상에게 재생할 Animator 상태 이름이다.
     [SerializeField] private string deathAnimationStateName = "Death";
     // 전투 연출이 끝난 생존 Actor에게 재생할 Animator 상태 이름이다.

@@ -1,6 +1,6 @@
 # S2-T 현재 구현 구조
 
-- 최신 기준: 2026-08-19
+- 최신 기준: 2026-08-21
 - 기준 브랜치: `main`
 - Unity 버전: `6000.0.64f1`
 - 기준 테스트 씬: `Assets/Scenes/Test/BootstrapTest.unity`, `Assets/Scenes/Test/LobbyTest.unity`, `Assets/Scenes/Test/StoryTest.unity`, `Assets/Scenes/Test/BattleTest01.unity`, `Assets/Scenes/Test/BattleTest02.unity`
@@ -669,7 +669,7 @@ PlayerInputReader
 
 - `GridActorMovePresenter`: 플레이어·적 이동 위치 보간과 이동 상태 전환. 적이 시야 경계를 넘으면 한 칸 이동과 표시 알파를 함께 보간한다.
 - `AlertDetectedPresenter`: 경고색 점멸과 선택적 발각 애니메이션.
-- `CombatActionPresenter`: 공격자·피격자 방향과 공격·피격·사망 자세 동시 처리.
+- `CombatActionPresenter`: 공격자·피격자 방향과 공격·피격·회피·사망 자세 동시 처리.
 - `SwordActionPresenter`: 검 투척·해킹·회수 위치와 근접 기울기.
 - `HackPresenter`: 현재 해킹 시간 대기와 로그.
 - `SecurityDoorPresenter`: 열린 문의 `DoorVisual` 비활성화.
@@ -680,7 +680,7 @@ PlayerInputReader
 - 시야 밖 공격자는 공격 연출 동안 Sprite 정렬을 Fog보다 한 단계 위로 올리고, 공격 종료 뒤 기존 Sorting Layer·Order로 복원한다. Fog 지형 자체는 걷지 않는다.
 
 `MovePresentationData`는 이동 시간·커브·이동/Idle 애니메이션 옵션을 보관한다.
-`CombatPresentationData`는 공격 종류별 공격 상태와 유지 시간, 공통 Hit·Death·Idle 상태를 보관한다.
+`CombatPresentationData`는 공격 종류별 공격 상태와 유지 시간, 공통 Hit·Dodge·Death·Idle 상태를 보관한다.
 
 ## 12. 해킹 터미널과 보안문
 
@@ -804,6 +804,10 @@ SecurityDoor01
 - 해킹·검 투척 사거리: 각각 `5칸`.
 - 총 사거리: `5칸`, 최대 총알 `10`.
 - 플레이어 시야 기본값: `6칸`.
+- 유진 비주얼 에셋은 `Assets/Art/Character/Yujin/Sprites`와 `Animations`로 분리한다. `Sprites`에는 512×512 단일 Sprite 8장, `Animations`에는 이름이 같은 AnimationClip 8개와 `유진.controller`를 둔다.
+- 8동작 이름은 전투 대기·달리기·근접공격(검)·근접공격(일반)·총·피격·회피·사망으로 통일한다. `SwordThrow`와 `MeleeWithSword` Animator 상태는 `유진 근접공격(검)` Clip을 공유한다.
+- `Idle`, `Move`, `MeleeWithSword`, `MeleeUnarmed`, `SwordThrow`, `PlayerGun`, `Hit`, `Dodge`, `Death`는 코드·연출 데이터가 사용하는 Animator 상태 계약이므로 영문 이름을 유지한다.
+- 원거리 공격이 빗나가면 `CombatPresentationData.MissAnimationStateName`의 `Dodge` 상태를 재생하고, 명중한 생존 대상은 `Hit` 상태를 재생한다.
 
 동료1 테스트 데이터:
 
@@ -870,6 +874,8 @@ SecurityDoor01
 - Unity AssetDatabase가 신규 스크립트와 변경 씬·데이터를 인식했으며, 사용자가 `BattleTest01`에서 현재 엄폐·명중·빗나감과 유닛별 명중 데이터 적용을 플레이 테스트해 완료 처리했다.
 - 적 위치 선정을 실제 낮은 엄폐 효과 기반 점수로 교체한 뒤 `dotnet build S2.slnx --no-restore`에서 경고 0개, 오류 0개와 `git diff --check` 통과를 확인했다.
 - 사용자가 Unity 플레이 모드에서 변경된 AI 위치 선정으로 경계 반응·적 턴·공격 흐름이 오류 없이 유지되는 것을 확인해 회귀 테스트를 완료했다. 후보별 엄폐도 우선순위의 시각적 비교 테스트는 필요할 때 전용 배치와 후보 점수 로그로 진행한다.
+- 새 유진 8동작 Sprite를 기존 7개 GUID 보존 방식으로 교체하고 회피 Sprite·AnimationClip과 `Dodge` Animator 상태를 추가했다. Unity AssetDatabase 강제 Refresh·컴파일 뒤 새 에셋과 유진 9개·TestNPC1 8개 Animator 상태가 정상 인식되고 프로젝트 에셋·컴파일 오류가 없음을 확인했다.
+- 사용자가 Unity 플레이 모드에서 유진의 전투 대기·달리기·검 근접 공격·일반 근접 공격·총·피격·회피·사망 동작과 빗나감 시 전용 `Dodge` 재생을 확인해 유진 8동작 교체 작업을 완료 처리했다. 별도 회피 원화가 없는 `TestNPC1`은 현재 `Dodge` 상태에서도 기존 Hit Clip을 공유하는 것이 의도된 임시 상태다.
 
 ## 17. 현재 한계
 
@@ -879,7 +885,7 @@ SecurityDoor01
 - 적 AI의 이동 엄폐 평가는 낮은 엄폐 효과만 사용한다. 높은 엄폐와 완전한 LOS 차단 위치의 별도 방어 가치는 아직 평가하지 않는다.
 - 공격 엄폐는 낮은 엄폐만 지원한다. 높은 엄폐, 거리·무기별 명중 보정, 치명타와 방어도는 아직 없다.
 - 엄폐 명중 판정은 현재 Unity 난수를 사용하며 고정 시드 기반 전투 재현 기능은 아직 없다.
-- 실제 빗나감 전용 애니메이션이 없어 `CombatPresentationData`의 별도 빗나감 상태 슬롯이 현재 `Hit` 상태를 가리킨다.
+- 빗나감 대상은 공통 `Dodge` 상태를 재생한다. 유진은 전용 회피 Clip을 사용하고 현재 `TestNPC1` 적은 별도 회피 원화가 없어 기존 Hit Clip을 `Dodge` 상태에서도 공유한다.
 - 모든 플레이어 총과 적 원거리 공격은 엄폐 명중 판정을 필수로 사용한다. `AttackResolutionCoordinator`가 없는 씬에서는 오류를 출력하고 해당 원거리 공격 컴포넌트를 비활성화하며 확정 명중으로 우회하지 않는다.
 - 해킹 연출은 시간 대기와 로그, 문 열림은 비주얼 비활성화 수준이다.
 - 검 경로, 총격, 근접 타격, 적 공격의 최종 VFX가 없다.
@@ -1040,7 +1046,7 @@ SecurityDoor01
 - `BattleTest01`에서 사용하는 유진·적 데이터의 현재 튜닝은 기본 `80%`, 낮은 엄폐 최대 `-20%`, 최소 `5%`, 최대 `95%`다. 따라서 엄폐 방향에서 정확히 `45도`인 대각선 공격은 `-10%`를 받는다.
 - `AttackResolutionCoordinator`가 없거나 유닛별 명중 데이터가 잘못되면 오류를 남기고 원거리 공격 흐름을 중단한다. 기존 확정 명중 fallback은 없다.
 - `BattleTest02` 등 아직 Coordinator가 없는 씬은 원거리 공격이 오류로 비활성화되며, 해당 씬에 적용할 때 Coordinator를 명시적으로 연결해야 한다.
-- 실제 빗나감 애니메이션을 나중에 교체할 수 있도록 별도 상태명을 추가했으며, 현재 테스트 데이터에서는 기존 `Hit` 애니메이션을 사용한다.
+- 별도 빗나감 상태명은 `Dodge`로 연결했으며 유진 Animator는 전용 회피 Sprite AnimationClip을 재생한다.
 - 정적 빌드와 씬 참조 검사를 통과했고, 사용자가 현재 코드의 `BattleTest01` 플레이 테스트를 완료했다.
 
 ### 다음 우선 작업과 확정 규칙
