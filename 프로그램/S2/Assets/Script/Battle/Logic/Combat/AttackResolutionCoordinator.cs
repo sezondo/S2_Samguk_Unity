@@ -136,6 +136,36 @@ public sealed class AttackResolutionCoordinator : MonoBehaviour, IActionLogicEve
     }
 
     /// <summary>
+    /// 실제 난수 판정 없이 지정한 위치와 명중 데이터의 최종 명중률·엄폐 결과를 계산한다.
+    /// </summary>
+    public bool TryPreviewAttack(
+        GridPosition attackerPosition,
+        GridPosition targetPosition,
+        RangedAttackAccuracyData accuracyData,
+        out AttackPreviewResult preview)
+    {
+        preview = default;
+        if (coverCalculator == null || accuracyData == null || !HasValidAccuracyData(accuracyData))
+        {
+            return false;
+        }
+
+        CoverResult coverResult = coverCalculator.Calculate(
+            attackerPosition,
+            targetPosition,
+            accuracyData.LowCoverHitPenalty,
+            fullEffectMaximumAngle,
+            flankMinimumAngle);
+        int finalHitChance = Mathf.Clamp(
+            accuracyData.BaseHitChance + coverResult.HitChanceModifier,
+            accuracyData.MinimumHitChance,
+            accuracyData.MaximumHitChance);
+
+        preview = new AttackPreviewResult(accuracyData.BaseHitChance, finalHitChance, coverResult);
+        return true;
+    }
+
+    /// <summary>
     /// 엄폐 계산에 필요한 GridManager 참조가 연결되어 있는지 확인한다.
     /// </summary>
     public bool HasValidReference()
@@ -183,5 +213,16 @@ public sealed class AttackResolutionCoordinator : MonoBehaviour, IActionLogicEve
         }
 
         return true;
+    }
+
+    /// <summary>
+    /// 미리보기에 사용할 유닛별 명중률 데이터가 유효한지 확인한다.
+    /// </summary>
+    private static bool HasValidAccuracyData(RangedAttackAccuracyData accuracyData)
+    {
+        return accuracyData.BaseHitChance >= 0 && accuracyData.BaseHitChance <= 100 &&
+               accuracyData.LowCoverHitPenalty >= 0 && accuracyData.LowCoverHitPenalty <= 100 &&
+               accuracyData.MinimumHitChance >= 0 && accuracyData.MaximumHitChance <= 100 &&
+               accuracyData.MinimumHitChance <= accuracyData.MaximumHitChance;
     }
 }

@@ -1,3 +1,4 @@
+using System;
 using UnityEngine;
 
 /// <summary>
@@ -28,6 +29,9 @@ public class PlayerSwordState : MonoBehaviour
     public GridPosition CurrentPosition => isRecalled ? playerContext.GridActor.GridPosition : currentPosition;
     public bool IsRecalled => isRecalled;
 
+    // 검의 배치 위치나 회수 상태가 바뀔 때 현재 위치와 회수 여부를 전달한다.
+    public event Action<GridPosition, bool> SwordStateChanged;
+
     /// <summary>
     /// 검 위치 상태에 필요한 참조를 확인하고 초기 위치를 정한다.
     /// </summary>
@@ -50,6 +54,7 @@ public class PlayerSwordState : MonoBehaviour
     {
         currentPosition = position;
         isRecalled = false;
+        SwordStateChanged?.Invoke(CurrentPosition, isRecalled);
 
         if (logPositionChanged)
         {
@@ -64,6 +69,7 @@ public class PlayerSwordState : MonoBehaviour
     {
         currentPosition = playerContext.GridActor.GridPosition;
         isRecalled = true;
+        SwordStateChanged?.Invoke(CurrentPosition, isRecalled);
 
         if (logPositionChanged)
         {

@@ -1,4 +1,5 @@
 using UnityEngine;
+using UnityEngine.EventSystems;
 using UnityEngine.InputSystem;
 
 /// <summary>
@@ -110,6 +111,7 @@ public class PlayerInputReader : MonoBehaviour
 
         ConfirmPressedThisFrame = confirmByLeftClick &&
             Mouse.current != null &&
+            (EventSystem.current == null || !EventSystem.current.IsPointerOverGameObject()) &&
             Mouse.current.leftButton.wasPressedThisFrame;
 
         bool escapeCanceled = cancelByEscape &&

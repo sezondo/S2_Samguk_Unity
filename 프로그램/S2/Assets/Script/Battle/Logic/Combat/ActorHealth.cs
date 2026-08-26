@@ -1,3 +1,4 @@
+using System;
 using UnityEngine;
 
 /// <summary>
@@ -19,6 +20,9 @@ public class ActorHealth : MonoBehaviour, IDamageable
     public int MaxHitPoint => maxHitPoint;
     public int CurrentHitPoint => currentHitPoint;
     public bool IsDead => currentHitPoint <= 0;
+
+    // HP가 바뀔 때 현재 HP와 최대 HP를 전달한다.
+    public event Action<int, int> HealthChanged;
 
     /// <summary>
     /// 인스펙터에서 HP 값이 잘못 들어가지 않게 보정한다.
@@ -55,6 +59,7 @@ public class ActorHealth : MonoBehaviour, IDamageable
 
         currentHitPoint = Mathf.Max(0, currentHitPoint - damage);
         DamageResult result = new(true, damage, hitPointBefore, currentHitPoint, wasDeadBefore, IsDead);
+        HealthChanged?.Invoke(currentHitPoint, maxHitPoint);
 
         if (logDamage)
         {

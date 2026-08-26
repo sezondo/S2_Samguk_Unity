@@ -10,6 +10,8 @@ public class ControllableUnitData : ScriptableObject
     [Header("Identity")]
     // 디버그와 UI에서 사용할 전술 유닛 표시 이름이다.
     [SerializeField] private string displayName = "전술 유닛";
+    // 전투 HUD의 유닛 카드에 표시할 캐릭터 초상화다.
+    [SerializeField] private Sprite portrait;
     // 이 데이터의 유닛이 반드시 갖춰야 하는 행동 능력 조합이다.
     [SerializeField] private UnitAbilityType requiredAbilities =
         UnitAbilityType.Move |
@@ -77,6 +79,7 @@ public class ControllableUnitData : ScriptableObject
     [SerializeField] private int maxGunAmmo = 3;
 
     public string DisplayName => displayName;
+    public Sprite Portrait => portrait;
     public UnitAbilityType RequiredAbilities => requiredAbilities;
     public bool DefeatOnDeath => defeatOnDeath;
     public int VisionRange => visionRange;

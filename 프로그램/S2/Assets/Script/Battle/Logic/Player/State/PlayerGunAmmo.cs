@@ -1,3 +1,4 @@
+using System;
 using UnityEngine;
 
 /// <summary>
@@ -22,6 +23,9 @@ public class PlayerGunAmmo : MonoBehaviour
 
     public int CurrentAmmo => currentAmmo;
     public int MaxAmmo => playerContext.UnitData.MaxGunAmmo;
+
+    // 총알 수가 바뀔 때 현재 총알과 최대 총알을 전달한다.
+    public event Action<int, int> AmmoChanged;
 
     /// <summary>
     /// 총알 상태에 필요한 참조와 데이터를 확인하고 시작 총알을 세팅한다.
@@ -71,6 +75,7 @@ public class PlayerGunAmmo : MonoBehaviour
         }
 
         currentAmmo -= amount;
+        AmmoChanged?.Invoke(currentAmmo, MaxAmmo);
         if (logAmmo)
         {
             Debug.Log($"{nameof(PlayerGunAmmo)}: 총알 {amount}발을 소비했습니다. 남은 총알: {currentAmmo}/{MaxAmmo}", this);
@@ -85,6 +90,7 @@ public class PlayerGunAmmo : MonoBehaviour
     public void RefillToMax()
     {
         currentAmmo = MaxAmmo;
+        AmmoChanged?.Invoke(currentAmmo, MaxAmmo);
         if (logAmmo)
         {
             Debug.Log($"{nameof(PlayerGunAmmo)}: 총알을 최대치로 보충했습니다. 현재 총알: {currentAmmo}/{MaxAmmo}", this);
