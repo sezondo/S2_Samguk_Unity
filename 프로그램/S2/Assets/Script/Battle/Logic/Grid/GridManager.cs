@@ -154,6 +154,32 @@ public class GridManager : MonoBehaviour
         return IsInside(position) && HasTileAt(lowObstacleLogicTilemap, position);
     }
 
+    /// <summary>보드 안의 지정한 칸에 벽 논리 타일이 있는지 확인한다.</summary>
+    public bool IsWall(GridPosition position)
+    {
+        return IsInside(position) && HasTileAt(wallLogicTilemap, position);
+    }
+
+    /// <summary>보드 안의 기준 칸에서 상하좌우 한 칸에 벽이 있는지 확인한다.</summary>
+    public bool HasAdjacentWall(GridPosition position)
+    {
+        return IsInside(position) &&
+               (IsWall(position + GridPosition.Up) ||
+                IsWall(position + GridPosition.Down) ||
+                IsWall(position + GridPosition.Left) ||
+                IsWall(position + GridPosition.Right));
+    }
+
+    /// <summary>보드 안의 기준 칸에서 상하좌우 한 칸에 낮은 엄폐물이 있는지 확인한다.</summary>
+    public bool HasAdjacentLowObstacle(GridPosition position)
+    {
+        return IsInside(position) &&
+               (IsLowObstacle(position + GridPosition.Up) ||
+                IsLowObstacle(position + GridPosition.Down) ||
+                IsLowObstacle(position + GridPosition.Left) ||
+                IsLowObstacle(position + GridPosition.Right));
+    }
+
     /// <summary>
     /// 지정한 칸이 다른 GridActor에게 점유되어 있는지 확인한다.
     /// </summary>

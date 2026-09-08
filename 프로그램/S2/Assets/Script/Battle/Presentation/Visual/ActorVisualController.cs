@@ -7,6 +7,10 @@ using UnityEngine.Serialization;
 /// </summary>
 public class ActorVisualController : MonoBehaviour
 {
+    // 대기 재생 요청을 낮은 엄폐 자세로 바꿀지 나타내며, 벽 엄폐보다 우선한다.
+    private bool useLowCoverIdle;
+    // 낮은 엄폐물이 없고 벽이 인접하면 벽 엄폐 대기를 사용한다.
+    private bool useWallCoverIdle;
     [Header("Visual Components")]
     // Actor를 화면에 표시하는 스프라이트 렌더러다.
     [SerializeField] private SpriteRenderer targetRenderer;
@@ -40,6 +44,40 @@ public class ActorVisualController : MonoBehaviour
     public string CurrentAnimationStateName => currentAnimationStateName;
     public bool IsFacingRight { get; private set; }
     public float VisionAlpha => visionAlpha;
+
+    /// <summary>낮은 엄폐·벽 엄폐 여부를 저장하고 현재 대기 중일 때만 자세를 즉시 갱신한다.</summary>
+    public void SetCoverIdle(bool isNearLowCover, bool isNearWallCover)
+    {
+        useLowCoverIdle = isNearLowCover;
+        useWallCoverIdle = isNearWallCover;
+        AnimatorStateInfo state = animator.GetCurrentAnimatorStateInfo(0);
+        if (state.IsName("Idle") || state.IsName("LowCoverIdle") || state.IsName("WallCoverIdle"))
+        {
+            TryPlayAnimationState("Idle", 0f);
+            // 한 장짜리 대기 자세는 Animator의 다음 평가를 기다리지 않고 즉시 표시한다.
+            animator.Update(0f);
+        }
+    }
+
+    /// <summary>일반 대기와 낮은 엄폐·벽 엄폐 대기 상태가 연결되어 있는지 확인한다.</summary>
+    public bool HasValidCoverIdleAnimation()
+    {
+        if (!HasValidAnimationReference())
+        {
+            return false;
+        }
+
+        if (animator.runtimeAnimatorController != null &&
+            animator.HasState(0, Animator.StringToHash("Base Layer.Idle")) &&
+            animator.HasState(0, Animator.StringToHash("Base Layer.LowCoverIdle")) &&
+            animator.HasState(0, Animator.StringToHash("Base Layer.WallCoverIdle")))
+        {
+            return true;
+        }
+
+        Debug.LogError($"{nameof(ActorVisualController)} on {name}에는 Idle·LowCoverIdle·WallCoverIdle 상태가 있는 Animator Controller가 필요합니다.", this);
+        return false;
+    }
 
     /// <summary>
     /// 시작 시 SpriteRenderer의 현재 반전값을 화면상 바라보는 방향으로 변환한다.
@@ -165,7 +203,7 @@ public class ActorVisualController : MonoBehaviour
     }
 
     /// <summary>
-    /// Animator에 지정한 상태 재생을 요청한다. 같은 상태를 유지할 때 재시작 여부를 선택할 수 있다.
+    /// Animator 상태 재생을 요청한다. Idle 요청은 엄폐 여부에 맞게 바꾸고 같은 상태의 재시작 여부를 적용한다.
     /// </summary>
     public bool TryPlayAnimationState(string stateName, float crossFadeDuration, bool restartIfSameState = true)
     {
@@ -179,6 +217,15 @@ public class ActorVisualController : MonoBehaviour
         {
             Debug.LogError($"{nameof(ActorVisualController)} on {name}에는 재생할 Animator 상태 이름이 필요합니다.", this);
             return false;
+        }
+
+        if (stateName == "Idle" && useLowCoverIdle)
+        {
+            stateName = "LowCoverIdle";
+        }
+        else if (stateName == "Idle" && useWallCoverIdle)
+        {
+            stateName = "WallCoverIdle";
         }
 
         if (!restartIfSameState && currentAnimationStateName == stateName)
