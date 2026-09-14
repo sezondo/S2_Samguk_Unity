@@ -1,0 +1,61 @@
+{
+  "schemaVersion": 6,
+  "size": [
+    15,
+    15
+  ],
+  "importedThroughActualMapMakerNormalize": true,
+  "allWalkableCellsReachable": true,
+  "floor": 109,
+  "wall": 113,
+  "cover": 3,
+  "groups": [
+    {
+      "id": "외곽",
+      "title": "맵 바깥으로 이어지는 건물·담장",
+      "cells": 55
+    },
+    {
+      "id": "A",
+      "title": "ㄴ자 정비소",
+      "cells": 16
+    },
+    {
+      "id": "B",
+      "title": "길쭉한 창고",
+      "cells": 8
+    },
+    {
+      "id": "C",
+      "title": "원통형 저장 시설",
+      "cells": 21
+    },
+    {
+      "id": "D",
+      "title": "ㄱ자 주거·상점 건물",
+      "cells": 11
+    },
+    {
+      "id": "E",
+      "title": "소형 설비실",
+      "cells": 2
+    }
+  ],
+  "routes": [
+    {
+      "name": "정면 접근 후보",
+      "cells": 18
+    },
+    {
+      "name": "서쪽 골목 우회 후보",
+      "cells": 30
+    },
+    {
+      "name": "해킹 후 목표 이동",
+      "cells": 8
+    }
+  ],
+  "unitySceneChanged": false,
+  "artCreated": false,
+  "hackLogicImplemented": false
+}

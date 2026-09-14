@@ -1,7 +1,7 @@
 using UnityEngine;
 
 /// <summary>
-/// 담당 보안문의 열림 연출 이벤트를 받아 문 비주얼을 숨기고 큐 완료 신호를 보낸다.
+/// 담당 보안문의 열림 연출 이벤트를 받아 닫힌 비주얼을 숨기고 설정된 열린 비주얼을 표시한다.
 /// 문의 그리드 점유와 개방 상태에는 관여하지 않는다.
 /// </summary>
 public class SecurityDoorPresenter : MonoBehaviour, IPresentationEventHandler
@@ -11,6 +11,12 @@ public class SecurityDoorPresenter : MonoBehaviour, IPresentationEventHandler
     [SerializeField] private SecurityDoorController targetDoor;
     // 닫힌 문 스프라이트를 포함하며 개방 시 숨길 비주얼 오브젝트다.
     [SerializeField] private GameObject doorVisual;
+
+    [Header("Open Visual")]
+    // true면 문 개방 시 별도의 열린 비주얼을 표시한다. false는 기존 비주얼 숨김 방식이다.
+    [SerializeField] private bool useOpenDoorVisual;
+    // 열린 문과 남아 있는 기둥·울타리를 표시할 오브젝트다. 열린 비주얼 사용 시 반드시 연결한다.
+    [SerializeField] private GameObject openDoorVisual;
 
     [Header("Debug")]
     // true면 문 열림 연출 처리 결과를 Unity 콘솔에 출력한다.
@@ -117,14 +123,24 @@ public class SecurityDoorPresenter : MonoBehaviour, IPresentationEventHandler
             return false;
         }
 
+        if (useOpenDoorVisual && (openDoorVisual == null || openDoorVisual == doorVisual))
+        {
+            Debug.LogError($"{nameof(SecurityDoorPresenter)} on {name}에는 닫힌 문과 구분되는 열린 문 비주얼 참조가 필요합니다.", this);
+            return false;
+        }
+
         return true;
     }
 
     /// <summary>
-    /// 현재 문의 논리 상태에 맞춰 닫힌 문 비주얼 활성 상태를 적용한다.
+    /// 현재 문의 논리 상태에 맞춰 닫힌 비주얼과 선택적으로 사용하는 열린 비주얼을 전환한다.
     /// </summary>
     private void ApplyCurrentDoorState()
     {
         doorVisual.SetActive(!targetDoor.IsOpen);
+        if (useOpenDoorVisual)
+        {
+            openDoorVisual.SetActive(targetDoor.IsOpen);
+        }
     }
 }
