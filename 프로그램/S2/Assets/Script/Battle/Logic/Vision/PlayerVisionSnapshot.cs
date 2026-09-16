@@ -9,21 +9,44 @@ public sealed class PlayerVisionSnapshot
     private readonly HashSet<GridPosition> visiblePositions;
     private readonly HashSet<GridPosition> exploredPositions;
     private readonly HashSet<GridActor> visibleEnemyActors;
+    // 연출 시점보다 먼저 바뀔 수 있는 시야 원점과 벽·닫힌 문을 독립적으로 보존한다.
+    private readonly HashSet<GridPosition> sightBlockers;
+    // 외부에서 내용을 바꿀 수 없는 원형 시야 원점 목록이다.
+    public IReadOnlyList<PlayerVisionSource> Sources { get; }
 
     public IReadOnlyCollection<GridPosition> VisiblePositions => visiblePositions;
     public IReadOnlyCollection<GridPosition> ExploredPositions => exploredPositions;
 
     /// <summary>
-    /// 지정한 현재 시야와 탐색 이력을 복사해 독립된 스냅샷을 만든다.
+    /// 현재 시야, 탐색 이력, 적 표시와 광원·차단물 배치를 복사해 독립된 스냅샷을 만든다.
     /// </summary>
     public PlayerVisionSnapshot(
         IEnumerable<GridPosition> visiblePositions,
         IEnumerable<GridPosition> exploredPositions,
-        IEnumerable<GridActor> visibleEnemyActors)
+        IEnumerable<GridActor> visibleEnemyActors,
+        IEnumerable<PlayerVisionSource> sources,
+        IEnumerable<GridPosition> sightBlockers)
     {
         this.visiblePositions = new HashSet<GridPosition>(visiblePositions);
         this.exploredPositions = new HashSet<GridPosition>(exploredPositions);
         this.visibleEnemyActors = new HashSet<GridActor>(visibleEnemyActors);
+        Sources = new List<PlayerVisionSource>(sources).AsReadOnly();
+        this.sightBlockers = new HashSet<GridPosition>(sightBlockers);
+    }
+
+    /// <summary>이 스냅샷이 만들어진 시점에 해당 칸이 시야를 차단했는지 확인한다.</summary>
+    public bool IsSightBlocked(GridPosition position) => sightBlockers.Contains(position);
+
+    /// <summary>논리 칸 결과가 같아도 광원 위치나 벽이 달라졌는지 검사한다.</summary>
+    public bool HasSameGeometry(IReadOnlyList<PlayerVisionSource> sources, HashSet<GridPosition> blockers)
+    {
+        if (Sources.Count != sources.Count || !sightBlockers.SetEquals(blockers)) return false;
+        for (int i = 0; i < Sources.Count; i++)
+        {
+            if (Sources[i].Origin != sources[i].Origin || Sources[i].Radius != sources[i].Radius ||
+                Sources[i].GuaranteeAdjacent != sources[i].GuaranteeAdjacent) return false;
+        }
+        return true;
     }
 
     /// <summary>

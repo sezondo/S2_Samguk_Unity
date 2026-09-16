@@ -27,6 +27,10 @@ public class PlayerVisionManager : MonoBehaviour, IActionLogicEventHandler
     private readonly HashSet<GridPosition> nextVisiblePositions = new();
     // 시야 스냅샷 생성 시점에 실제로 보이는 적 Actor를 담는 재사용 버퍼다.
     private readonly HashSet<GridActor> visibleEnemyActors = new();
+    // 이번 논리 시점의 시야 원점 목록이다. 연출이 최신 유닛 위치를 잘못 읽지 않게 스냅샷에 복사한다.
+    private readonly List<PlayerVisionSource> visionSources = new();
+    // 벽과 닫힌 문 차단 칸을 저장하는 스냅샷 작성용 버퍼다.
+    private readonly HashSet<GridPosition> sightBlockers = new();
 
     public static PlayerVisionManager Instance { get; private set; }
     public PlayerVisionSnapshot CurrentSnapshot { get; private set; }
@@ -117,7 +121,7 @@ public class PlayerVisionManager : MonoBehaviour, IActionLogicEventHandler
     }
 
     /// <summary>
-    /// 현재 플레이어 유닛 위치와 시야 거리로 합산 시야를 다시 계산한다.
+    /// 현재 플레이어 유닛 위치와 시야 거리로 합산 시야를 다시 계산하고 광원·차단물도 함께 보존한다.
     /// 행동 문맥이 있으면 칸 단위 순서를 보존하도록 연출 큐에 스냅샷을 추가한다.
     /// </summary>
     public bool RefreshVision(ActionResolutionContext resolutionContext)
@@ -128,6 +132,7 @@ public class PlayerVisionManager : MonoBehaviour, IActionLogicEventHandler
         }
 
         nextVisiblePositions.Clear();
+        visionSources.Clear();
         IReadOnlyList<TacticalUnitContext> playerUnits = context.TacticalUnitRegistry.PlayerControllableUnits;
         for (int i = 0; i < playerUnits.Count; i++)
         {
@@ -150,13 +155,16 @@ public class PlayerVisionManager : MonoBehaviour, IActionLogicEventHandler
         int previousExploredCount = exploredPositions.Count;
         exploredPositions.UnionWith(visiblePositions);
         bool exploredChanged = previousExploredCount != exploredPositions.Count;
-        if (!visibleChanged && !exploredChanged && CurrentSnapshot != null)
+        CaptureSightBlockers();
+        if (!visibleChanged && !exploredChanged && CurrentSnapshot != null &&
+            CurrentSnapshot.HasSameGeometry(visionSources, sightBlockers))
         {
             return true;
         }
 
         CaptureVisibleEnemyActors();
-        CurrentSnapshot = new PlayerVisionSnapshot(visiblePositions, exploredPositions, visibleEnemyActors);
+        CurrentSnapshot = new PlayerVisionSnapshot(visiblePositions, exploredPositions, visibleEnemyActors,
+            visionSources, sightBlockers);
         if (resolutionContext != null)
         {
             resolutionContext.EnqueuePresentation(PresentationEvent.PlayerVisionChanged(CurrentSnapshot, "플레이어 시야 갱신 연출"));
@@ -223,10 +231,11 @@ public class PlayerVisionManager : MonoBehaviour, IActionLogicEventHandler
     }
 
     /// <summary>
-    /// 지정한 원점의 원형 시야를 합산하고 플레이어 근접 시야 여부에 따라 주변 8칸의 가림을 무시한다.
+    /// 연속 안개용 원점을 기록하고 원형 논리 시야를 합산한다. 기존 플레이어 주변 8칸 예외를 유지한다.
     /// </summary>
     private void AddVisionArea(GridPosition origin, int visionRange, bool guaranteeAdjacentVision)
     {
+        visionSources.Add(new PlayerVisionSource(origin, visionRange, guaranteeAdjacentVision));
         GridManager gridManager = context.GridManager;
         int squaredRange = visionRange * visionRange;
         for (int xOffset = -visionRange; xOffset <= visionRange; xOffset++)
@@ -251,6 +260,19 @@ public class PlayerVisionManager : MonoBehaviour, IActionLogicEventHandler
                     nextVisiblePositions.Add(target);
                 }
             }
+        }
+    }
+
+    /// <summary>현재 보드의 벽과 동적 차단물만 복사한다. 낮은 장애물은 기존처럼 시야를 막지 않는다.</summary>
+    private void CaptureSightBlockers()
+    {
+        sightBlockers.Clear();
+        GridManager grid = context.GridManager;
+        for (int y = 0; y < grid.Height; y++)
+        for (int x = 0; x < grid.Width; x++)
+        {
+            GridPosition position = new(x, y);
+            if (grid.IsSightBlocked(position)) sightBlockers.Add(position);
         }
     }
 

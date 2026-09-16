@@ -6,7 +6,7 @@ using UnityEngine.Tilemaps;
 
 /// <summary>
 /// 격자 보드의 크기, 좌표 변환, 고정 이동불가 상태, 칸 점유와 동적 시야 차단 상태를 관리한다.
-/// 벽과 낮은 장애물은 모두 이동을 막지만 벽만 시야를 막는다.
+/// 벽·낮은 장애물·경계는 이동을 막고 벽·경계는 시야를 막는다. 경계는 엄폐에 포함하지 않는다.
 /// </summary>
 public class GridManager : MonoBehaviour
 {
@@ -26,6 +26,8 @@ public class GridManager : MonoBehaviour
     [SerializeField] private Tilemap wallLogicTilemap;
     // 이동은 차단하지만 시야는 통과시키는 낮은 장애물 칸을 제공한다. 낮은 장애물이 없는 씬은 비워둘 수 있다.
     [SerializeField] private Tilemap lowObstacleLogicTilemap;
+    // 이동·시야만 막고 엄폐 효과나 자세를 제공하지 않는 경계다. 경계를 사용하지 않는 씬은 비워둘 수 있다.
+    [SerializeField] private Tilemap boundaryLogicTilemap;
 
     [Header("Gizmos")]
     // Scene 뷰에서 보드 선과 점유 칸을 그릴지 정한다.
@@ -55,6 +57,8 @@ public class GridManager : MonoBehaviour
     public Tilemap WallLogicTilemap => wallLogicTilemap;
     // 이동만 차단하는 낮은 장애물 논리 타일맵이다.
     public Tilemap LowObstacleLogicTilemap => lowObstacleLogicTilemap;
+    // 엄폐 판정에서 제외되는 선택적 맵 경계 타일맵이다.
+    public Tilemap BoundaryLogicTilemap => boundaryLogicTilemap;
 
     // 동적 시야 차단물이 등록되거나 해제될 때 발생한다.
     public event Action SightBlockingChanged;
@@ -189,11 +193,11 @@ public class GridManager : MonoBehaviour
     }
 
     /// <summary>
-    /// 지정한 칸이 벽 타일 또는 등록된 동적 구조물에 의해 시야가 막힌 칸인지 확인한다.
+    /// 지정한 칸이 벽·경계 타일 또는 등록된 동적 구조물에 의해 시야가 막힌 칸인지 확인한다.
     /// </summary>
     public bool IsSightBlocked(GridPosition position)
     {
-        if (HasTileAt(wallLogicTilemap, position))
+        if (HasTileAt(wallLogicTilemap, position) || HasTileAt(boundaryLogicTilemap, position))
         {
             return true;
         }
@@ -405,7 +409,7 @@ public class GridManager : MonoBehaviour
     }
 
     /// <summary>
-    /// 보드 범위 안의 모든 칸 상태를 다시 만들고 벽·낮은 장애물 타일을 이동불가 상태로 반영한다.
+    /// 보드의 칸 상태를 다시 만들고 벽·낮은 장애물·경계 타일을 이동불가 상태로 반영한다.
     /// </summary>
     private void RebuildCellStates()
     {
@@ -431,7 +435,8 @@ public class GridManager : MonoBehaviour
                 GridCellState cellState = new(position);
 
                 if (HasTileAt(wallLogicTilemap, position) ||
-                    HasTileAt(lowObstacleLogicTilemap, position))
+                    HasTileAt(lowObstacleLogicTilemap, position) ||
+                    HasTileAt(boundaryLogicTilemap, position))
                 {
                     cellState.SetBlocked(true);
                 }

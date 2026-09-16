@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using UnityEngine;
 
 /// <summary>
-/// 플레이어 시야 스냅샷을 Fog 칸과 적 Visual에 적용하고 공격자의 임시 노출을 처리한다.
+/// 플레이어 시야 스냅샷을 연속 안개와 적 Visual에 적용하고 공격자의 임시 노출을 처리한다.
 /// 시야 판정이나 대상 선택 규칙은 바꾸지 않는다.
 /// </summary>
 public class PlayerVisionPresenter : MonoBehaviour, IPresentationEventHandler
@@ -15,7 +15,7 @@ public class PlayerVisionPresenter : MonoBehaviour, IPresentationEventHandler
     [Header("Fog Colors")]
     // 아직 한 번도 탐색하지 않은 칸을 가리는 색이다.
     [SerializeField] private Color unexploredColor = new(0f, 0f, 0f, 1f);
-    // 탐색했지만 현재 시야 밖인 칸을 어둡게 표시하는 색이다.
+    // 탐색했지만 현재 시야 밖인 영역의 불투명도다. 기존 직렬화 호환을 위해 Color의 알파를 사용한다.
     [SerializeField] private Color exploredColor = new(0f, 0f, 0f, 0.65f);
     // 현재 시야 안의 Fog 색이다. 기본값은 완전 투명이다.
     [SerializeField] private Color visibleColor = new(0f, 0f, 0f, 0f);
@@ -36,14 +36,30 @@ public class PlayerVisionPresenter : MonoBehaviour, IPresentationEventHandler
     // true면 Fog와 적 표시 갱신 결과를 Unity 콘솔에 출력한다.
     [SerializeField] private bool logVisionPresentation;
 
-    // 좌표별 런타임 Fog SpriteRenderer다.
-    private readonly Dictionary<GridPosition, SpriteRenderer> fogRendererByPosition = new();
+    [Header("Soft Fog")]
+    // 한 칸을 나누어 시선을 계산하는 표본 수다.
+    [SerializeField, Range(4, 24)] private int fogSamplesPerCell = 12;
+    // 원과 벽 그림자 가장자리를 흐리는 월드 거리다.
+    [SerializeField, Min(0.05f)] private float fogEdgeSoftness = 0.35f;
+    // 탐색 영역의 회색빛이다. 불투명도는 기존 exploredColor 값을 사용한다.
+    [SerializeField] private Color exploredGrayTint = new(0.16f, 0.17f, 0.18f, 1f);
+    // 연속 시야와 누적 탐색을 계산하는 마스크다.
+    private PlayerVisionFogMask fogMask;
+    // 현재 표시, 전환 시작 및 목표 픽셀 버퍼다.
+    private Color32[] fogPixels, startFogPixels, targetFogPixels;
+    // 이 컴포넌트가 소유하는 런타임 안개 루트다.
+    private GameObject runtimeFogRoot;
+    // 외곽 가림용 공용 리소스다.
+    private Sprite outsideFogSprite;
+    private Texture2D outsideFogTexture;
+    // 디버그 공개를 적용할 외곽 렌더러 목록이다.
+    private readonly List<SpriteRenderer> outsideFogRenderers = new();
     // 공격 연출 때문에 현재 시야와 무관하게 잠시 보여 주는 Actor 집합이다.
     private readonly HashSet<GridActor> forcedVisibleActors = new();
     // 현재 화면 연출이 알고 있는 적 Actor별 표시 상태다. 적 이동이 끝날 때 스냅샷 이후 상태를 이어받는다.
     private readonly Dictionary<GridActor, bool> presentedEnemyVisibility = new();
 
-    // 런타임 Fog 사각형에 사용하는 공용 Sprite와 Texture다.
+    // 연속 안개 마스크를 표시하는 Sprite와 Texture다.
     private Sprite fogSprite;
     private Texture2D fogTexture;
     // 현재 화면에 적용된 플레이어 시야 스냅샷이다.
@@ -84,13 +100,16 @@ public class PlayerVisionPresenter : MonoBehaviour, IPresentationEventHandler
     }
 
     /// <summary>
-    /// 시야 매니저, Actor 등록소와 연출 큐 구독을 시작한다.
+    /// 시야 매니저, Actor 등록소와 연출 큐 구독을 시작하고 재활성화 시 현재 스냅샷을 복원한다.
     /// </summary>
     private void OnEnable()
     {
+        if (runtimeFogRoot != null) runtimeFogRoot.SetActive(true);
         TrySubscribeVisionManager();
         SubscribeActorRegistry();
         TryRegisterQueue(false);
+        if (fogMask != null && context.PlayerVisionManager.CurrentSnapshot != null)
+            ApplySnapshotImmediately(context.PlayerVisionManager.CurrentSnapshot);
     }
 
     /// <summary>
@@ -135,7 +154,9 @@ public class PlayerVisionPresenter : MonoBehaviour, IPresentationEventHandler
         }
 
         ClearForcedActorOverrides();
+        if (presentationCoroutine != null) StopCoroutine(presentationCoroutine);
         CompleteActivePresentation();
+        if (runtimeFogRoot != null) runtimeFogRoot.SetActive(false);
     }
 
     /// <summary>
@@ -143,6 +164,9 @@ public class PlayerVisionPresenter : MonoBehaviour, IPresentationEventHandler
     /// </summary>
     private void OnDestroy()
     {
+        if (runtimeFogRoot != null) Destroy(runtimeFogRoot);
+        if (outsideFogSprite != null) Destroy(outsideFogSprite);
+        if (outsideFogTexture != null) Destroy(outsideFogTexture);
         if (fogSprite != null)
         {
             Destroy(fogSprite);
@@ -343,10 +367,8 @@ public class PlayerVisionPresenter : MonoBehaviour, IPresentationEventHandler
 
         presentedSnapshot = snapshot;
         SynchronizePresentedEnemyVisibility(snapshot);
-        foreach (KeyValuePair<GridPosition, SpriteRenderer> pair in fogRendererByPosition)
-        {
-            pair.Value.color = GetFogColor(snapshot.GetState(pair.Key));
-        }
+        PrepareFogTarget(snapshot);
+        ApplyFogProgress(1f);
 
         ApplyAllEnemyVisibilityImmediately();
     }
@@ -368,24 +390,20 @@ public class PlayerVisionPresenter : MonoBehaviour, IPresentationEventHandler
             return;
         }
 
-        foreach (KeyValuePair<GridPosition, SpriteRenderer> pair in fogRendererByPosition)
-        {
-            pair.Value.color = GetFogColor(GridVisibilityState.Unexplored);
-        }
+        System.Array.Fill(fogPixels, (Color32)GetFogColor(GridVisibilityState.Unexplored));
+        UploadFogPixels();
+        UpdateOutsideFog();
 
         ApplyAllEnemyVisibilityImmediately();
     }
 
     /// <summary>
-    /// 모든 Fog 칸과 적 Visual을 현재 상태까지 동시에 페이드한다.
+    /// 연속 안개 마스크와 적 Visual을 현재 상태까지 동시에 페이드한다.
     /// </summary>
     private IEnumerator FadeToCurrentState()
     {
-        Dictionary<GridPosition, Color> startFogColors = new(fogRendererByPosition.Count);
-        foreach (KeyValuePair<GridPosition, SpriteRenderer> pair in fogRendererByPosition)
-        {
-            startFogColors[pair.Key] = pair.Value.color;
-        }
+        PrepareFogTarget(presentedSnapshot);
+        System.Array.Copy(fogPixels, startFogPixels, fogPixels.Length);
 
         List<(ActorVisualController visual, float startAlpha, float targetAlpha)> enemyTransitions = BuildEnemyTransitions();
         float elapsed = 0f;
@@ -393,21 +411,14 @@ public class PlayerVisionPresenter : MonoBehaviour, IPresentationEventHandler
         while (elapsed < duration)
         {
             float t = duration <= 0f ? 1f : Mathf.Clamp01(elapsed / duration);
-            foreach (KeyValuePair<GridPosition, SpriteRenderer> pair in fogRendererByPosition)
-            {
-                Color targetColor = GetFogColor(presentedSnapshot.GetState(pair.Key));
-                pair.Value.color = Color.Lerp(startFogColors[pair.Key], targetColor, t);
-            }
+            ApplyFogProgress(t);
 
             ApplyEnemyTransitionProgress(enemyTransitions, t);
             elapsed += Time.deltaTime;
             yield return null;
         }
 
-        foreach (KeyValuePair<GridPosition, SpriteRenderer> pair in fogRendererByPosition)
-        {
-            pair.Value.color = GetFogColor(presentedSnapshot.GetState(pair.Key));
-        }
+        ApplyFogProgress(1f);
 
         ApplyEnemyTransitionProgress(enemyTransitions, 1f);
     }
@@ -539,46 +550,98 @@ public class PlayerVisionPresenter : MonoBehaviour, IPresentationEventHandler
         return state switch
         {
             GridVisibilityState.Visible => visibleColor,
-            GridVisibilityState.Explored => exploredColor,
+            GridVisibilityState.Explored => new Color(exploredGrayTint.r, exploredGrayTint.g, exploredGrayTint.b, exploredColor.a),
             _ => unexploredColor,
         };
     }
 
-    /// <summary>
-    /// 보드의 모든 칸을 덮는 런타임 사각형 Fog SpriteRenderer를 만든다.
-    /// </summary>
+    /// <summary>기존 FogRoot 아래에 연속 텍스처와 보드 밖 미탐색 가림을 런타임에 구성한다.</summary>
     private void BuildFogRenderers()
     {
-        fogTexture = new Texture2D(1, 1, TextureFormat.RGBA32, false)
+        GridManager grid = context.GridManager;
+        fogMask = new PlayerVisionFogMask(grid.Width, grid.Height, fogSamplesPerCell, grid.CellSize, fogEdgeSoftness);
+        fogPixels = new Color32[fogMask.Width * fogMask.Height];
+        startFogPixels = new Color32[fogPixels.Length];
+        targetFogPixels = new Color32[fogPixels.Length];
+        System.Array.Fill(fogPixels, (Color32)GetFogColor(GridVisibilityState.Unexplored));
+        fogTexture = new Texture2D(fogMask.Width, fogMask.Height, TextureFormat.RGBA32, false)
         {
-            name = "Player Vision Fog Texture",
-            filterMode = FilterMode.Point,
-            wrapMode = TextureWrapMode.Clamp,
+            name = "Player Vision Soft Fog", filterMode = FilterMode.Bilinear, wrapMode = TextureWrapMode.Clamp,
         };
-        fogTexture.SetPixel(0, 0, Color.white);
-        fogTexture.Apply();
-        fogSprite = Sprite.Create(fogTexture, new Rect(0f, 0f, 1f, 1f), new Vector2(0.5f, 0.5f), 1f);
-        fogSprite.name = "Player Vision Fog Sprite";
+        UploadFogPixels();
+        fogSprite = Sprite.Create(fogTexture, new Rect(0, 0, fogMask.Width, fogMask.Height),
+            new Vector2(0.5f, 0.5f), fogSamplesPerCell / grid.CellSize, 0, SpriteMeshType.FullRect);
+        runtimeFogRoot = new GameObject("Player Vision Runtime Fog");
+        runtimeFogRoot.transform.SetParent(context.FogRoot, false);
+        Vector3 center = grid.GridToWorld(new GridPosition(0, 0)) +
+            new Vector3((grid.Width - 1) * grid.CellSize * 0.5f, (grid.Height - 1) * grid.CellSize * 0.5f, 0f);
+        CreateFogRenderer("Soft Fog", fogSprite, center, Vector3.one, Color.white);
 
-        GridManager gridManager = context.GridManager;
-        for (int x = 0; x < gridManager.Width; x++)
-        {
-            for (int y = 0; y < gridManager.Height; y++)
-            {
-                GridPosition position = new(x, y);
-                GameObject fogCell = new($"Fog {x},{y}");
-                fogCell.transform.SetParent(context.FogRoot, false);
-                fogCell.transform.position = gridManager.GridToWorld(position);
-                fogCell.transform.localScale = Vector3.one * gridManager.CellSize;
+        outsideFogTexture = new Texture2D(1, 1, TextureFormat.RGBA32, false);
+        outsideFogTexture.SetPixel(0, 0, Color.white);
+        outsideFogTexture.Apply();
+        outsideFogSprite = Sprite.Create(outsideFogTexture, new Rect(0, 0, 1, 1), Vector2.one * 0.5f, 1f);
+        float halfWidth = (grid.Width + PlayerVisionFogMask.Padding * 2) * grid.CellSize * 0.5f;
+        float halfHeight = (grid.Height + PlayerVisionFogMask.Padding * 2) * grid.CellSize * 0.5f;
+        // 카메라가 보드 밖으로 이동해도 지형이 노출되지 않도록 충분히 넓은 네 장으로 외곽을 덮는다.
+        const float extent = 10000f;
+        AddOutsideFog(center + Vector3.left * (halfWidth + extent * 0.5f), new Vector3(extent, extent * 2f, 1f));
+        AddOutsideFog(center + Vector3.right * (halfWidth + extent * 0.5f), new Vector3(extent, extent * 2f, 1f));
+        AddOutsideFog(center + Vector3.up * (halfHeight + extent * 0.5f), new Vector3(halfWidth * 2f, extent, 1f));
+        AddOutsideFog(center + Vector3.down * (halfHeight + extent * 0.5f), new Vector3(halfWidth * 2f, extent, 1f));
+    }
 
-                SpriteRenderer renderer = fogCell.AddComponent<SpriteRenderer>();
-                renderer.sprite = fogSprite;
-                renderer.color = GetFogColor(GridVisibilityState.Unexplored);
-                renderer.sortingLayerName = fogSortingLayerName;
-                renderer.sortingOrder = fogSortingOrder;
-                fogRendererByPosition[position] = renderer;
-            }
-        }
+    /// <summary>소유 루트 아래에 안개 렌더러를 만든다. 저장된 씬이나 Inspector 연결은 변경하지 않는다.</summary>
+    private SpriteRenderer CreateFogRenderer(string objectName, Sprite sprite, Vector3 position, Vector3 scale, Color color)
+    {
+        GameObject fog = new(objectName);
+        fog.transform.SetParent(runtimeFogRoot.transform, false);
+        fog.transform.position = position;
+        fog.transform.localScale = scale;
+        SpriteRenderer renderer = fog.AddComponent<SpriteRenderer>();
+        renderer.sprite = sprite;
+        renderer.color = color;
+        renderer.sortingLayerName = fogSortingLayerName;
+        renderer.sortingOrder = fogSortingOrder;
+        return renderer;
+    }
+
+    /// <summary>미탐색 바깥 영역 한 장을 만들고 디버그 공개 전환 목록에 등록한다.</summary>
+    private void AddOutsideFog(Vector3 position, Vector3 scale)
+    {
+        outsideFogRenderers.Add(CreateFogRenderer("Outside Fog", outsideFogSprite, position, scale,
+            GetFogColor(GridVisibilityState.Unexplored)));
+    }
+
+    /// <summary>스냅샷 원점과 벽만 사용해 목표 픽셀을 만든다. 디버그 공개는 탐색 이력을 늘리지 않는다.</summary>
+    private void PrepareFogTarget(PlayerVisionSnapshot snapshot)
+    {
+        Color remembered = new(exploredGrayTint.r, exploredGrayTint.g, exploredGrayTint.b, exploredColor.a);
+        fogMask.BuildColors(snapshot, unexploredColor, remembered, visibleColor, targetFogPixels);
+        if (revealAllForDebug) System.Array.Fill(targetFogPixels, (Color32)Color.clear);
+        UpdateOutsideFog();
+    }
+
+    /// <summary>현재 표시 상태에서 새 안개 상태까지 픽셀을 보간한다.</summary>
+    private void ApplyFogProgress(float progress)
+    {
+        for (int i = 0; i < fogPixels.Length; i++)
+            fogPixels[i] = Color32.Lerp(startFogPixels[i], targetFogPixels[i], progress);
+        UploadFogPixels();
+    }
+
+    /// <summary>재사용 픽셀 버퍼를 GPU 텍스처로 전달한다.</summary>
+    private void UploadFogPixels()
+    {
+        fogTexture.SetPixels32(fogPixels);
+        fogTexture.Apply(false, false);
+    }
+
+    /// <summary>보드 바깥 안개에도 현재 디버그 공개 설정을 반영한다.</summary>
+    private void UpdateOutsideFog()
+    {
+        foreach (SpriteRenderer renderer in outsideFogRenderers)
+            renderer.color = GetFogColor(GridVisibilityState.Unexplored);
     }
 
     /// <summary>
@@ -706,11 +769,24 @@ public class PlayerVisionPresenter : MonoBehaviour, IPresentationEventHandler
     }
 
     /// <summary>
-    /// Fog 색과 전환 시간이 사용할 수 있는 값인지 확인한다.
+    /// 안개 해상도, 월드 경계 폭, 색과 전환 시간이 사용할 수 있는 값인지 확인한다.
     /// </summary>
     public bool HasValidData()
     {
-        if (transitionDuration < 0f)
+        GridManager grid = context != null ? context.GridManager : null;
+        if (fogSamplesPerCell < 4 || fogSamplesPerCell > 24 ||
+            float.IsNaN(fogEdgeSoftness) || float.IsInfinity(fogEdgeSoftness) || fogEdgeSoftness <= 0f ||
+            grid == null || grid.Width <= 0 || grid.Height <= 0 || grid.CellSize <= 0f ||
+            float.IsNaN(grid.CellSize) || float.IsInfinity(grid.CellSize) || fogEdgeSoftness > grid.CellSize * 0.5f ||
+            (long)(grid.Width + 2) * fogSamplesPerCell > SystemInfo.maxTextureSize ||
+            (long)(grid.Height + 2) * fogSamplesPerCell > SystemInfo.maxTextureSize ||
+            (long)(grid.Width + 2) * (grid.Height + 2) * fogSamplesPerCell * fogSamplesPerCell > 4194304)
+        {
+            Debug.LogError($"{nameof(PlayerVisionPresenter)}: 안개 해상도는 칸당 4~24, 경계 폭은 0 초과~셀 크기의 절반이어야 합니다. 유효한 보드와 장치 제한 및 419만 픽셀 이하의 텍스처가 필요합니다.", this);
+            return false;
+        }
+
+        if (float.IsNaN(transitionDuration) || float.IsInfinity(transitionDuration) || transitionDuration < 0f)
         {
             Debug.LogError($"{nameof(PlayerVisionPresenter)} on {name}의 시야 전환 시간은 0 이상이어야 합니다.", this);
             return false;
