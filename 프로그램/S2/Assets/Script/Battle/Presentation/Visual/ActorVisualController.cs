@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.Serialization;
 
@@ -38,6 +39,54 @@ public class ActorVisualController : MonoBehaviour
     private int sortingOrderBeforeVisionOverride;
     // 공격자 임시 노출용 정렬 순서 덮어쓰기가 현재 적용돼 있는지 나타낸다.
     private bool hasVisionSortingOverride;
+    // 건물 앞에 서 있을 때 필요한 정렬 요청을 건물별로 보관한다.
+    private readonly Dictionary<SpriteRenderer, int> buildingSortingRequests = new();
+    // 건물 정렬 요청이 시작되기 전의 원래 순서다.
+    private int sortingOrderBeforeBuildingOverride;
+    // 건물 앞 정렬 보정이 적용 중인지 나타낸다.
+    private bool hasBuildingSortingOverride;
+
+    [Header("Ground Sorting")]
+    // 애니메이션에 흔들리지 않는 발 기준점이며 VisualRoot의 로컬 좌표다.
+    [SerializeField] private Vector2 groundPointLocalOffset = new Vector2(0f, -2.2f);
+    public Vector3 GroundWorldPosition => transform.TransformPoint(groundPointLocalOffset);
+    public bool HasVisionSortingOverride => hasVisionSortingOverride;
+
+    /// <summary>건물별 전면 정렬 요청을 모아 적용하며 요청 해제 시 원래 순서로 복원한다.</summary>
+    public void SetBuildingFrontSorting(SpriteRenderer building, bool inFront)
+    {
+        if (targetRenderer == null || building == null) return;
+        if (inFront && building.sortingLayerID == targetRenderer.sortingLayerID)
+        {
+            if (!hasBuildingSortingOverride)
+            {
+                sortingOrderBeforeBuildingOverride = hasVisionSortingOverride ? sortingOrderBeforeVisionOverride : targetRenderer.sortingOrder;
+                hasBuildingSortingOverride = true;
+            }
+            buildingSortingRequests[building] = building.sortingOrder + 1;
+        }
+        else buildingSortingRequests.Remove(building);
+        ApplyBuildingSorting();
+    }
+
+    /// <summary>복수 건물의 요청을 합치되 안개 위 공격 연출의 정렬은 우선 유지한다.</summary>
+    private void ApplyBuildingSorting()
+    {
+        if (!hasBuildingSortingOverride || targetRenderer == null) return;
+        int order = sortingOrderBeforeBuildingOverride;
+        foreach (var request in buildingSortingRequests)
+            if (request.Key != null && request.Key.enabled && request.Key.gameObject.activeInHierarchy) order = Mathf.Max(order, request.Value);
+        if (hasVisionSortingOverride) sortingOrderBeforeVisionOverride = order;
+        else targetRenderer.sortingOrder = order;
+        if (buildingSortingRequests.Count == 0) hasBuildingSortingOverride = false;
+    }
+
+    /// <summary>표시를 중단하면 건물의 임시 정렬 요청을 해제한다.</summary>
+    private void OnDisable()
+    {
+        buildingSortingRequests.Clear();
+        ApplyBuildingSorting();
+    }
 
     public SpriteRenderer TargetRenderer => targetRenderer;
     public Animator Animator => animator;
@@ -84,7 +133,7 @@ public class ActorVisualController : MonoBehaviour
     /// </summary>
     private void Awake()
     {
-        if (!HasValidReference())
+        if (!HasValidReference() || !HasValidData())
         {
             enabled = false;
             return;
@@ -312,9 +361,19 @@ public class ActorVisualController : MonoBehaviour
         return true;
     }
 
-    /// <summary>
-    /// VisualRoot에 필요한 기본 시각 컴포넌트 참조가 연결되어 있는지 확인한다.
-    /// </summary>
+    /// <summary>고정 발 기준점의 좌표가 유효한지 검사한다.</summary>
+    public bool HasValidData()
+    {
+        if (float.IsNaN(groundPointLocalOffset.x) || float.IsInfinity(groundPointLocalOffset.x) ||
+            float.IsNaN(groundPointLocalOffset.y) || float.IsInfinity(groundPointLocalOffset.y))
+        {
+            Debug.LogError($"{nameof(ActorVisualController)} on {name}의 발 기준 좌표가 유효하지 않습니다.", this);
+            return false;
+        }
+        return true;
+    }
+
+    /// <summary>VisualRoot에 필요한 기본 시각 컴포넌트 참조가 연결되어 있는지 확인한다.</summary>
     public bool HasValidReference()
     {
         if (targetRenderer == null)
