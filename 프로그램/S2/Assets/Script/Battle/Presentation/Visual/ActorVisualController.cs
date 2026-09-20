@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.Serialization;
@@ -8,10 +9,46 @@ using UnityEngine.Serialization;
 /// </summary>
 public class ActorVisualController : MonoBehaviour
 {
-    // 대기 재생 요청을 낮은 엄폐 자세로 바꿀지 나타내며, 벽 엄폐보다 우선한다.
+    // 선택된 엄폐 대상이 낮은 엄폐여서 대기 자세를 바꿀지 나타낸다.
     private bool useLowCoverIdle;
-    // 낮은 엄폐물이 없고 벽이 인접하면 벽 엄폐 대기를 사용한다.
+    // 선택된 엄폐 대상이 벽이면 높은 엄폐 대기를 사용한다.
     private bool useWallCoverIdle;
+    // 이동 등 일반 요청의 마지막 좌우 방향이며 엄폐/공격 방향과 분리한다.
+    private bool requestedFacingRight;
+    // 현재 엄폐 자세에 고정할 좌우 방향이다. 위아래 엄폐 진입 때는 현재 방향을 보존한다.
+    private bool coverFacingRight;
+    // 이동 연출 중 엄폐 재부착을 막는 상태다.
+    private bool isMovingPresentation;
+    // 전투 중 접촉 위치 보간을 잠시 정지하는 상태다.
+    private bool isCombatPresentation;
+    // 공격자의 방향만 엄폐 방향보다 우선하는지 나타낸다.
+    private bool hasCombatFacing;
+    // 공격 연출에서 임시로 바라볼 방향이다.
+    private bool combatFacingRight;
+    // 사망 그림의 위치를 고정하며 이후 엄폐 재진입을 막는다.
+    private bool isDeathPresentation;
+    // 논리/이동 기준 위치에 더하는 현재 월드 표시 보정이다.
+    private Vector3 coverWorldOffset;
+    // 이번 부착/해제 보간의 시작·목표 오프셋이다.
+    private Vector3 coverOffsetStart;
+    private Vector3 coverOffsetTarget;
+    // 부착/해제 보간의 경과 시간과 설정 시간이다.
+    private float coverTransitionElapsed;
+    private float coverTransitionDuration = 0.15f;
+    // 선택된 엄폐물의 좌우 구분이다. 0은 위아래 엄폐다.
+    private int coverSide;
+
+    // Idle을 실제 재생하기 전에 표시 위치에 맞는 엄폐 선택을 동기화하는 알림이다.
+    public event Action IdleRequested;
+    // 엄폐 선택 콜백에서 Idle 재생을 중복 요청하지 않게 하는 상태다.
+    private bool resolvingIdleRequest;
+    // 소품별 앞/뒤 정렬 요청이다. 뒤쪽 요청은 건물 전면 보정보다 낮은 상한을 적용한다.
+    private readonly Dictionary<SpriteRenderer, bool> propSortingRequests = new();
+
+    public Vector3 CoverWorldOffset => coverWorldOffset;
+    public bool IsMovingPresentation => isMovingPresentation;
+    public bool IsDeathPresentation => isDeathPresentation;
+
     [Header("Visual Components")]
     // Actor를 화면에 표시하는 스프라이트 렌더러다.
     [SerializeField] private SpriteRenderer targetRenderer;
@@ -41,9 +78,9 @@ public class ActorVisualController : MonoBehaviour
     private bool hasVisionSortingOverride;
     // 건물 앞에 서 있을 때 필요한 정렬 요청을 건물별로 보관한다.
     private readonly Dictionary<SpriteRenderer, int> buildingSortingRequests = new();
-    // 건물 정렬 요청이 시작되기 전의 원래 순서다.
+    // 건물·소품 정렬 요청이 시작되기 전의 원래 순서다.
     private int sortingOrderBeforeBuildingOverride;
-    // 건물 앞 정렬 보정이 적용 중인지 나타낸다.
+    // 건물 또는 소품의 임시 정렬 보정이 적용 중인지 나타낸다.
     private bool hasBuildingSortingOverride;
 
     [Header("Ground Sorting")]
@@ -56,7 +93,7 @@ public class ActorVisualController : MonoBehaviour
     public void SetBuildingFrontSorting(SpriteRenderer building, bool inFront)
     {
         if (targetRenderer == null || building == null) return;
-        if (inFront && building.sortingLayerID == targetRenderer.sortingLayerID)
+        if (inFront && building.sortingLayerID == (hasVisionSortingOverride ? sortingLayerIdBeforeVisionOverride : targetRenderer.sortingLayerID))
         {
             if (!hasBuildingSortingOverride)
             {
@@ -69,22 +106,56 @@ public class ActorVisualController : MonoBehaviour
         ApplyBuildingSorting();
     }
 
-    /// <summary>복수 건물의 요청을 합치되 안개 위 공격 연출의 정렬은 우선 유지한다.</summary>
+    /// <summary>소품 앞/뒤의 상대 정렬을 요청하거나 null로 해제한다. 위치와 알파는 변경하지 않는다.</summary>
+    public void SetPropDepthSorting(SpriteRenderer prop, bool? inFront)
+    {
+        if (targetRenderer == null || prop == null) return;
+        int layer = hasVisionSortingOverride ? sortingLayerIdBeforeVisionOverride : targetRenderer.sortingLayerID;
+        if (inFront.HasValue && prop.sortingLayerID == layer)
+        {
+            if (!hasBuildingSortingOverride)
+            {
+                sortingOrderBeforeBuildingOverride = hasVisionSortingOverride ? sortingOrderBeforeVisionOverride : targetRenderer.sortingOrder;
+                hasBuildingSortingOverride = true;
+            }
+            propSortingRequests[prop] = inFront.Value;
+        }
+        else propSortingRequests.Remove(prop);
+        ApplyBuildingSorting();
+    }
+
+    /// <summary>건물 전면과 소품 앞/뒤 요청을 합치되 안개 위 공격 표시를 최우선으로 유지한다.</summary>
     private void ApplyBuildingSorting()
     {
         if (!hasBuildingSortingOverride || targetRenderer == null) return;
         int order = sortingOrderBeforeBuildingOverride;
         foreach (var request in buildingSortingRequests)
             if (request.Key != null && request.Key.enabled && request.Key.gameObject.activeInHierarchy) order = Mathf.Max(order, request.Value);
+        int behindLimit = int.MaxValue;
+        foreach (var request in propSortingRequests)
+        {
+            SpriteRenderer prop = request.Key;
+            if (prop == null || !prop.enabled || !prop.gameObject.activeInHierarchy) continue;
+            if (request.Value) order = Mathf.Max(order, prop.sortingOrder + 1);
+            else behindLimit = Mathf.Min(behindLimit, prop.sortingOrder - 1);
+        }
+        // 뒤에 선 소품보다 앞서 그려지지 않도록 건물 전면 보정에도 상한을 적용한다.
+        order = Mathf.Min(order, behindLimit);
         if (hasVisionSortingOverride) sortingOrderBeforeVisionOverride = order;
         else targetRenderer.sortingOrder = order;
-        if (buildingSortingRequests.Count == 0) hasBuildingSortingOverride = false;
+        if (buildingSortingRequests.Count == 0 && propSortingRequests.Count == 0) hasBuildingSortingOverride = false;
     }
 
-    /// <summary>표시를 중단하면 건물의 임시 정렬 요청을 해제한다.</summary>
+    /// <summary>표시를 중단하면 건물·소품의 임시 정렬 요청을 해제한다.</summary>
     private void OnDisable()
     {
+        // 재활성화 시 이전 표시 보정이 누적되지 않게 되돌린다.
+        transform.position -= coverWorldOffset;
+        coverWorldOffset = coverOffsetStart = coverOffsetTarget = Vector3.zero;
+        useLowCoverIdle = useWallCoverIdle = false;
+        isMovingPresentation = isCombatPresentation = hasCombatFacing = isDeathPresentation = false;
         buildingSortingRequests.Clear();
+        propSortingRequests.Clear();
         ApplyBuildingSorting();
     }
 
@@ -97,14 +168,19 @@ public class ActorVisualController : MonoBehaviour
     /// <summary>낮은 엄폐·벽 엄폐 여부를 저장하고 현재 대기 중일 때만 자세를 즉시 갱신한다.</summary>
     public void SetCoverIdle(bool isNearLowCover, bool isNearWallCover)
     {
+        if (isDeathPresentation) return;
+        if (useLowCoverIdle == isNearLowCover && useWallCoverIdle == isNearWallCover) return;
         useLowCoverIdle = isNearLowCover;
         useWallCoverIdle = isNearWallCover;
+        if (resolvingIdleRequest) return;
         AnimatorStateInfo state = animator.GetCurrentAnimatorStateInfo(0);
         if (state.IsName("Idle") || state.IsName("LowCoverIdle") || state.IsName("WallCoverIdle"))
         {
-            TryPlayAnimationState("Idle", 0f);
-            // 한 장짜리 대기 자세는 Animator의 다음 평가를 기다리지 않고 즉시 표시한다.
-            animator.Update(0f);
+            string idle = useLowCoverIdle ? "LowCoverIdle" : useWallCoverIdle ? "WallCoverIdle" : "Idle";
+            // 이미 선택된 자세만 적용한다. 다시 선택하면 외부 갱신과 재귀적으로 충돌한다.
+            resolvingIdleRequest = true;
+            try { TryPlayAnimationState(idle, 0f); }
+            finally { resolvingIdleRequest = false; }
         }
     }
 
@@ -141,7 +217,103 @@ public class ActorVisualController : MonoBehaviour
 
         presentationColor = targetRenderer.color;
         IsFacingRight = artworkFacesRight ? !targetRenderer.flipX : targetRenderer.flipX;
+        requestedFacingRight = IsFacingRight;
+        coverFacingRight = IsFacingRight;
         ApplyCompositeColor();
+    }
+
+    /// <summary>이동 기준 월드 위치에 현재 엄폐 보정만 합쳐 표시한다.</summary>
+    public void SetPresentationPosition(Vector3 worldPosition)
+    {
+        transform.position = worldPosition + coverWorldOffset;
+    }
+
+    /// <summary>선택된 엄폐물의 자세·방향·접촉 오프셋을 하나의 요청으로 적용한다.</summary>
+    public void SetCoverPresentation(bool low, bool wall, Vector3 offset, int horizontalSide, float duration)
+    {
+        if (isDeathPresentation || isMovingPresentation) return;
+        bool hadCover = useLowCoverIdle || useWallCoverIdle;
+        bool hasCover = low || wall;
+        if (hasCover && (!hadCover || coverSide != horizontalSide))
+            coverFacingRight = horizontalSide == 0 ? IsFacingRight : horizontalSide > 0;
+        coverSide = horizontalSide;
+        SetCoverIdle(low, wall);
+        SetCoverOffsetTarget(hasCover ? offset : Vector3.zero, duration);
+        ApplyRequestedFacing();
+    }
+
+    /// <summary>같은 목표 요청은 보간을 재시작하지 않고 새 목표만 저장한다.</summary>
+    private void SetCoverOffsetTarget(Vector3 target, float duration)
+    {
+        if ((coverOffsetTarget - target).sqrMagnitude < 0.00000001f) return;
+        coverOffsetStart = coverWorldOffset;
+        coverOffsetTarget = target;
+        coverTransitionElapsed = 0f;
+        coverTransitionDuration = duration;
+    }
+
+    /// <summary>논리 위치와 무관하게 현재 그림의 엄폐 오프셋만 부드럽게 보간한다.</summary>
+    private void Update()
+    {
+        if (isDeathPresentation || isCombatPresentation || coverWorldOffset == coverOffsetTarget) return;
+        coverTransitionElapsed += Time.deltaTime;
+        float time = coverTransitionDuration <= 0f ? 1f : Mathf.Clamp01(coverTransitionElapsed / coverTransitionDuration);
+        Vector3 next = Vector3.Lerp(coverOffsetStart, coverOffsetTarget, Mathf.SmoothStep(0f, 1f, time));
+        transform.position += next - coverWorldOffset;
+        coverWorldOffset = next;
+    }
+
+    /// <summary>이동 시작 즉시 엄폐 방향·자세 고정을 풀고 현재 보정을 부드럽게 해제한다.</summary>
+    public void BeginMovePresentation()
+    {
+        if (isDeathPresentation) return;
+        isMovingPresentation = true;
+        useLowCoverIdle = useWallCoverIdle = false;
+        isCombatPresentation = hasCombatFacing = false;
+        SetCoverOffsetTarget(Vector3.zero, coverTransitionDuration);
+        ApplyRequestedFacing();
+    }
+
+    /// <summary>이동 종료 후 큐가 비면 엄폐 Presenter가 새 칸을 평가할 수 있게 한다.</summary>
+    public void EndMovePresentation()
+    {
+        isMovingPresentation = false;
+    }
+
+    /// <summary>전투 중 위치는 유지하며 공격자만 엄폐보다 우선해 목표를 바라본다.</summary>
+    public void BeginCombatPresentation(GridPosition from, GridPosition to, bool attacker, bool killed)
+    {
+        isCombatPresentation = true;
+        hasCombatFacing = attacker;
+        combatFacingRight = to.x == from.x ? IsFacingRight : to.x > from.x;
+        // 엄폐하지 않은 공격자는 기존처럼 공격 방향을 일반 대기에도 유지한다.
+        if (attacker && !useLowCoverIdle && !useWallCoverIdle) requestedFacingRight = combatFacingRight;
+        if (killed)
+        {
+            isDeathPresentation = true;
+            useLowCoverIdle = useWallCoverIdle = false;
+            hasCombatFacing = false;
+            requestedFacingRight = IsFacingRight;
+            coverOffsetStart = coverOffsetTarget = coverWorldOffset;
+        }
+        else if (!attacker) FaceFromTo(from, to);
+        ApplyRequestedFacing();
+    }
+
+    /// <summary>생존자의 공격 방향 우선권을 해제하고 엄폐 또는 일반 방향으로 복귀한다.</summary>
+    public void EndCombatPresentation()
+    {
+        if (isDeathPresentation) return;
+        isCombatPresentation = hasCombatFacing = false;
+        ApplyRequestedFacing();
+    }
+
+    /// <summary>공격 → 엄폐 → 일반 요청 순서로 실제 좌우 방향을 결정한다.</summary>
+    private void ApplyRequestedFacing()
+    {
+        bool facing = hasCombatFacing ? combatFacingRight :
+            (useLowCoverIdle || useWallCoverIdle) && !isMovingPresentation ? coverFacingRight : requestedFacingRight;
+        ApplyFacing(facing);
     }
 
     /// <summary>
@@ -268,6 +440,13 @@ public class ActorVisualController : MonoBehaviour
             return false;
         }
 
+        if (stateName == "Idle" && !resolvingIdleRequest)
+        {
+            resolvingIdleRequest = true;
+            try { IdleRequested?.Invoke(); }
+            finally { resolvingIdleRequest = false; }
+        }
+
         if (stateName == "Idle" && useLowCoverIdle)
         {
             stateName = "LowCoverIdle";
@@ -282,7 +461,14 @@ public class ActorVisualController : MonoBehaviour
             return true;
         }
 
-        if (crossFadeDuration > 0f)
+        bool isIdle = stateName == "Idle" || stateName == "LowCoverIdle" || stateName == "WallCoverIdle";
+        if (isIdle)
+        {
+            // 한 장짜리 Sprite 자세는 블렌딩하지 않고 확정된 최종 자세를 같은 프레임에 평가한다.
+            animator.Play(stateName, 0, 0f);
+            animator.Update(0f);
+        }
+        else if (crossFadeDuration > 0f)
         {
             animator.CrossFade(stateName, crossFadeDuration);
         }
@@ -322,7 +508,8 @@ public class ActorVisualController : MonoBehaviour
     /// </summary>
     public void FaceRight()
     {
-        ApplyFacing(true);
+        requestedFacingRight = true;
+        ApplyRequestedFacing();
     }
 
     /// <summary>
@@ -330,7 +517,8 @@ public class ActorVisualController : MonoBehaviour
     /// </summary>
     public void FaceLeft()
     {
-        ApplyFacing(false);
+        requestedFacingRight = false;
+        ApplyRequestedFacing();
     }
 
     /// <summary>

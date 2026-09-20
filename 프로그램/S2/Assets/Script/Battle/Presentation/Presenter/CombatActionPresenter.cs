@@ -196,7 +196,7 @@ public class CombatActionPresenter : MonoBehaviour, IPresentationEventHandler
     }
 
     /// <summary>
-    /// 공격자와 피격자가 서로 마주보게 한 뒤 공격·피격 또는 사망 자세를 동시에 재생한다.
+    /// 공격자는 대상을 보고 피격자는 엄폐 방향을 유지하며 공격·피격 또는 사망 자세를 재생한다.
     /// </summary>
     private IEnumerator PlayCombatAction(
         PresentationEvent presentationEvent,
@@ -208,8 +208,8 @@ public class CombatActionPresenter : MonoBehaviour, IPresentationEventHandler
 
         GridPosition attackerPosition = presentationEvent.Actor.GridPosition;
         GridPosition targetPosition = presentationEvent.TargetActor.GridPosition;
-        activeAttackerVisual.FaceFromTo(attackerPosition, targetPosition);
-        activeTargetVisual.FaceFromTo(targetPosition, attackerPosition);
+        activeAttackerVisual.BeginCombatPresentation(attackerPosition, targetPosition, true, false);
+        activeTargetVisual.BeginCombatPresentation(targetPosition, attackerPosition, false, activeTargetKilled);
 
         activeAttackerVisual.TryPlayAnimationState(
             entry.AttackerAnimationStateName,
@@ -254,6 +254,8 @@ public class CombatActionPresenter : MonoBehaviour, IPresentationEventHandler
             return;
         }
 
+        activeAttackerVisual?.EndCombatPresentation();
+        activeTargetVisual?.EndCombatPresentation();
         activeAttackerVisual?.TryPlayAnimationState(
             presentationData.IdleAnimationStateName,
             presentationData.CrossFadeDuration,

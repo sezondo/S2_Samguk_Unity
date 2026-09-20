@@ -64,6 +64,7 @@ public class GridActorMovePresenter : MonoBehaviour, IPresentationEventHandler
             ActionPresentationQueue.Instance.Unregister(this);
         }
 
+        visualController?.EndMovePresentation();
         if (moveCoroutine != null)
         {
             StopCoroutine(moveCoroutine);
@@ -174,7 +175,8 @@ public class GridActorMovePresenter : MonoBehaviour, IPresentationEventHandler
             ? 0f
             : 1f;
 
-        visualRoot.position = fromWorldPosition;
+        visualController.BeginMovePresentation();
+        visualController.SetPresentationPosition(fromWorldPosition);
         if (applyVisionTransition)
         {
             // 적이 시야 경계를 넘는 한 칸 동안 이동과 표시 알파를 함께 보간한다.
@@ -197,7 +199,7 @@ public class GridActorMovePresenter : MonoBehaviour, IPresentationEventHandler
         {
             float normalizedTime = Mathf.Clamp01(elapsed / moveData.MoveDuration);
             float curveTime = moveData.MoveCurve.Evaluate(normalizedTime);
-            visualRoot.position = Vector3.LerpUnclamped(fromWorldPosition, toWorldPosition, curveTime);
+            visualController.SetPresentationPosition(Vector3.LerpUnclamped(fromWorldPosition, toWorldPosition, curveTime));
             if (applyVisionTransition)
             {
                 visualController.SetVisionAlpha(Mathf.Lerp(startVisionAlpha, targetVisionAlpha, curveTime));
@@ -207,7 +209,7 @@ public class GridActorMovePresenter : MonoBehaviour, IPresentationEventHandler
             yield return null;
         }
 
-        visualRoot.position = toWorldPosition;
+        visualController.SetPresentationPosition(toWorldPosition);
         if (applyVisionTransition)
         {
             visualController.SetVisionAlpha(targetVisionAlpha);
@@ -216,6 +218,7 @@ public class GridActorMovePresenter : MonoBehaviour, IPresentationEventHandler
 
         if (EndsMoveAnimation(presentationEvent.MovePhase))
         {
+            visualController.EndMovePresentation();
             visualController.TryCompleteMoveAnimation(moveData);
         }
 
@@ -290,6 +293,12 @@ public class GridActorMovePresenter : MonoBehaviour, IPresentationEventHandler
 
         if (!visualController.HasValidReference())
         {
+            return false;
+        }
+
+        if (visualRoot != visualController.transform)
+        {
+            Debug.LogError($"{nameof(GridActorMovePresenter)} on {name}의 VisualRoot는 ActorVisualController가 붙은 Transform이어야 합니다.", this);
             return false;
         }
 

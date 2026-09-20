@@ -91,6 +91,7 @@ public class GroupMovePresenter : MonoBehaviour, IPresentationEventHandler
             moveCoroutine = null;
         }
 
+        foreach (MemberPresentationState member in memberStates) member.VisualController.EndMovePresentation();
         memberStates.Clear();
         facingIndicators.Clear();
         if (activeHandle != null && !activeHandle.IsCompleted)
@@ -233,7 +234,8 @@ public class GroupMovePresenter : MonoBehaviour, IPresentationEventHandler
         for (int i = 0; i < memberStates.Count; i++)
         {
             MemberPresentationState state = memberStates[i];
-            state.VisualRoot.position = gridManager.GridToWorld(state.Snapshot.StartPosition);
+            state.VisualController.BeginMovePresentation();
+            state.VisualController.SetPresentationPosition(gridManager.GridToWorld(state.Snapshot.StartPosition));
             if (presentationData.UseMoveAnimation)
             {
                 state.VisualController.TryPlayAnimationState(
@@ -252,6 +254,8 @@ public class GroupMovePresenter : MonoBehaviour, IPresentationEventHandler
         {
             yield return PlayStep(gridManager, stepIndex);
         }
+
+        foreach (MemberPresentationState member in memberStates) member.VisualController.EndMovePresentation();
 
         if (presentationData.PlayIdleAnimationOnComplete)
         {
@@ -291,7 +295,7 @@ public class GroupMovePresenter : MonoBehaviour, IPresentationEventHandler
                 ? state.Snapshot.StartPosition
                 : state.Snapshot.Path[stepIndex - 1];
             GridPosition to = state.Snapshot.Path[stepIndex];
-            state.VisualRoot.position = gridManager.GridToWorld(from);
+            state.VisualController.SetPresentationPosition(gridManager.GridToWorld(from));
             ApplyVisionAlpha(state, visionPresenter, from, false);
 
             if (state.FacingIndicator != null)
@@ -341,10 +345,10 @@ public class GroupMovePresenter : MonoBehaviour, IPresentationEventHandler
                     ? state.Snapshot.StartPosition
                     : state.Snapshot.Path[stepIndex - 1];
                 GridPosition to = state.Snapshot.Path[stepIndex];
-                state.VisualRoot.position = Vector3.LerpUnclamped(
+                state.VisualController.SetPresentationPosition(Vector3.LerpUnclamped(
                     gridManager.GridToWorld(from),
                     gridManager.GridToWorld(to),
-                    curveTime);
+                    curveTime));
                 ApplyVisionAlpha(state, visionPresenter, from, to, curveTime);
             }
 
@@ -361,7 +365,7 @@ public class GroupMovePresenter : MonoBehaviour, IPresentationEventHandler
             }
 
             GridPosition to = state.Snapshot.Path[stepIndex];
-            state.VisualRoot.position = gridManager.GridToWorld(to);
+            state.VisualController.SetPresentationPosition(gridManager.GridToWorld(to));
             ApplyVisionAlpha(state, visionPresenter, to, true);
         }
     }
@@ -503,6 +507,7 @@ public class GroupMovePresenter : MonoBehaviour, IPresentationEventHandler
     {
         moveCoroutine = null;
         activeHandle = null;
+        foreach (MemberPresentationState member in memberStates) member.VisualController.EndMovePresentation();
         memberStates.Clear();
         facingIndicators.Clear();
         handle.Complete();
