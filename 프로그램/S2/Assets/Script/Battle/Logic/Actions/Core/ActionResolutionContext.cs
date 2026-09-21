@@ -1,4 +1,4 @@
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using UnityEngine;
 
 /// <summary>
@@ -11,6 +11,19 @@ public sealed class ActionResolutionContext
     private readonly Queue<IActionLogicEvent> logicEvents = new();
     // 논리 결과 연출을 저장할 연출 큐다.
     private readonly ActionPresentationQueue presentationQueue;
+
+    // 논리 이벤트 처리에 실패하면 이 문맥의 나머지 논리를 실행하지 않는다.
+    public bool HasFailed { get; private set; }
+
+    /// <summary>불완전한 결과에서 후속 판단이 진행되지 않도록 실패를 전파한다.</summary>
+    public void Fail(string reason)
+    {
+        if (HasFailed) return;
+        HasFailed = true;
+        logicEvents.Clear();
+        if (presentationQueue != null) presentationQueue.ReportFailure(reason);
+        else Debug.LogError(reason);
+    }
 
     /// <summary>
     /// 지정한 연출 큐를 사용하는 행동 처리 문맥을 만든다.
@@ -25,7 +38,7 @@ public sealed class ActionResolutionContext
     /// </summary>
     public void Publish(IActionLogicEvent logicEvent)
     {
-        if (logicEvent == null)
+        if (HasFailed || logicEvent == null)
         {
             return;
         }
@@ -53,7 +66,7 @@ public sealed class ActionResolutionContext
     /// </summary>
     public void Resolve()
     {
-        while (logicEvents.Count > 0)
+        while (!HasFailed && logicEvents.Count > 0)
         {
             IActionLogicEvent logicEvent = logicEvents.Dequeue();
             ActionLogicEventBus.Dispatch(logicEvent, this);

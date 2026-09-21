@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using UnityEngine;
 using UnityEngine.Serialization;
 
@@ -37,6 +37,8 @@ public class EnemyAlertState : MonoBehaviour
 
     // 경계 상태가 바뀔 때 이전 상태와 새 상태를 전달한다.
     public event Action<EnemyAwarenessState, EnemyAwarenessState> AwarenessStateChanged;
+    // 조사 단계 변경을 논리와 별도로 순차 표시할 수 있도록 알린다.
+    public event Action SuspiciousPhaseChanged;
 
     /// <summary>
     /// 상태 관리에 필요한 참조를 확인한다.
@@ -76,7 +78,7 @@ public class EnemyAlertState : MonoBehaviour
             // 복귀 도중 새 이상 현상을 감지하면 복귀만 중단하고 즉시 반응 연출은 다시 실행하지 않는다.
             if (suspiciousPhase == SuspiciousBehaviorPhase.ReturningToRoutine)
             {
-                suspiciousPhase = SuspiciousBehaviorPhase.Searching;
+                SetSuspiciousPhase(SuspiciousBehaviorPhase.Searching);
             }
 
             return true;
@@ -98,9 +100,10 @@ public class EnemyAlertState : MonoBehaviour
     /// </summary>
     public void SetSuspiciousPhase(SuspiciousBehaviorPhase nextPhase)
     {
-        if (IsSuspicious)
+        if (IsSuspicious && suspiciousPhase != nextPhase)
         {
             suspiciousPhase = nextPhase;
+            SuspiciousPhaseChanged?.Invoke();
         }
     }
 

@@ -1,4 +1,4 @@
-using System.Collections;
+﻿using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 
@@ -285,7 +285,7 @@ public class PlayerVisionPresenter : MonoBehaviour, IPresentationEventHandler
         activeHandle = handle;
         presentationCoroutine = presentationEvent.Type == PresentationEventType.PlayerVisionChanged
             ? StartCoroutine(PlaySnapshotTransition(presentationEvent.VisionSnapshot, handle))
-            : StartCoroutine(PlayActorVisibilityOverride(presentationEvent.Actor, presentationEvent.ActorVisibility, handle));
+            : StartCoroutine(PlayActorVisibilityOverride(presentationEvent.Actor, presentationEvent.ActorVisibility, presentationEvent.EventPosition, handle));
     }
 
     /// <summary>
@@ -315,7 +315,7 @@ public class PlayerVisionPresenter : MonoBehaviour, IPresentationEventHandler
     /// <summary>
     /// 공격자 Actor의 강제 노출 상태를 바꾸고 현재 시야 기준 표시 알파로 전환한다.
     /// </summary>
-    private IEnumerator PlayActorVisibilityOverride(GridActor actor, bool isVisible, PresentationEventHandle handle)
+    private IEnumerator PlayActorVisibilityOverride(GridActor actor, bool isVisible, GridPosition eventPosition, PresentationEventHandle handle)
     {
         if (actor == null)
         {
@@ -342,11 +342,11 @@ public class PlayerVisionPresenter : MonoBehaviour, IPresentationEventHandler
             forcedVisibleActors.Remove(actor);
             if (IsEnemyActor(actor))
             {
-                presentedEnemyVisibility[actor] = IsPositionPresentedVisible(actor.GridPosition);
+                presentedEnemyVisibility[actor] = IsPositionPresentedVisible(eventPosition);
             }
         }
 
-        yield return FadeActorToCurrentState(actor);
+        yield return FadeActorToCurrentState(actor, eventPosition);
         if (!isVisible)
         {
             visual.EndVisionSortingOverride();
@@ -426,7 +426,7 @@ public class PlayerVisionPresenter : MonoBehaviour, IPresentationEventHandler
     /// <summary>
     /// 지정한 적 Actor 하나를 현재 시야와 강제 노출 상태에 맞는 알파로 페이드한다.
     /// </summary>
-    private IEnumerator FadeActorToCurrentState(GridActor actor)
+    private IEnumerator FadeActorToCurrentState(GridActor actor, GridPosition eventPosition)
     {
         if (!context.ActorPresentationRegistry.TryGetVisual(actor, out ActorVisualController visual))
         {
@@ -434,7 +434,7 @@ public class PlayerVisionPresenter : MonoBehaviour, IPresentationEventHandler
         }
 
         float startAlpha = visual.VisionAlpha;
-        float targetAlpha = ShouldShowEnemyActorAt(actor, actor.GridPosition) ? 1f : 0f;
+        float targetAlpha = ShouldShowEnemyActorAt(actor, eventPosition) ? 1f : 0f;
         float elapsed = 0f;
         float duration = Mathf.Max(0f, transitionDuration);
         while (elapsed < duration)

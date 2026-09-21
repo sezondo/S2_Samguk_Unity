@@ -1,4 +1,4 @@
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using UnityEngine;
 
 /// <summary>
@@ -64,10 +64,10 @@ public class EnemyInvestigationAgent : MonoBehaviour, IActionLogicEventHandler
             return;
         }
 
-        TryMoveToInvestigationPosition(suspicion.SuspicionInfo, context);
+        if (TryMoveToInvestigationPosition(suspicion.SuspicionInfo, context)) return;
         if (enemyContext.AlertState.IsSuspicious)
         {
-            EnemyMovementUtility.FacePosition(enemyContext, suspicion.SuspicionInfo.Position, context);
+            if (EnemyMovementUtility.FacePosition(enemyContext, suspicion.SuspicionInfo.Position, context)) return;
             enemyContext.AlertState.SetSuspiciousPhase(SuspiciousBehaviorPhase.Observing);
         }
     }
@@ -88,7 +88,8 @@ public class EnemyInvestigationAgent : MonoBehaviour, IActionLogicEventHandler
         }
 
         GridDirection nextDirection = GetNextSearchDirection(enemyContext.GridSight.FacingDirection);
-        EnemyMovementUtility.FaceDirection(enemyContext, nextDirection, context);
+        // 감지가 확정되면 마지막 수색 턴이라도 복귀 이동을 시작하지 않는다.
+        if (EnemyMovementUtility.FaceDirection(enemyContext, nextDirection, context)) return true;
         if (!enemyContext.AlertState.IsSuspicious)
         {
             return true;
@@ -107,9 +108,9 @@ public class EnemyInvestigationAgent : MonoBehaviour, IActionLogicEventHandler
     }
 
     /// <summary>
-    /// 의심 지점을 볼 수 있고 적정 거리를 유지하는 엄폐 후보 중 최고 위치로 이동한다.
+    /// 조사 위치로 이동하고 도중 플레이어 감지로 중단했는지 반환한다.
     /// </summary>
-    private void TryMoveToInvestigationPosition(EnemySuspicionInfo info, ActionResolutionContext context)
+    private bool TryMoveToInvestigationPosition(EnemySuspicionInfo info, ActionResolutionContext context)
     {
         EnemyData data = enemyContext.EnemyData;
         GridPosition start = enemyContext.GridActor.GridPosition;
@@ -146,10 +147,11 @@ public class EnemyInvestigationAgent : MonoBehaviour, IActionLogicEventHandler
                 Debug.Log($"{nameof(EnemyInvestigationAgent)}: {enemyContext.name} 적은 현재 위치에서 {info.Position} 칸을 조사합니다.", this);
             }
 
-            return;
+            return false;
         }
 
-        EnemyMovementUtility.MoveAlongPath(enemyContext, pathBuffer, context, "적 의심 조사 반응 이동 연출");
+        EnemyMovementUtility.MoveAlongPath(enemyContext, pathBuffer, context, "적 의심 조사 반응 이동 연출", out bool detectedPlayer);
+        return detectedPlayer;
     }
 
     /// <summary>

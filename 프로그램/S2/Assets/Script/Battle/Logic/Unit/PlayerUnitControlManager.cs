@@ -1,10 +1,10 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using UnityEngine;
 
 /// <summary>
 /// 플레이어가 현재 조작할 전술 유닛의 선택과 AP 소진 시 자동 전환을 관리한다.
-/// 연출 중에도 선택은 허용하지만 실제 행동 실행 가능 여부는 행동 흐름 조정자가 판단한다.
+/// 처리 중에는 수동 선택을 막고, AP 소진에 따른 자동 선택은 잠금 해제 후 이어간다.
 /// </summary>
 public class PlayerUnitControlManager : MonoBehaviour
 {
@@ -20,6 +20,8 @@ public class PlayerUnitControlManager : MonoBehaviour
     private int processedSelectionFrame = -1;
     // 이번 프레임의 포인터 입력이 유닛 선택에 사용됐는지 나타낸다.
     private bool selectionConsumedThisFrame;
+    // 처리 잠금 때문에 미뤄진 자동 선택을 다음 조작 가능 시점에 이어간다.
+    private bool pendingAutomaticSelection;
 
     public TacticalUnitContext ActiveUnit { get; private set; }
 
@@ -70,6 +72,13 @@ public class PlayerUnitControlManager : MonoBehaviour
     /// </summary>
     private void Update()
     {
+        if (pendingAutomaticSelection &&
+            (ActionPresentationQueue.Instance == null || !ActionPresentationQueue.Instance.IsBusy) &&
+            (TurnManager.Instance == null || TurnManager.Instance.IsPlayerTurn))
+        {
+            pendingAutomaticSelection = false;
+            TrySelectNextAvailableUnit(ActiveUnit);
+        }
         TryProcessSelectionInput();
     }
 
@@ -112,7 +121,7 @@ public class PlayerUnitControlManager : MonoBehaviour
 
         PlayerInputReader inputReader = PlayerInputReader.Instance;
         if (inputReader == null ||
-            (ActionPresentationQueue.Instance != null && ActionPresentationQueue.Instance.IsPlaying) ||
+            (ActionPresentationQueue.Instance != null && ActionPresentationQueue.Instance.IsBusy) ||
             !inputReader.ConfirmPressedThisFrame ||
             !inputReader.TryGetPointerGridPosition(out GridPosition position) ||
             GridManager.Instance == null ||
@@ -133,6 +142,10 @@ public class PlayerUnitControlManager : MonoBehaviour
     /// </summary>
     public bool TrySelectUnit(TacticalUnitContext unit)
     {
+        if ((ActionPresentationQueue.Instance != null && ActionPresentationQueue.Instance.IsBusy) ||
+            (TurnManager.Instance != null && !TurnManager.Instance.IsPlayerTurn))
+            return false;
+
         if (!CanSelectUnit(unit))
         {
             if (logSelection && unit != null)
@@ -167,6 +180,12 @@ public class PlayerUnitControlManager : MonoBehaviour
     /// </summary>
     public bool TrySelectNextAvailableUnit(TacticalUnitContext current)
     {
+        if ((ActionPresentationQueue.Instance != null && ActionPresentationQueue.Instance.IsBusy) ||
+            (TurnManager.Instance != null && !TurnManager.Instance.IsPlayerTurn))
+        {
+            pendingAutomaticSelection = true;
+            return false;
+        }
         TacticalUnitRegistry registry = TacticalUnitRegistry.Instance;
         if (registry == null)
         {

@@ -1,4 +1,4 @@
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using UnityEngine;
 
 /// <summary>
@@ -102,6 +102,7 @@ public class EnemyAlertCoordinator : MonoBehaviour, IActionLogicEventHandler
             return;
         }
 
+        bool cameraFocusQueued = false;
         int spreadRange = sourceEnemy.EnemyData.AlertSpreadRange;
         GridPosition spreadOrigin = sourceEnemy.GridActor.GridPosition;
         IReadOnlyList<EnemyContext> enemies = EnemyRegistry.Instance.Enemies;
@@ -124,6 +125,13 @@ public class EnemyAlertCoordinator : MonoBehaviour, IActionLogicEventHandler
             if (!changed)
             {
                 continue;
+            }
+
+            // 같은 전파 사건에서 카메라는 한 번만 이동한다. 사망한 원인 적 대신 살아 있는 수신자를 비춘다.
+            if (!cameraFocusQueued)
+            {
+                context.EnqueuePresentation(PresentationEvent.AlertCameraFocus(sourceEnemy.IsAlive ? sourceEnemy : enemy));
+                cameraFocusQueued = true;
             }
 
             EnemyAlertReason reason = enemy == sourceEnemy ? sourceReason : EnemyAlertReason.Spread;

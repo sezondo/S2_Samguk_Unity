@@ -1,4 +1,4 @@
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.EventSystems;
 using UnityEngine.InputSystem;
@@ -36,7 +36,7 @@ public class CameraMouseZoom : MonoBehaviour
         Mouse mouse = Mouse.current;
         if (mouse == null || !Application.isFocused ||
             !targetCamera.pixelRect.Contains(mouse.position.ReadValue()) ||
-            (ActionPresentationQueue.Instance != null && ActionPresentationQueue.Instance.IsPlaying))
+            (ActionPresentationQueue.Instance != null && ActionPresentationQueue.Instance.IsBusy))
         {
             return;
         }

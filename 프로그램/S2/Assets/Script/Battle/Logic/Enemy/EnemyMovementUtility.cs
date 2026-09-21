@@ -1,4 +1,4 @@
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using UnityEngine;
 
 /// <summary>
@@ -25,21 +25,22 @@ public static class EnemyMovementUtility
         return true;
     }
 
-    /// <summary>
-    /// 지정한 경로를 따라 적을 이동시키고 실제로 이동한 칸 수를 반환한다.
-    /// </summary>
-    public static int MoveAlongPath(
-        EnemyContext enemy,
-        IReadOnlyList<GridPosition> path,
-        ActionResolutionContext context,
-        string message)
-    {
-        if (enemy == null || enemy.GridActor == null || enemy.GridSight == null || path == null || context == null)
-        {
-            return 0;
-        }
+    /// <summary>확정한 이동 칸 수를 반환한다. 이미 발각된 적의 전투·엄폐 이동도 같은 경로를 사용한다.</summary>
+    public static int MoveAlongPath(EnemyContext enemy, IReadOnlyList<GridPosition> path,
+        ActionResolutionContext context, string message)
+        => MoveAlongPath(enemy, path, context, message, out _);
 
-        int movedSteps = 0;
+    /// <summary>한 칸마다 감지를 확정하고 발견한 칸에서 원래 이동을 종료한다.</summary>
+    public static int MoveAlongPath(EnemyContext enemy, IReadOnlyList<GridPosition> path,
+        ActionResolutionContext context, string message, out bool detectedPlayer)
+    {
+        detectedPlayer = false;
+        if (enemy == null || enemy.GridActor == null || enemy.GridSight == null || path == null ||
+            context == null || context.HasFailed) return 0;
+
+        // 확정된 칸만 보관해 중간 감지·막힘에서도 마지막 연출을 Single 또는 End로 만든다.
+        var steps = new List<(GridPosition from, GridPosition to, GridDirection previous,
+            GridDirection direction, EnemyPerceptionChangedLogicEvent perception)>();
         GridPosition previousPosition = enemy.GridActor.GridPosition;
         for (int i = 0; i < path.Count; i++)
         {
@@ -49,55 +50,47 @@ public static class EnemyMovementUtility
                 Debug.LogError($"{nameof(EnemyMovementUtility)}: {enemy.name} 적을 {nextPosition} 칸으로 이동시키지 못했습니다.", enemy);
                 break;
             }
-
             GridDirection previousDirection = enemy.GridSight.FacingDirection;
-            GridDirection movementDirection = GetDirectionFromMovement(previousPosition, nextPosition);
-            enemy.GridSight.SetFacingDirection(movementDirection);
+            GridDirection direction = GetDirectionFromMovement(previousPosition, nextPosition);
+            enemy.GridSight.SetFacingDirection(direction);
             enemy.GridSight.RefreshSight();
-            if (previousDirection != movementDirection && CanPresentFacing(enemy))
-            {
-                context.EnqueuePresentation(PresentationEvent.EnemyFacingTurn(
-                    enemy,
-                    previousDirection,
-                    movementDirection,
-                    "적 이동 전 시야 방향 전환 연출"));
-            }
-
-            context.Publish(new MoveStepEnteredLogicEvent(enemy.GridActor, nextPosition));
-            context.Publish(new EnemyPerceptionChangedLogicEvent(enemy));
-            context.EnqueuePresentation(PresentationEvent.EnemyReactionMove(
-                enemy,
-                previousPosition,
-                nextPosition,
-                MovePresentationPhaseUtility.GetPhase(i, path.Count),
-                message));
-
+            var perception = EnemyPerceptionCoordinator.CapturePlayerDetection(enemy);
+            steps.Add((previousPosition, nextPosition, previousDirection, direction, perception));
             previousPosition = nextPosition;
-            movedSteps++;
+            detectedPlayer = perception.HasDetectedPlayer;
+            if (detectedPlayer) break;
         }
 
-        if (movedSteps > 0)
+        for (int i = 0; i < steps.Count; i++)
         {
-            context.Publish(new MoveCompletedLogicEvent(enemy.GridActor, enemy.GridActor.GridPosition));
+            var step = steps[i];
+            if (step.previous != step.direction && CanPresentFacing(enemy))
+                context.EnqueuePresentation(PresentationEvent.EnemyFacingTurn(enemy, step.previous, step.direction,
+                    "적 이동 전 시야 방향 전환 연출"));
+            context.Publish(new MoveStepEnteredLogicEvent(enemy.GridActor, step.to));
+            context.EnqueuePresentation(PresentationEvent.EnemyReactionMove(enemy, step.from, step.to,
+                MovePresentationPhaseUtility.GetPhase(i, steps.Count), message));
+            context.Publish(step.perception);
         }
-
-        return movedSteps;
+        if (steps.Count > 0)
+            context.Publish(new MoveCompletedLogicEvent(enemy.GridActor, previousPosition));
+        return steps.Count;
     }
 
     /// <summary>
-    /// 적을 지정한 방향으로 돌리고 플레이어 감지 재검사 이벤트를 발행한다.
+    /// 적을 지정한 방향으로 돌린 직후 감지를 확정하고 발견 여부를 반환한다.
     /// </summary>
-    public static void FaceDirection(EnemyContext enemy, GridDirection direction, ActionResolutionContext context)
+    public static bool FaceDirection(EnemyContext enemy, GridDirection direction, ActionResolutionContext context)
     {
         if (enemy == null || enemy.GridSight == null || context == null)
         {
-            return;
+            return false;
         }
 
         GridDirection previousDirection = enemy.GridSight.FacingDirection;
         if (!RefreshFacingDirection(enemy, direction))
         {
-            return;
+            return false;
         }
 
         if (previousDirection != direction && CanPresentFacing(enemy))
@@ -109,7 +102,9 @@ public static class EnemyMovementUtility
                 "적 제자리 시야 방향 전환 연출"));
         }
 
-        context.Publish(new EnemyPerceptionChangedLogicEvent(enemy));
+        var perception = EnemyPerceptionCoordinator.CapturePlayerDetection(enemy);
+        context.Publish(perception);
+        return perception.HasDetectedPlayer;
     }
 
     /// <summary>
@@ -129,25 +124,25 @@ public static class EnemyMovementUtility
     }
 
     /// <summary>
-    /// 적이 지정한 칸을 향하도록 가장 큰 축 기준의 4방향을 선택한다.
+    /// 지정한 칸을 바라본 직후 감지를 확정하고 발견 여부를 반환한다.
     /// </summary>
-    public static void FacePosition(EnemyContext enemy, GridPosition targetPosition, ActionResolutionContext context)
+    public static bool FacePosition(EnemyContext enemy, GridPosition targetPosition, ActionResolutionContext context)
     {
         if (enemy == null || enemy.GridActor == null)
         {
-            return;
+            return false;
         }
 
         GridPosition offset = targetPosition - enemy.GridActor.GridPosition;
         if (offset == GridPosition.Zero)
         {
-            return;
+            return false;
         }
 
         GridDirection direction = Mathf.Abs(offset.x) >= Mathf.Abs(offset.y)
             ? (offset.x >= 0 ? GridDirection.Right : GridDirection.Left)
             : (offset.y >= 0 ? GridDirection.Up : GridDirection.Down);
-        FaceDirection(enemy, direction, context);
+        return FaceDirection(enemy, direction, context);
     }
 
     /// <summary>

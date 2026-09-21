@@ -1,4 +1,4 @@
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using UnityEngine;
 
 /// <summary>
@@ -128,7 +128,7 @@ public class EnemyRoutineController : MonoBehaviour
 
         int stepCount = Mathf.Min(enemyContext.EnemyData.PatrolMoveRange, pathBuffer.Count);
         List<GridPosition> movementPath = pathBuffer.GetRange(0, stepCount);
-        int movedSteps = EnemyMovementUtility.MoveAlongPath(enemyContext, movementPath, context, "적 단독 순찰 이동 연출");
+        int movedSteps = EnemyMovementUtility.MoveAlongPath(enemyContext, movementPath, context, "적 단독 순찰 이동 연출", out bool detectedPlayer);
         if (movedSteps <= 0)
         {
             HandleBlockedTurn();
@@ -140,6 +140,9 @@ public class EnemyRoutineController : MonoBehaviour
         {
             Debug.LogError($"{nameof(EnemyRoutineController)}: {enemyContext.name} 적의 순찰 AP 소비에 실패했습니다.", this);
         }
+
+        // 감지 칸에서 멈춘 경우 도착 방향으로 돌거나 순찰 목적지를 갱신하지 않는다.
+        if (detectedPlayer) return true;
 
         if (enemyContext.GridActor.GridPosition == targetPosition)
         {
@@ -189,7 +192,7 @@ public class EnemyRoutineController : MonoBehaviour
     }
 
     /// <summary>
-    /// 조사 종료 후 경비 적을 원래 위치와 방향으로 복귀시키고 완료 여부를 반환한다.
+    /// 경비 위치로 복귀하되 도중·도착 회전에 감지하면 복귀 완료를 알리지 않는다.
     /// </summary>
     public bool TryReturnGuard(ActionResolutionContext context)
     {
@@ -200,8 +203,7 @@ public class EnemyRoutineController : MonoBehaviour
 
         if (enemyContext.GridActor.GridPosition == guardPosition)
         {
-            EnemyMovementUtility.FaceDirection(enemyContext, guardLookDirection, context);
-            return true;
+            return !EnemyMovementUtility.FaceDirection(enemyContext, guardLookDirection, context);
         }
 
         int searchDistance = GridManager.Instance.Width * GridManager.Instance.Height;
@@ -212,11 +214,12 @@ public class EnemyRoutineController : MonoBehaviour
 
         int stepCount = Mathf.Min(enemyContext.EnemyData.PatrolMoveRange, pathBuffer.Count);
         List<GridPosition> movementPath = pathBuffer.GetRange(0, stepCount);
-        EnemyMovementUtility.MoveAlongPath(enemyContext, movementPath, context, "적 경비 위치 복귀 연출");
+        EnemyMovementUtility.MoveAlongPath(enemyContext, movementPath, context, "적 경비 위치 복귀 연출", out bool detectedPlayer);
+        // 감지를 예약한 뒤 평상 상태·원래 경비 방향으로 복귀하는 후처리를 막는다.
+        if (detectedPlayer) return false;
         if (enemyContext.GridActor.GridPosition == guardPosition)
         {
-            EnemyMovementUtility.FaceDirection(enemyContext, guardLookDirection, context);
-            return true;
+            return !EnemyMovementUtility.FaceDirection(enemyContext, guardLookDirection, context);
         }
 
         return false;

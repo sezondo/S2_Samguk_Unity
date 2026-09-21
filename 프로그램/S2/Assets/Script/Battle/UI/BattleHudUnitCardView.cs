@@ -1,4 +1,4 @@
-using TMPro;
+﻿using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
 
@@ -78,14 +78,21 @@ public sealed class BattleHudUnitCardView : MonoBehaviour
             return;
         }
 
-        int hp = unit.Health != null ? unit.Health.CurrentHitPoint : 0;
+        var registry = ActorPresentationRegistry.Instance;
+        if (registry == null || unit.Health == null)
+        {
+            Debug.LogError($"{name}: 화면 HP를 표시할 등록소와 Health 참조가 필요합니다.", this);
+            enabled = false;
+            return;
+        }
+        int hp = registry.GetPresentedHitPoint(unit.GridActor, unit.Health.CurrentHitPoint);
         int maxHp = unit.Health != null ? unit.Health.MaxHitPoint : 0;
         int ap = unit.ActionPoint != null ? unit.ActionPoint.Current : 0;
         int maxAp = unit.ActionPoint != null ? unit.ActionPoint.Max : 0;
         stateText.text = $"HP {hp}/{maxHp}\nAP {ap}/{maxAp}";
 
         Sprite nextState;
-        if (!unit.IsAlive)
+        if (hp <= 0)
         {
             nextState = deadSprite;
         }
@@ -104,7 +111,8 @@ public sealed class BattleHudUnitCardView : MonoBehaviour
 
         stateOverlay.sprite = nextState;
         stateOverlay.enabled = nextState != null;
-        button.interactable = isPlayerTurn && unit.IsAlive && ap > 0;
+        button.interactable = isPlayerTurn && unit.IsAlive && ap > 0 &&
+            ActionPresentationQueue.Instance != null && !ActionPresentationQueue.Instance.IsBusy;
     }
 
     /// <summary>

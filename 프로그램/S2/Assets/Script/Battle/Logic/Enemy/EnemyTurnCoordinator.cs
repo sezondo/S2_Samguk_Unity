@@ -1,4 +1,4 @@
-using System.Collections;
+﻿using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 
@@ -24,6 +24,14 @@ public class EnemyTurnCoordinator : MonoBehaviour
 
     // 현재 적 턴 실행 코루틴이다.
     private Coroutine enemyTurnCoroutine;
+    // 논리 생산과 마지막 연출 완료를 포함한 적 턴 처리 상태다.
+    public bool IsRunning { get; private set; }
+    // 한 프레임에 누적할 판단 시간의 목표다. 단일 Plan 호출을 강제 중단하지는 않는다.
+    private const double LogicSliceMilliseconds = 4;
+    // 최근 적 턴의 판단·논리 확정 시간과 단일 행동 최대 시간, 실행 시도 수다.
+    public double LastLogicMilliseconds { get; private set; }
+    public double LastMaxActionMilliseconds { get; private set; }
+    public int LastActionCount { get; private set; }
 
     /// <summary>
     /// 적 턴 조정에 필요한 참조를 확인한다.
@@ -64,6 +72,12 @@ public class EnemyTurnCoordinator : MonoBehaviour
             StopCoroutine(enemyTurnCoroutine);
             enemyTurnCoroutine = null;
         }
+        if (IsRunning && presentationQueue != null)
+        {
+            presentationQueue.EndProduction();
+            presentationQueue.ReleaseTurnProcessing();
+        }
+        IsRunning = false;
     }
 
     /// <summary>
@@ -72,14 +86,16 @@ public class EnemyTurnCoordinator : MonoBehaviour
     private void HandleTurnStarted(TurnSide side)
     {
         if (side != TurnSide.Enemy ||
-            enemyTurnCoroutine != null ||
+            IsRunning ||
             stageStateManager == null ||
             !stageStateManager.IsPlaying)
         {
             return;
         }
 
+        IsRunning = true;
         enemyTurnCoroutine = StartCoroutine(RunEnemyTurn());
+        if (!IsRunning) enemyTurnCoroutine = null;
     }
 
     /// <summary>
@@ -87,99 +103,112 @@ public class EnemyTurnCoordinator : MonoBehaviour
     /// </summary>
     private IEnumerator RunEnemyTurn()
     {
-        if (!HasValidReference())
+        bool completedNormally = false;
+        bool ownsProduction = false;
+        try
         {
-            enemyTurnCoroutine = null;
-            yield break;
-        }
-
-        if (!stageStateManager.IsPlaying)
-        {
-            enemyTurnCoroutine = null;
-            yield break;
-        }
-
-        if (logEnemyTurn)
-        {
-            Debug.Log($"{nameof(EnemyTurnCoordinator)}: 적 턴 행동을 시작합니다.", this);
-        }
-
-        yield return WaitForPresentationQueue();
-        if (!stageStateManager.IsPlaying)
-        {
-            enemyTurnCoroutine = null;
-            yield break;
-        }
-
-        IReadOnlyList<EnemyContext> enemies = EnemyRegistry.Instance.Enemies;
-        // 그룹 순찰은 첫 그룹원이 실행될 때 다른 그룹원 AP도 필요하므로 행동 전에 전원 AP를 채운다.
-        for (int i = 0; i < enemies.Count; i++)
-        {
-            EnemyContext refillEnemy = enemies[i];
-            if (refillEnemy != null && refillEnemy.enabled && refillEnemy.IsAlive &&
-                refillEnemy.ActionPoint != null && refillEnemy.ActionPoint.enabled)
-            {
-                refillEnemy.ActionPoint.RefillForTurn();
-            }
-        }
-
-        for (int i = 0; i < enemies.Count; i++)
-        {
-            if (!stageStateManager.IsPlaying)
-            {
-                break;
-            }
-
-            EnemyContext enemy = enemies[i];
-            if (enemy == null || !enemy.enabled)
-            {
-                continue;
-            }
-
-            EnemyTurnAgent turnAgent = enemy.TurnAgent;
-            if (turnAgent == null || !turnAgent.enabled)
-            {
-                if (logMissingAgent)
-                {
-                    Debug.Log($"{nameof(EnemyTurnCoordinator)}: {enemy.name} 적에는 활성 {nameof(EnemyTurnAgent)}가 없어 적 턴 행동을 생략합니다.", this);
-                }
-
-                continue;
-            }
-
-            if (enemy.ActionPoint == null || !enemy.ActionPoint.enabled)
-            {
-                if (logMissingAgent)
-                {
-                    Debug.Log($"{nameof(EnemyTurnCoordinator)}: {enemy.name} 적에는 활성 {nameof(EnemyActionPoint)}가 없어 적 턴 행동을 생략합니다.", this);
-                }
-
-                continue;
-            }
-
-            ActionResolutionContext resolutionContext = new(presentationQueue);
-            bool acted = turnAgent.TryExecuteTurn(resolutionContext);
-            resolutionContext.Resolve();
-
-            if (acted || presentationQueue.QueuedEventCount > 0)
-            {
-                presentationQueue.PlayQueuedEvents();
+            if (!HasValidReference() || !stageStateManager.IsPlaying) yield break;
+            // 빈 큐에 대한 불필요한 한 프레임 대기로 적 턴 시작 직후 잠금이 비지 않게 한다.
+            if (presentationQueue.IsPlaying || presentationQueue.QueuedEventCount > 0)
                 yield return WaitForPresentationQueue();
+            if (!stageStateManager.IsPlaying || !presentationQueue.TryBeginProduction()) yield break;
+
+            ownsProduction = true;
+            LastLogicMilliseconds = LastMaxActionMilliseconds = 0;
+            LastActionCount = 0;
+            var slice = System.Diagnostics.Stopwatch.StartNew();
+            try
+            {
+                // 등록 변경과 새 발각을 구분하기 위해 적 목록과 턴 시작의 전투 상태를 저장한다.
+                var enemies = new List<EnemyContext>(EnemyRegistry.Instance.Enemies);
+                var combatAtStart = new HashSet<EnemyContext>();
+                foreach (var enemy in enemies)
+                {
+                    if (enemy == null || !enemy.isActiveAndEnabled || !enemy.IsAlive) continue;
+                    if (enemy.AlertState.IsAlerted) combatAtStart.Add(enemy);
+                    if (enemy.ActionPoint != null && enemy.ActionPoint.enabled)
+                    {
+                        enemy.ActionPoint.RefillForTurn();
+                        enemy.TurnAgent?.BeginTurn();
+                    }
+                }
+
+                foreach (var enemy in enemies)
+                {
+                    if (!stageStateManager.IsPlaying || presentationQueue.HasFailed) break;
+                    if (enemy == null || !enemy.isActiveAndEnabled || !enemy.IsAlive) continue;
+                    var agent = enemy.TurnAgent;
+                    if (agent == null || !agent.enabled || enemy.ActionPoint == null || !enemy.ActionPoint.enabled)
+                    {
+                        if (logMissingAgent) Debug.Log($"{name}: {enemy.name}의 턴 행동 참조가 없어 건너뜁니다.", this);
+                        continue;
+                    }
+                    // 이 턴 도중 새로 발각된 적은 즉시 반응만 수행하고 다음 턴부터 공격한다.
+                    bool combatTurn = combatAtStart.Contains(enemy);
+                    if (!combatTurn && enemy.AlertState.IsAlerted) continue;
+                    do
+                    {
+                        int beforeAP = enemy.ActionPoint.Current;
+                        var context = new ActionResolutionContext(presentationQueue);
+                        bool acted = ExecuteLogicalAction(agent, context);
+                        presentationQueue.PlayQueuedEvents();
+                        if (context.HasFailed || presentationQueue.HasFailed) break;
+
+                        // 연출 완료와 무관하게 시간 예산만 양보한다. 다음 프레임에도 논리는 계속 앞서간다.
+                        if (slice.Elapsed.TotalMilliseconds >= LogicSliceMilliseconds)
+                        {
+                            yield return null;
+                            slice.Restart();
+                        }
+                        if (!combatTurn || !acted || enemy.ActionPoint.Current >= beforeAP) break;
+                    }
+                    while (stageStateManager.IsPlaying && enemy.IsAlive && agent.enabled && enemy.ActionPoint.Current > 0);
+                }
             }
-        }
+            finally
+            {
+                presentationQueue.EndProduction();
+            }
 
-        if (logEnemyTurn)
-        {
-            string endReason = stageStateManager.IsPlaying
-                ? "모든 적 행동을 처리했습니다."
-                : $"스테이지가 {stageStateManager.CurrentState} 상태가 되어 남은 적 행동을 중단했습니다.";
-            Debug.Log($"{nameof(EnemyTurnCoordinator)}: {endReason}", this);
+            // 실패·클리어 때도 확정된 연출은 끝까지 처리하고 결과 UI가 앞서지 않게 한다.
+            yield return WaitForPresentationQueue();
+            completedNormally = !presentationQueue.HasFailed;
+            if (logEnemyTurn)
+                Debug.Log($"적 턴 논리 {LastLogicMilliseconds:F2}ms, 단일 최대 {LastMaxActionMilliseconds:F2}ms, 판단 {LastActionCount}회", this);
         }
-
-        enemyTurnCoroutine = null;
-        if (stageStateManager.IsPlaying && turnManager.IsEnemyTurn)
+        finally
         {
+            if (ownsProduction) presentationQueue.ReleaseTurnProcessing();
+            IsRunning = false;
+            enemyTurnCoroutine = null;
+        }
+        if (completedNormally && stageStateManager.IsPlaying && turnManager.IsEnemyTurn)
             turnManager.EndCurrentTurn();
+    }
+
+    /// <summary>한 행동의 파생 논리까지 확정하고 예외 시 이후 생산을 정지한다.</summary>
+    private bool ExecuteLogicalAction(EnemyTurnAgent agent, ActionResolutionContext context)
+    {
+        var timer = System.Diagnostics.Stopwatch.StartNew();
+        try
+        {
+            bool acted = agent.TryExecuteTurn(context);
+            context.Resolve();
+            if (!agent.enabled) context.Fail("적 행동 실행이 중단되어 후속 판단을 정지합니다.");
+            return acted;
+        }
+        catch (System.Exception exception)
+        {
+            context.Fail($"적 행동 실행 예외: {exception}");
+            return false;
+        }
+        finally
+        {
+            timer.Stop();
+            double elapsed = timer.Elapsed.TotalMilliseconds;
+            LastLogicMilliseconds += elapsed;
+            LastMaxActionMilliseconds = System.Math.Max(LastMaxActionMilliseconds, elapsed);
+            LastActionCount++;
         }
     }
 

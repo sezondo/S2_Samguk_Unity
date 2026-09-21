@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using TMPro;
 using UnityEngine;
 using UnityEngine.InputSystem;
@@ -43,7 +43,7 @@ public class StageResultPresenter : MonoBehaviour, IPresentationEventHandler
         }
 
         resultRoot.SetActive(false);
-        confirmButton.onClick.AddListener(ConfirmResult);
+
     }
 
     /// <summary>
@@ -51,6 +51,11 @@ public class StageResultPresenter : MonoBehaviour, IPresentationEventHandler
     /// </summary>
     private void OnEnable()
     {
+        if (confirmButton != null)
+        {
+            confirmButton.onClick.RemoveListener(ConfirmResult);
+            confirmButton.onClick.AddListener(ConfirmResult);
+        }
         TryRegisterQueue(false);
     }
 
@@ -67,6 +72,11 @@ public class StageResultPresenter : MonoBehaviour, IPresentationEventHandler
     /// </summary>
     private void OnDisable()
     {
+        // 씬 종료·비활성화는 결과 확정으로 취급하지 않고 대기 핸들만 정리한다.
+        var handle = pendingHandle;
+        pendingHandle = null;
+        if (resultRoot != null) resultRoot.SetActive(false);
+        handle?.Complete();
         if (confirmButton != null)
         {
             confirmButton.onClick.RemoveListener(ConfirmResult);

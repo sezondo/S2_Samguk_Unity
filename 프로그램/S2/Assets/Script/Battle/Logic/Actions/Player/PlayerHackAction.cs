@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using UnityEngine;
 
@@ -224,7 +224,7 @@ public class PlayerHackAction : MonoBehaviour
             return false;
         }
 
-        if (presentationQueue.IsPlaying)
+        if (presentationQueue.IsBusy)
         {
             if (logBlockedTarget)
             {

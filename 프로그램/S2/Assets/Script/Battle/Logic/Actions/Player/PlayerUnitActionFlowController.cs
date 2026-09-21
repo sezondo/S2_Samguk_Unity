@@ -1,4 +1,4 @@
-using UnityEngine;
+﻿using UnityEngine;
 
 /// <summary>
 /// 플레이어 행동 하나의 논리 처리와 연출 큐 실행 시점을 조정한다.
@@ -255,7 +255,7 @@ public class PlayerUnitActionFlowController : MonoBehaviour
             return false;
         }
 
-        if (presentationQueue.IsPlaying)
+        if (presentationQueue.IsBusy)
         {
             if (logBlockedAction)
             {

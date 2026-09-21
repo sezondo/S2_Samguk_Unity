@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using UnityEngine;
 
@@ -1389,7 +1389,7 @@ public class EnemyPatrolGroup : MonoBehaviour
             EnemyContext enemy = members[i].Enemy;
             if (enemy != null && enemy.IsAlive && enemy.GridSight != null)
             {
-                context.Publish(new EnemyPerceptionChangedLogicEvent(enemy));
+                context.Publish(EnemyPerceptionCoordinator.CapturePlayerDetection(enemy));
             }
         }
     }

@@ -87,6 +87,9 @@ public class ActorVisualController : MonoBehaviour
     // 애니메이션에 흔들리지 않는 발 기준점이며 VisualRoot의 로컬 좌표다.
     [SerializeField] private Vector2 groundPointLocalOffset = new Vector2(0f, -2.2f);
     public Vector3 GroundWorldPosition => transform.TransformPoint(groundPointLocalOffset);
+    // 이미지의 투명 여백과 무관한 머리 위 UI 기준점이며 VisualRoot 로컬 좌표다.
+    [SerializeField] private Vector2 headPointLocalOffset = new(0f, 2.2f);
+    public Vector3 HeadWorldPosition => transform.TransformPoint(headPointLocalOffset);
     public bool HasVisionSortingOverride => hasVisionSortingOverride;
 
     /// <summary>건물별 전면 정렬 요청을 모아 적용하며 요청 해제 시 원래 순서로 복원한다.</summary>

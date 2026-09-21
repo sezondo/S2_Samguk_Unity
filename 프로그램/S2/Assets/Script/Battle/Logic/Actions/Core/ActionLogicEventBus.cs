@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using UnityEngine;
 
@@ -56,21 +56,18 @@ public static class ActionLogicEventBus
             return;
         }
 
-        for (int i = 0; i < handlers.Count; i++)
+        for (int i = 0; i < handlers.Count && !context.HasFailed; i++)
         {
             IActionLogicEventHandler handler = handlers[i];
-            if (handler == null || !handler.CanHandle(logicEvent))
-            {
-                continue;
-            }
-
+            if (handler == null) continue;
             try
             {
+                if (!handler.CanHandle(logicEvent)) continue;
                 handler.Handle(logicEvent, context);
             }
             catch (Exception exception)
             {
-                Debug.LogError($"{nameof(ActionLogicEventBus)}: {logicEvent.GetType().Name} 처리 중 예외가 발생했습니다.\n{exception}");
+                context.Fail($"{nameof(ActionLogicEventBus)}: {logicEvent.GetType().Name} 처리 중 예외: {exception}");
             }
         }
     }

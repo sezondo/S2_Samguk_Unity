@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using TMPro;
 using UnityEngine;
@@ -26,8 +26,8 @@ public sealed class BattleHudTacticalOverlayController : MonoBehaviour
     [SerializeField] private RectTransform enemyStateIconRoot;
     // 적 수에 따라 생성할 상태 아이콘 Prefab이다.
     [SerializeField] private Image enemyStateIconPrefab;
-    // 적 머리 위에 아이콘을 띄울 화면 픽셀 오프셋이다.
-    [SerializeField] private Vector2 worldIconScreenOffset = new(0f, 58f);
+    // 머리 기준점과 상태 아이콘 아래쪽 사이의 화면 픽셀 여백이다.
+    [SerializeField] private float enemyIconGapPixels = 8f;
 
     // 전술 오버레이 Sprite를 제공하는 HUD 에셋이다.
     private BattleHudAssetSet assetSet;
@@ -87,10 +87,17 @@ public sealed class BattleHudTacticalOverlayController : MonoBehaviour
         }
 
         enemyStateIcons.Clear();
+        EnsureEnemyStateIcons();
+    }
+
+    /// <summary>HUD 초기화 뒤 등록된 적도 아이콘을 한 번만 생성한다. 사망 연출 중인 기존 아이콘은 유지한다.</summary>
+    private void EnsureEnemyStateIcons()
+    {
         IReadOnlyList<EnemyContext> enemies = enemyRegistry.Enemies;
         for (int i = 0; i < enemies.Count; i++)
         {
             EnemyContext enemy = enemies[i];
+            if (enemy == null || enemyStateIcons.ContainsKey(enemy)) continue;
             Image icon = Instantiate(enemyStateIconPrefab, enemyStateIconRoot);
             icon.name = $"EnemyState_{enemy.name}";
             enemyStateIcons.Add(enemy, icon);
@@ -102,19 +109,35 @@ public sealed class BattleHudTacticalOverlayController : MonoBehaviour
     /// </summary>
     public void Refresh()
     {
+        EnsureEnemyStateIcons();
         TacticalUnitContext activeUnit = unitControlManager.ActiveUnit;
-        selectedUnitBracket.enabled = activeUnit != null && activeUnit.IsAlive;
+        var registry = ActorPresentationRegistry.Instance;
+        if (registry == null)
+        {
+            Debug.LogError($"{name}: 전술 표시용 ActorPresentationRegistry가 없습니다.", this);
+            enabled = false;
+            return;
+        }
+        ActorVisualController selectedVisual = null;
+        selectedUnitBracket.enabled = activeUnit != null &&
+            registry.TryGetVisual(activeUnit.GridActor, out selectedVisual) && !selectedVisual.IsDeathPresentation;
         if (selectedUnitBracket.enabled)
         {
-            SetWorldOverlayPosition(selectedUnitBracket.rectTransform, activeUnit.GridActor.transform.position, Vector2.zero);
+            SetGridBracket(selectedUnitBracket.rectTransform, selectedVisual.transform.position - selectedVisual.CoverWorldOffset);
         }
 
         foreach (KeyValuePair<EnemyContext, Image> pair in enemyStateIcons)
         {
             EnemyContext enemy = pair.Key;
             Image icon = pair.Value;
-            bool visible = enemy != null && enemy.IsAlive &&
-                           (PlayerVisionManager.Instance == null || PlayerVisionManager.Instance.IsVisible(enemy.GridActor.GridPosition));
+            ActorVisualController enemyVisual = null;
+            bool visible = enemy != null && registry.TryGetVisual(enemy.GridActor, out enemyVisual) &&
+                !enemyVisual.IsDeathPresentation && enemyVisual.VisionAlpha > 0.01f;
+            if (visible)
+            {
+                var state = registry.GetPresentedEnemyState(enemy);
+                visible = state.awareness != EnemyAwarenessState.Alerted || registry.IsAlertIconVisible(enemy.GridActor);
+            }
             icon.enabled = visible;
             if (!visible)
             {
@@ -122,7 +145,9 @@ public sealed class BattleHudTacticalOverlayController : MonoBehaviour
             }
 
             icon.sprite = GetEnemyStateSprite(enemy);
-            SetWorldOverlayPosition(icon.rectTransform, enemy.GridActor.transform.position, worldIconScreenOffset);
+            Vector3 headPosition = enemyVisual.HeadWorldPosition;
+            float halfIconHeight = icon.rectTransform.rect.height * hudCanvas.scaleFactor * 0.5f;
+            SetWorldOverlayPosition(icon.rectTransform, headPosition, new Vector2(0f, halfIconHeight + enemyIconGapPixels));
         }
 
         RefreshPointerTarget(activeUnit);
@@ -159,6 +184,7 @@ public sealed class BattleHudTacticalOverlayController : MonoBehaviour
     private void RefreshPointerTarget(TacticalUnitContext activeUnit)
     {
         ClearPointerPreview();
+        if (ActionPresentationQueue.Instance != null && ActionPresentationQueue.Instance.IsBusy) return;
         BattleHudActionType? selectedAction = activeUnit != null ? getSelectedAction(activeUnit) : null;
         if (selectedAction == null || PlayerInputReader.Instance == null ||
             !PlayerInputReader.Instance.TryGetPointerGridPosition(out GridPosition pointerPosition) ||
@@ -169,7 +195,7 @@ public sealed class BattleHudTacticalOverlayController : MonoBehaviour
 
         targetBracket.sprite = GetTargetBracketSprite(selectedAction.Value);
         targetBracket.enabled = targetBracket.sprite != null;
-        SetWorldOverlayPosition(targetBracket.rectTransform, GridManager.Instance.GridToWorld(pointerPosition), Vector2.zero);
+        SetGridBracket(targetBracket.rectTransform, GridManager.Instance.GridToWorld(pointerPosition));
 
         if (selectedAction != BattleHudActionType.Gun ||
             !GridManager.Instance.TryGetActorAt(pointerPosition, out GridActor targetActor) ||
@@ -200,14 +226,15 @@ public sealed class BattleHudTacticalOverlayController : MonoBehaviour
     /// </summary>
     private Sprite GetEnemyStateSprite(EnemyContext enemy)
     {
-        if (enemy.AlertState.IsAlerted)
+        var state = ActorPresentationRegistry.Instance.GetPresentedEnemyState(enemy);
+        if (state.awareness == EnemyAwarenessState.Alerted)
         {
             return assetSet.EnemyAlerted;
         }
 
-        if (enemy.AlertState.IsSuspicious)
+        if (state.awareness == EnemyAwarenessState.Suspicious)
         {
-            return enemy.AlertState.SuspiciousPhase == SuspiciousBehaviorPhase.Searching
+            return state.phase == SuspiciousBehaviorPhase.Searching
                 ? assetSet.EnemyInvestigating
                 : assetSet.EnemySuspicious;
         }
@@ -229,6 +256,24 @@ public sealed class BattleHudTacticalOverlayController : MonoBehaviour
             BattleHudActionType.Hack => assetSet.HackTargetBracket,
             _ => null,
         };
+    }
+
+    /// <summary>현재 줌과 Canvas 배율을 반영해 한 칸의 테두리를 감싸도록 브래킷을 배치한다.</summary>
+    private void SetGridBracket(RectTransform target, Vector3 center)
+    {
+        GridManager grid = GridManager.Instance;
+        if (grid == null)
+        {
+            Debug.LogError($"{name}: 선택 표시 크기를 계산할 GridManager가 없습니다.", this);
+            enabled = false;
+            return;
+        }
+        float halfCell = grid.CellSize * 0.5f;
+        Vector2 lower = worldCamera.WorldToScreenPoint(center - new Vector3(halfCell, halfCell));
+        Vector2 upper = worldCamera.WorldToScreenPoint(center + new Vector3(halfCell, halfCell));
+        Vector2 size = (upper - lower) / hudCanvas.scaleFactor;
+        target.sizeDelta = new Vector2(Mathf.Abs(size.x), Mathf.Abs(size.y));
+        SetWorldOverlayPosition(target, center, Vector2.zero);
     }
 
     /// <summary>

@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
@@ -206,8 +206,10 @@ public class CombatActionPresenter : MonoBehaviour, IPresentationEventHandler
         activeHandle = handle;
         activePresentationEvent = presentationEvent;
 
-        GridPosition attackerPosition = presentationEvent.Actor.GridPosition;
-        GridPosition targetPosition = presentationEvent.TargetActor.GridPosition;
+        GridPosition attackerPosition = presentationEvent.FromPosition;
+        GridPosition targetPosition = presentationEvent.ToPosition;
+        if (presentationEvent.HasDamageResult)
+            presentationRegistry.PresentDamage(presentationEvent.TargetActor, presentationEvent.DamageResult);
         activeAttackerVisual.BeginCombatPresentation(attackerPosition, targetPosition, true, false);
         activeTargetVisual.BeginCombatPresentation(targetPosition, attackerPosition, false, activeTargetKilled);
 

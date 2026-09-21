@@ -1,4 +1,4 @@
-using UnityEngine;
+﻿using UnityEngine;
 
 /// <summary>
 /// 도깨비 환도를 거리 제한 없이 플레이어 현재 칸으로 회수하는 행동을 담당한다.
@@ -96,7 +96,7 @@ public class PlayerSwordRecallAction : MonoBehaviour
             return false;
         }
 
-        if (presentationQueue.IsPlaying)
+        if (presentationQueue.IsBusy)
         {
             LogBlockedAction("연출 큐가 실행 중입니다");
             return false;

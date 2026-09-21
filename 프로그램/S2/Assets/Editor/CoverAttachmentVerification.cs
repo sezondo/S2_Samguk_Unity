@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.IO;
@@ -111,7 +111,9 @@ public static class CoverAttachmentVerification
     private static IEnumerator Run()
     {
         Application.runInBackground = true;
-        var covers = UnityEngine.Object.FindObjectsByType<LowCoverIdlePresenter>(FindObjectsInactive.Include, FindObjectsSortMode.InstanceID);
+        // 적에게도 엄폐가 연결되어 있으므로 이 검증의 대상인 플레이어·NPC만 선택한다.
+        var covers = Array.FindAll(UnityEngine.Object.FindObjectsByType<LowCoverIdlePresenter>(FindObjectsInactive.Include, FindObjectsSortMode.InstanceID),
+            cover => Read<TacticalUnitContext>(cover, "unitContext") != null);
         Require(covers.Length == 2, "플레이어와 NPC 엄폐 참조");
         // 원래 꺼져 있는 NPC도 플레이 사본에서만 활성화하여 같은 구현을 검사한다.
         foreach (var cover in covers) cover.transform.root.gameObject.SetActive(true);

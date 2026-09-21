@@ -1,4 +1,4 @@
-using UnityEngine;
+﻿using UnityEngine;
 
 /// <summary>
 /// 씬의 단일 입력 Reader를 현재 선택된 전술 유닛의 행동 요청으로 변환한다.
@@ -59,6 +59,9 @@ public class PlayerUnitInputController : MonoBehaviour
         {
             return;
         }
+
+        if ((ActionPresentationQueue.Instance != null && ActionPresentationQueue.Instance.IsBusy) ||
+            (TurnManager.Instance != null && !TurnManager.Instance.IsPlayerTurn)) return;
 
         PlayerInputReader input = PlayerInputReader.Instance;
         PlayerUnitControlManager controlManager = PlayerUnitControlManager.Instance;

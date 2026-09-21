@@ -1,4 +1,4 @@
-/// <summary>
+﻿/// <summary>
 /// 연출 큐에 들어가는 단일 연출 이벤트 데이터다.
 /// 판정 결과를 화면에 어떤 순서로 보여줄지 설명한다.
 /// </summary>
@@ -28,6 +28,10 @@ public readonly struct PresentationEvent
     public GridDirection FromFacingDirection { get; }
     public GridDirection ToFacingDirection { get; }
     public string Message { get; }
+    // 경계 아이콘 갱신 이벤트가 생성된 시점의 인식 상태다.
+    public EnemyAwarenessState AwarenessState { get; }
+    // 인식 상태 표시 이벤트 생성 당시의 조사 단계다.
+    public SuspiciousBehaviorPhase SuspiciousPhase { get; }
 
     /// <summary>
     /// 지정한 값으로 연출 이벤트를 만든다.
@@ -57,9 +61,13 @@ public readonly struct PresentationEvent
         GridDirection toFacingDirection = GridDirection.Up,
         GroupFacingTurnPresentationSnapshot groupFacingTurnSnapshot = null,
         AttackResult attackResult = default,
-        bool hasAttackResult = false)
+        bool hasAttackResult = false,
+        EnemyAwarenessState awarenessState = EnemyAwarenessState.Unaware,
+        SuspiciousBehaviorPhase suspiciousPhase = default)
     {
         Type = type;
+        AwarenessState = awarenessState;
+        SuspiciousPhase = suspiciousPhase;
         Actor = actor;
         TargetActor = targetActor;
         Enemy = enemy;
@@ -96,6 +104,15 @@ public readonly struct PresentationEvent
         string message = null)
     {
         return new PresentationEvent(PresentationEventType.MoveActor, actor, null, null, null, fromPosition, toPosition, toPosition, toPosition, movePhase, AttackPresentationKind.None, default, false, message);
+    }
+
+    /// <summary>발각 당시 적 칸을 기록해 논리 반응 이동이 먼저 끝나도 당시 위치를 비춘다.</summary>
+    public static PresentationEvent AlertCameraFocus(EnemyContext enemy)
+    {
+        GridPosition position = enemy.GridActor.GridPosition;
+        return new PresentationEvent(PresentationEventType.AlertCameraFocus, enemy.GridActor, null, enemy,
+            null, position, position, position, position, MovePresentationPhase.None,
+            AttackPresentationKind.None, default, false, "발각 적 카메라 이동");
     }
 
     /// <summary>
@@ -226,9 +243,16 @@ public readonly struct PresentationEvent
             snapshot);
     }
 
-    /// <summary>
-    /// 적이 이상 현상을 감지한 의심 연출 이벤트를 만든다.
-    /// </summary>
+    /// <summary>적 인식 상태의 화면 반영을 논리 변경 순서에 맞춰 예약한다.</summary>
+    public static PresentationEvent EnemyAwarenessChanged(EnemyContext enemy, EnemyAwarenessState state)
+    {
+        return new PresentationEvent(PresentationEventType.EnemyAwarenessChanged,
+            null, null, enemy, null, default, default, default, default,
+            MovePresentationPhase.None, AttackPresentationKind.None, default, false,
+            "적 인식 상태 표시 갱신", awarenessState: state, suspiciousPhase: enemy.AlertState.SuspiciousPhase);
+    }
+
+    /// <summary>적이 이상 현상을 감지한 의심 연출 이벤트를 만든다.</summary>
     public static PresentationEvent SuspicionDetected(GridPosition eventPosition, EnemyContext enemy, string message = null)
     {
         return new PresentationEvent(PresentationEventType.SuspicionDetected, null, null, enemy, null, default, default, eventPosition, eventPosition, MovePresentationPhase.None, AttackPresentationKind.None, default, false, message);
@@ -286,10 +310,10 @@ public readonly struct PresentationEvent
             null,
             null,
             null,
-            default,
-            default,
-            default,
-            default,
+            actor != null ? actor.GridPosition : default,
+            actor != null ? actor.GridPosition : default,
+            actor != null ? actor.GridPosition : default,
+            actor != null ? actor.GridPosition : default,
             MovePresentationPhase.None,
             AttackPresentationKind.None,
             default,

@@ -27,14 +27,11 @@
 - 필수 컴포넌트 참조 유효성 검사 함수 명칭은 `HasValidReference()`를 기본으로 통일한다.
 - `PlayerTurnData` 같은 튜닝 데이터는 빈 값이나 누락 참조가 있으면 fallback 없이 오류로 드러내야 한다.
 - `PlayerTurnData` 같은 튜닝 데이터 에셋 자체에 `HasValidData()` 책임을 두지 않는다. 데이터를 사용하는 스크립트가 자기 `HasValidData()`에서 필요한 데이터 참조와 필드 값을 직접 검사하고, 누락/오류 원인을 `Debug.LogError`로 남긴다.
-- `PlayerContext`를 쓰는 플레이어 컴포넌트는 Context 참조가 없을 때 같은 루트에서 핵심 컴포넌트를 직접 `GetComponent<T>()`로 찾아 보정하지 않는다.
 - 사용자를 호출하거나 부를 때는 "주인님" 이라고 부른다.
 
 ## Context 참조 규칙
 
 - 런타임 컴포넌트 참조는 카테고리별 Context를 통해 모아서 관리한다.
-- Player 계열 컴포넌트는 `PlayerContext`에 참조를 추가하고, 다른 Player 컴포넌트는 `PlayerContext`에서 꺼내 사용한다.
-- Enemy 계열은 추후 `EnemyContext`, NPC 계열은 추후 `NPCContext`처럼 도메인별 Context를 만든다.
 - 기능 컴포넌트가 같은 루트의 다른 핵심 컴포넌트를 직접 `GetComponent<T>()`로 찾지 않는다. 필요한 참조는 해당 Context에 추가한다.
 - Context는 참조 주머니 역할만 한다. 튜닝 수치, 상태 변경 정책, 계산 로직을 넣지 않는다.
 - Context에서 얻은 참조의 내부 값을 직접 수정하지 않고, 각 컴포넌트가 제공하는 함수나 요청 메서드를 사용한다.

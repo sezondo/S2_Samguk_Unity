@@ -1,4 +1,4 @@
-/// <summary>
+﻿/// <summary>
 /// 액터가 이동 경로의 한 칸에 진입했음을 알리는 논리 이벤트다.
 /// </summary>
 public sealed class MoveStepEnteredLogicEvent : IActionLogicEvent
@@ -162,13 +162,17 @@ public sealed class SwordThrownLogicEvent : IActionLogicEvent
 public sealed class EnemyPerceptionChangedLogicEvent : IActionLogicEvent
 {
     public EnemyContext Enemy { get; }
+    // 이동·회전 직후 그 위치의 시야로 확정한 감지 결과다.
+    public bool HasDetectedPlayer { get; }
+    // 감지 당시 플레이어 칸이며 나중에 바뀐 적 시야로 다시 판정하지 않는다.
+    public GridPosition DetectedPlayerPosition { get; }
 
-    /// <summary>
-    /// 감지 정보를 갱신한 적을 지정해 이벤트를 만든다.
-    /// </summary>
-    public EnemyPerceptionChangedLogicEvent(EnemyContext enemy)
+    /// <summary>한 칸 이동 또는 회전 시점에 확정한 플레이어 감지 결과를 보관한다.</summary>
+    public EnemyPerceptionChangedLogicEvent(EnemyContext enemy, bool hasDetectedPlayer, GridPosition detectedPlayerPosition)
     {
         Enemy = enemy;
+        HasDetectedPlayer = hasDetectedPlayer;
+        DetectedPlayerPosition = detectedPlayerPosition;
     }
 }
 
@@ -365,4 +369,6 @@ public enum AttackPresentationKind
     MeleeUnarmed,
     PlayerGun,
     EnemyRanged,
+    // 기존 직렬화 번호를 유지하며 적 근접 연출을 추가한다.
+    EnemyMelee,
 }

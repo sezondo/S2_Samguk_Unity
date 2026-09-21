@@ -6,6 +6,8 @@ public class LowCoverIdlePresenter : MonoBehaviour
     [Header("Reference")]
     // 논리 위치와 생존 상태를 제공하는 명시적 참조다.
     [SerializeField] private TacticalUnitContext unitContext;
+    // 적에게 적용할 때 연결한다. 플레이어 Context와 둘 중 하나만 명시적으로 연결한다.
+    [SerializeField] private EnemyContext enemyContext;
     // 실제 그림의 위치·방향·자세를 제어하는 명시적 참조다.
     [SerializeField] private ActorVisualController visualController;
     // 벽과 낮은 엄폐물의 논리 칸을 조회한다.
@@ -40,6 +42,12 @@ public class LowCoverIdlePresenter : MonoBehaviour
     // 필수 참조와 설정 검증이 완료됐는지 나타낸다.
     private bool initialized;
 
+    // 연결된 진영의 논리 액터와 생존 상태를 같은 엄폐 표시 흐름에 제공한다.
+    private GridActor Actor => unitContext != null ? unitContext.GridActor : enemyContext.GridActor;
+    private bool IsActiveAndAlive => unitContext != null
+        ? unitContext.isActiveAndEnabled && unitContext.IsAlive
+        : enemyContext.isActiveAndEnabled && enemyContext.IsAlive;
+
     public bool IsNearLowCover => isNearLowCover;
     public bool IsNearWallCover => isNearWallCover;
     public bool HasSelectedCover => hasSelectedCover;
@@ -65,14 +73,13 @@ public class LowCoverIdlePresenter : MonoBehaviour
     public void RefreshCover()
     {
         if (!initialized || presentationQueue.IsPlaying || visualController.IsMovingPresentation) return;
-        bool canUseCover = unitContext.isActiveAndEnabled && unitContext.IsAlive &&
-                           unitContext.GridActor.IsRegisteredOnGrid && !visualController.IsDeathPresentation;
+        bool canUseCover = IsActiveAndAlive && Actor.IsRegisteredOnGrid && !visualController.IsDeathPresentation;
         if (!canUseCover)
         {
             ClearSelection();
             return;
         }
-        SelectCover(unitContext.GridActor.GridPosition);
+        SelectCover(Actor.GridPosition);
     }
 
     /// <summary>대기 요청 전에 실제 표시 도착 칸의 엄폐를 확정하여 일반 Idle이 한 프레임 끼지 않게 한다.</summary>
@@ -169,10 +176,12 @@ public class LowCoverIdlePresenter : MonoBehaviour
     /// <summary>필수 Context 및 연출 참조가 명시적으로 연결됐는지 검사한다.</summary>
     public bool HasValidReference()
     {
-        if (unitContext == null || unitContext.GridActor == null || unitContext.Health == null ||
+        bool hasPlayer = unitContext != null && unitContext.GridActor != null && unitContext.Health != null;
+        bool hasEnemy = enemyContext != null && enemyContext.GridActor != null && enemyContext.Health != null;
+        if (hasPlayer == hasEnemy || (unitContext != null && enemyContext != null) ||
             visualController == null || gridManager == null || presentationQueue == null)
         {
-            Debug.LogError($"{nameof(LowCoverIdlePresenter)} on {name}에는 GridActor·Health가 연결된 TacticalUnitContext, ActorVisualController, GridManager, ActionPresentationQueue가 필요합니다.", this);
+            Debug.LogError($"{nameof(LowCoverIdlePresenter)} on {name}에는 GridActor·Health가 연결된 플레이어 또는 적 Context 하나와 ActorVisualController, GridManager, ActionPresentationQueue가 필요합니다.", this);
             return false;
         }
         return true;

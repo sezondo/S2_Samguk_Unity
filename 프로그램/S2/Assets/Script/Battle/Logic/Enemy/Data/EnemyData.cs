@@ -39,7 +39,7 @@ public class EnemyData : ScriptableObject
     // 평상 순찰이 적 턴마다 1AP로 이동할 수 있는 최대 칸 수다.
     [SerializeField] private int patrolMoveRange = 3;
     // 적 턴마다 이 적이 사용할 수 있는 행동 AP다.
-    [SerializeField] private int turnActionPoint = 2;
+    [SerializeField] private int turnActionPoint = 3;
     // 적 턴 이동 행동 1회로 이동할 수 있는 최대 칸 수다.
     [SerializeField] private int turnMoveRange = 3;
     // 적 원거리 공격이 닿는 최대 맨해튼 거리다.
@@ -48,6 +48,10 @@ public class EnemyData : ScriptableObject
     [SerializeField] private int rangedAttackDamage = 1;
     // 이 적의 원거리 공격 기본 명중률과 엄폐 대응 수치다.
     [SerializeField] private RangedAttackAccuracyData rangedAttackAccuracy = new();
+
+    // AP 비용, 사용 가능한 공격과 공통 판단 점수 튜닝이다.
+    [SerializeField] private EnemyCombatSettings combat = new();
+    public EnemyCombatSettings Combat => combat;
 
     public int SightRange => sightRange;
     public bool UseAdjacentDetection => useAdjacentDetection;

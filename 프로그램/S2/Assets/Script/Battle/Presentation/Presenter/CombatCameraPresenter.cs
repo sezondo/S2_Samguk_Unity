@@ -1,4 +1,4 @@
-using System.Collections;
+﻿using System.Collections;
 using UnityEngine;
 
 /// <summary>
@@ -137,7 +137,8 @@ public class CombatCameraPresenter : MonoBehaviour, IPresentationEventHandler
     public bool CanHandle(PresentationEvent presentationEvent)
     {
         return presentationEvent.Type == PresentationEventType.CombatCameraFocus ||
-               presentationEvent.Type == PresentationEventType.CombatCameraRestore;
+               presentationEvent.Type == PresentationEventType.CombatCameraRestore ||
+               presentationEvent.Type == PresentationEventType.AlertCameraFocus;
     }
 
     /// <summary>
@@ -153,6 +154,11 @@ public class CombatCameraPresenter : MonoBehaviour, IPresentationEventHandler
         }
 
         activeHandle = handle;
+        if (presentationEvent.Type == PresentationEventType.AlertCameraFocus)
+        {
+            cameraCoroutine = StartCoroutine(FocusAlertRoutine(presentationEvent, handle));
+            return;
+        }
         if (presentationEvent.Type == PresentationEventType.CombatCameraFocus)
         {
             cameraCoroutine = StartCoroutine(FocusRoutine(presentationEvent, handle));
@@ -160,6 +166,18 @@ public class CombatCameraPresenter : MonoBehaviour, IPresentationEventHandler
         }
 
         cameraCoroutine = StartCoroutine(RestoreRoutine(handle));
+    }
+
+    /// <summary>발각한 적으로 위치만 이동한다. 이전 화면으로 돌아갈 상태는 저장하지 않는다.</summary>
+    private IEnumerator FocusAlertRoutine(PresentationEvent presentationEvent, PresentationEventHandle handle)
+    {
+        Vector3 destination = gridManager.GridToWorld(presentationEvent.EventPosition);
+        destination.z = targetCamera.transform.position.z;
+        float size = targetCamera.orthographicSize;
+        // 전투 포커스 도중 들어온 경우에도 이후 복귀 목적지는 새로 확인한 적 위치다.
+        if (hasSavedCameraState) savedPosition = destination;
+        yield return MoveCamera(targetCamera.transform.position, size, destination, size, focusDuration);
+        CompleteActiveEvent(handle);
     }
 
     /// <summary>

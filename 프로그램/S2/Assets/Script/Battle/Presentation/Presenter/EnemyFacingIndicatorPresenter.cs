@@ -1,4 +1,4 @@
-using System.Collections;
+﻿using System.Collections;
 using UnityEngine;
 
 /// <summary>
@@ -362,7 +362,7 @@ public class EnemyFacingIndicatorPresenter : MonoBehaviour, IPresentationEventHa
             return;
         }
 
-        bool visible = awarenessPresentationVisible && targetEnemy.IsAlive && visualController.VisionAlpha > 0.001f;
+        bool visible = awarenessPresentationVisible && !visualController.IsDeathPresentation && visualController.VisionAlpha > 0.001f;
         SetRendererEnabled(visible);
         if (!visible)
         {

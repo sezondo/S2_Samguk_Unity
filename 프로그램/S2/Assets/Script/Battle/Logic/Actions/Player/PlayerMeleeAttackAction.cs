@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using UnityEngine;
 
 /// <summary>
@@ -184,7 +184,7 @@ public class PlayerMeleeAttackAction : MonoBehaviour
             return false;
         }
 
-        if (presentationQueue.IsPlaying)
+        if (presentationQueue.IsBusy)
         {
             if (logBlockedTarget)
             {
@@ -228,9 +228,7 @@ public class PlayerMeleeAttackAction : MonoBehaviour
         targetActor = null;
 
         GridPosition attackerPosition = playerContext.GridActor.GridPosition;
-        int deltaX = Mathf.Abs(targetPosition.x - attackerPosition.x);
-        int deltaY = Mathf.Abs(targetPosition.y - attackerPosition.y);
-        bool isAdjacentEightDirection = deltaX <= 1 && deltaY <= 1 && (deltaX + deltaY) > 0;
+        bool isAdjacentEightDirection = CombatTargetRules.IsMeleeAdjacent(attackerPosition, targetPosition);
         if (!isAdjacentEightDirection)
         {
             LogBlockedTarget(targetPosition, "근접 공격은 플레이어 주변 8방향 1칸만 가능합니다");

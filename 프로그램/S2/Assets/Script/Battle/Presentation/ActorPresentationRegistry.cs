@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using UnityEngine;
 
@@ -13,6 +13,51 @@ public class ActorPresentationRegistry : MonoBehaviour
     private readonly Dictionary<GridActor, ActorVisualController> visualByActor = new();
     // 논리 Actor를 기준으로 등록된 적 시야 방향 표시 Presenter를 찾는 맵이다.
     private readonly Dictionary<GridActor, EnemyFacingIndicatorPresenter> facingIndicatorByActor = new();
+
+    // 최초 피해 직전 값을 보존하고 피격 연출 시작 때만 갱신하는 화면 HP다.
+    private readonly Dictionary<GridActor, int> presentedHealth = new();
+    // 적 머리 위 아이콘도 같은 연출 시점의 인식 상태와 조사 단계를 사용한다.
+    private readonly Dictionary<GridActor, (EnemyAwarenessState awareness, SuspiciousBehaviorPhase phase)> presentedEnemyStates = new();
+
+    // 발각 연출 중 빨간 눈이 켜진 적만 보관한다. 평소에는 표시하지 않는다.
+    private readonly HashSet<GridActor> flashingAlertIcons = new();
+
+    /// <summary>발각 연출의 눈 점멸 상태를 HUD와 공유한다.</summary>
+    public void SetAlertIconVisible(GridActor actor, bool visible)
+    {
+        if (visible) flashingAlertIcons.Add(actor);
+        else flashingAlertIcons.Remove(actor);
+    }
+
+    /// <summary>해당 적의 빨간 눈이 현재 점멸 중 켜진 구간인지 반환한다.</summary>
+    public bool IsAlertIconVisible(GridActor actor) => flashingAlertIcons.Contains(actor);
+
+    /// <summary>현재 화면에 반영한 적 인식 상태를 HUD에 공유한다.</summary>
+    public void PresentEnemyState(GridActor actor, EnemyAwarenessState awareness, SuspiciousBehaviorPhase phase)
+        => presentedEnemyStates[actor] = (awareness, phase);
+
+    /// <summary>초기 상태 또는 마지막 재생된 인식 상태와 조사 단계를 반환한다.</summary>
+    public (EnemyAwarenessState awareness, SuspiciousBehaviorPhase phase) GetPresentedEnemyState(
+        EnemyContext enemy)
+        => presentedEnemyStates.TryGetValue(enemy.GridActor, out var state)
+            ? state : (enemy.AlertState.CurrentState, enemy.AlertState.SuspiciousPhase);
+
+
+    /// <summary>아직 피해 연출을 시작하지 않은 액터의 초기 화면 HP를 보존한다.</summary>
+    public void PreserveHealthBeforeDamage(GridActor actor, int hitPointBefore)
+    {
+        if (!presentedHealth.ContainsKey(actor)) presentedHealth.Add(actor, hitPointBefore);
+    }
+
+    /// <summary>현재 공격 이벤트의 결과를 화면 HP에 적용한다. 논리 HP는 변경하지 않는다.</summary>
+    public void PresentDamage(GridActor actor, DamageResult result)
+    {
+        presentedHealth[actor] = result.HitPointAfter;
+    }
+
+    /// <summary>피해 이력이 없으면 초기 논리 HP를, 있으면 마지막으로 재생한 HP를 반환한다.</summary>
+    public int GetPresentedHitPoint(GridActor actor, int initialHitPoint)
+        => presentedHealth.TryGetValue(actor, out int value) ? value : initialHitPoint;
 
     // 새 Actor와 Visual 연결이 등록됐을 때 발생한다.
     public event Action<GridActor, ActorVisualController> ActorRegistered;
@@ -39,6 +84,9 @@ public class ActorPresentationRegistry : MonoBehaviour
     /// </summary>
     private void OnDestroy()
     {
+        flashingAlertIcons.Clear();
+        presentedHealth.Clear();
+        presentedEnemyStates.Clear();
         visualByActor.Clear();
         facingIndicatorByActor.Clear();
         if (Instance == this)
@@ -87,6 +135,9 @@ public class ActorPresentationRegistry : MonoBehaviour
         if (visualByActor.TryGetValue(actor, out ActorVisualController registeredVisual) && registeredVisual == visualController)
         {
             visualByActor.Remove(actor);
+            flashingAlertIcons.Remove(actor);
+            presentedHealth.Remove(actor);
+            presentedEnemyStates.Remove(actor);
             ActorUnregistered?.Invoke(actor, visualController);
         }
     }

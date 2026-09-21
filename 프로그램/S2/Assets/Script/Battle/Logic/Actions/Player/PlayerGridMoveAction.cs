@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using UnityEngine;
 
@@ -239,7 +239,7 @@ public class PlayerGridMoveAction : MonoBehaviour
             return false;
         }
 
-        if (presentationQueue.IsPlaying)
+        if (presentationQueue.IsBusy)
         {
             if (logBlockedTarget)
             {

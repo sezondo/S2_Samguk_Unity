@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using UnityEngine;
 
 /// <summary>
@@ -219,7 +219,7 @@ public class PlayerGunAttackAction : MonoBehaviour
             return false;
         }
 
-        if (presentationQueue.IsPlaying)
+        if (presentationQueue.IsBusy)
         {
             if (logBlockedTarget)
             {
@@ -281,7 +281,7 @@ public class PlayerGunAttackAction : MonoBehaviour
 
         GridPosition attackerPosition = playerContext.GridActor.GridPosition;
         int distance = attackerPosition.ManhattanDistanceTo(targetPosition);
-        if (distance > GunAttackRange)
+        if (!CombatTargetRules.CanRangedAttack(attackerPosition, targetPosition, GunAttackRange, true))
         {
             LogBlockedTarget(targetPosition, $"총 공격 사거리 밖입니다. 거리: {distance}, 최대 거리: {GunAttackRange}");
             return false;

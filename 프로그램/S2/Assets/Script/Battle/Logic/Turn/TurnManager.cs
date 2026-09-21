@@ -1,4 +1,5 @@
-using System;
+﻿using System;
+using System.Collections;
 using UnityEngine;
 using UnityEngine.InputSystem;
 
@@ -75,12 +76,13 @@ public class TurnManager : MonoBehaviour
     /// <summary>
     /// 설정에 따라 게임 시작 시 첫 턴 시작 이벤트를 발생시킨다.
     /// </summary>
-    private void Start()
+    private IEnumerator Start()
     {
-        if (beginTurnOnStart && stageStateManager.IsPlaying)
-        {
-            StartTurn(CurrentSide);
-        }
+        if (!beginTurnOnStart) yield break;
+        // 입장 연출이 먼저 시작돼도 최초 턴 알림을 유실하지 않는다.
+        while (stageStateManager.IsPlaying && ActionPresentationQueue.Instance != null &&
+            ActionPresentationQueue.Instance.IsBusy) yield return null;
+        if (stageStateManager.IsPlaying) StartTurn(CurrentSide);
     }
 
     /// <summary>
@@ -180,6 +182,9 @@ public class TurnManager : MonoBehaviour
         {
             return false;
         }
+
+        if (ActionPresentationQueue.Instance != null && ActionPresentationQueue.Instance.IsBusy)
+            return false;
 
         if (stageStateManager.IsPlaying)
         {

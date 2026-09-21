@@ -1,4 +1,4 @@
-using UnityEngine;
+﻿using UnityEngine;
 using UnityEngine.InputSystem;
 
 /// <summary>
@@ -99,7 +99,7 @@ public class CameraKeyboardMover : MonoBehaviour
     {
         return !lockWhilePresentationPlaying ||
                ActionPresentationQueue.Instance == null ||
-               !ActionPresentationQueue.Instance.IsPlaying;
+               !ActionPresentationQueue.Instance.IsBusy;
     }
 
     /// <summary>

@@ -1,4 +1,4 @@
-using UnityEngine;
+﻿using UnityEngine;
 using UnityEngine.UI;
 
 /// <summary>
@@ -139,7 +139,7 @@ public sealed class BattleHudController : MonoBehaviour
         bool playerTurn = turnManager.IsPlayerTurn;
         TacticalUnitContext activeUnit = unitControlManager.ActiveUnit;
         bool commonActionAvailable = activeUnit != null && activeUnit.IsAlive && playerTurn &&
-                                     stageStateManager.IsPlaying && !presentationQueue.IsPlaying &&
+                                     stageStateManager.IsPlaying && !presentationQueue.IsBusy &&
                                      activeUnit.ActionPoint != null && activeUnit.ActionPoint.Current > 0;
 
         baseHudController.Refresh(activeUnit, playerTurn);

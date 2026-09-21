@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
@@ -28,9 +28,42 @@ public class ActionPresentationQueue : MonoBehaviour
     // 현재 큐가 이벤트를 실행 중인지 나타낸다.
     public bool IsPlaying { get; private set; }
     // 현재 큐에 대기 중인 이벤트 수다.
-    public int QueuedEventCount => eventQueue.Count;
+    public int QueuedEventCount => eventQueue.Count + (terminalEvent.HasValue ? 1 : 0);
 
-    // 큐가 완전히 비었을 때 발생한다.
+    // 적 논리가 후속 연출을 생산하는 동안 큐가 잠시 비어도 처리를 유지한다.
+    public bool IsProducing { get; private set; }
+    // 실패 이후 잘못된 상태에서 새 명령을 받지 않는 안전 정지 상태다.
+    public bool HasFailed { get; private set; }
+    // 입력·턴 전환 잠금은 재생뿐 아니라 생산·대기·오류까지 포함한다.
+    public bool IsBusy => IsTurnPending || IsProducing || IsPlaying || QueuedEventCount > 0 || HasFailed;
+    // 마지막 큐 완료와 조정자의 턴 종료 사이에도 입력 잠금을 유지한다.
+    public bool IsTurnPending { get; private set; }
+    // 결과 UI는 모든 확정 연출과 논리 생산이 끝난 뒤에 재생한다.
+    private PresentationEvent? terminalEvent;
+
+    /// <summary>적 턴의 논리 생산 구간을 시작한다. 중복 생산은 허용하지 않는다.</summary>
+    public bool TryBeginProduction()
+    {
+        if (IsTurnPending || IsProducing || HasFailed) return false;
+        IsTurnPending = true;
+        IsProducing = true;
+        return true;
+    }
+
+    /// <summary>새 연출 생산이 끝났음을 알린다. 이미 쌓인 연출은 계속 재생한다.</summary>
+    public void EndProduction() => IsProducing = false;
+
+    /// <summary>조정자가 마지막 연출 완료를 확인하거나 중단될 때 턴 처리 잠금을 해제한다.</summary>
+    public void ReleaseTurnProcessing() => IsTurnPending = false;
+
+    /// <summary>실행 오류를 기록하고 후속 논리와 사용자 입력을 차단한다.</summary>
+    public void ReportFailure(string reason)
+    {
+        HasFailed = true;
+        Debug.LogError($"{nameof(ActionPresentationQueue)}: 처리 오류로 새 행동을 중단합니다. {reason}", this);
+    }
+
+    // 논리 생산과 모든 연출이 끝나 큐가 완전히 비었을 때 발생한다.
     public event Action QueueEmptied;
 
     /// <summary>
@@ -118,6 +151,12 @@ public class ActionPresentationQueue : MonoBehaviour
             return;
         }
 
+        if (presentationEvent.Type == PresentationEventType.StageCleared ||
+            presentationEvent.Type == PresentationEventType.StageFailed)
+        {
+            if (!terminalEvent.HasValue) terminalEvent = presentationEvent;
+            return;
+        }
         eventQueue.Enqueue(presentationEvent);
 
         if (logQueueFlow)
@@ -136,7 +175,7 @@ public class ActionPresentationQueue : MonoBehaviour
             return false;
         }
 
-        if (eventQueue.Count == 0)
+        if (QueuedEventCount == 0 && !IsProducing)
         {
             QueueEmptied?.Invoke();
             return false;
@@ -153,6 +192,7 @@ public class ActionPresentationQueue : MonoBehaviour
     public void ClearQueuedEvents()
     {
         eventQueue.Clear();
+        terminalEvent = null;
     }
 
     /// <summary>
@@ -162,8 +202,17 @@ public class ActionPresentationQueue : MonoBehaviour
     {
         IsPlaying = true;
 
-        while (eventQueue.Count > 0)
+        while (QueuedEventCount > 0 || IsProducing)
         {
+            if (eventQueue.Count == 0)
+            {
+                if (IsProducing) { yield return null; continue; }
+                if (terminalEvent.HasValue)
+                {
+                    eventQueue.Enqueue(terminalEvent.Value);
+                    terminalEvent = null;
+                }
+            }
             PresentationEvent presentationEvent = eventQueue.Dequeue();
             bool completed = false;
             PresentationEventHandle handle = new(() => completed = true);
@@ -232,7 +281,8 @@ public class ActionPresentationQueue : MonoBehaviour
             }
             catch (Exception exception)
             {
-                Debug.LogError($"{nameof(ActionPresentationQueue)}: {presentationEvent.Type} 이벤트 핸들러 실행 중 예외가 발생했습니다.\n{exception}", this);
+                ReportFailure($"{presentationEvent.Type} 이벤트 핸들러 예외: {exception}");
+                handle.Complete();
             }
         }
 

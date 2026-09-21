@@ -1,8 +1,8 @@
-using System.Collections;
+﻿using System.Collections;
 using UnityEngine;
 
 /// <summary>
-/// 담당 적의 발각 연출 이벤트를 받아 경고색을 점멸하고 큐 완료 신호를 보내는 Presenter다.
+/// 담당 적의 발각 연출 이벤트를 받아 머리 위 빨간 눈을 점멸하고 큐 완료 신호를 보내는 Presenter다.
 /// 발각 판정과 상태 변경에는 관여하지 않는다.
 /// </summary>
 public class AlertDetectedPresenter : MonoBehaviour, IPresentationEventHandler
@@ -14,17 +14,9 @@ public class AlertDetectedPresenter : MonoBehaviour, IPresentationEventHandler
     [SerializeField] private ActorVisualController visualController;
 
     [Header("Presentation")]
-    // 평상 상태일 때 적용할 색이다.
-    [SerializeField] private Color normalColor = Color.white;
-    // 의심 상태일 때 적용할 색이다.
-    [SerializeField] private Color suspiciousColor = new(1f, 0.75f, 0.15f, 1f);
-    // 발각 상태일 때 적용할 색이다.
-    [SerializeField] private Color alertedColor = new(1f, 0.25f, 0.2f, 1f);
-    // 발각 순간 점멸에 사용할 경고색이다.
-    [SerializeField] private Color warningColor = Color.white;
-    // 경고색과 현재 상태 색상을 각각 유지할 시간이다.
+    // 빨간 눈을 켠 구간과 끈 구간을 각각 유지할 시간이다.
     [SerializeField] private float flashInterval = 0.12f;
-    // 발각 연출 중 경고색을 표시할 횟수다.
+    // 발각 연출 중 빨간 눈을 표시할 횟수다.
     [SerializeField] private int flashCount = 3;
 
     [Header("Animation")]
@@ -43,6 +35,10 @@ public class AlertDetectedPresenter : MonoBehaviour, IPresentationEventHandler
     private Coroutine alertCoroutine;
     // 현재 처리 중인 큐 이벤트 완료 핸들이다.
     private PresentationEventHandle activeHandle;
+    // 현재 재생 순서까지 반영된 화면 인식 상태다.
+    private EnemyAwarenessState presentedAwareness;
+    // 현재 화면까지 재생된 조사 단계다.
+    private SuspiciousBehaviorPhase presentedPhase;
 
     /// <summary>
     /// 필수 참조와 연출 데이터를 검사하고 연출 큐 등록을 시도한다.
@@ -55,8 +51,10 @@ public class AlertDetectedPresenter : MonoBehaviour, IPresentationEventHandler
             return;
         }
 
+        presentedAwareness = targetEnemy.AlertState.CurrentState;
+        presentedPhase = targetEnemy.AlertState.SuspiciousPhase;
         SubscribeAwarenessState();
-        ApplyCurrentStateColor();
+        PresentCurrentState();
         TryRegisterQueue(false);
     }
 
@@ -65,6 +63,7 @@ public class AlertDetectedPresenter : MonoBehaviour, IPresentationEventHandler
     /// </summary>
     private void Start()
     {
+        PresentCurrentState();
         TryRegisterQueue(true);
     }
 
@@ -74,6 +73,7 @@ public class AlertDetectedPresenter : MonoBehaviour, IPresentationEventHandler
     private void OnDisable()
     {
         UnsubscribeAwarenessState();
+        SetAlertIconVisible(false);
 
         if (ActionPresentationQueue.Instance != null)
         {
@@ -88,7 +88,7 @@ public class AlertDetectedPresenter : MonoBehaviour, IPresentationEventHandler
 
         if (visualController != null && targetEnemy != null && targetEnemy.AlertState != null)
         {
-            ApplyCurrentStateColor();
+            PresentCurrentState();
         }
 
         if (activeHandle != null && !activeHandle.IsCompleted)
@@ -111,6 +111,8 @@ public class AlertDetectedPresenter : MonoBehaviour, IPresentationEventHandler
 
         alertState.AwarenessStateChanged -= HandleAwarenessStateChanged;
         alertState.AwarenessStateChanged += HandleAwarenessStateChanged;
+        alertState.SuspiciousPhaseChanged -= HandleSuspiciousPhaseChanged;
+        alertState.SuspiciousPhaseChanged += HandleSuspiciousPhaseChanged;
     }
 
     /// <summary>
@@ -122,17 +124,27 @@ public class AlertDetectedPresenter : MonoBehaviour, IPresentationEventHandler
         if (alertState != null)
         {
             alertState.AwarenessStateChanged -= HandleAwarenessStateChanged;
+            alertState.SuspiciousPhaseChanged -= HandleSuspiciousPhaseChanged;
         }
     }
 
+    /// <summary>조사 단계 변경도 인식 상태 이벤트에 담아 화면 순서대로 적용한다.</summary>
+    private void HandleSuspiciousPhaseChanged()
+        => HandleAwarenessStateChanged(targetEnemy.AlertState.CurrentState, targetEnemy.AlertState.CurrentState);
+
     /// <summary>
-    /// 논리 인식 상태가 바뀌면 현재 상태에 맞는 정상·의심·발각 색상을 즉시 적용한다.
+    /// 논리 인식 상태 변경 당시 값을 연출 큐에 기록한다.
     /// </summary>
     private void HandleAwarenessStateChanged(
         EnemyAwarenessState previousState,
         EnemyAwarenessState currentState)
     {
-        ApplyCurrentStateColor();
+        ActorPresentationRegistry.Instance?.PresentEnemyState(targetEnemy.GridActor, presentedAwareness, presentedPhase);
+        if (!ActionPresentationQueue.TryEnqueue(PresentationEvent.EnemyAwarenessChanged(targetEnemy, currentState)))
+        {
+            Debug.LogError($"{name}: 경계 상태를 기록할 연출 큐가 없습니다.", this);
+            enabled = false;
+        }
     }
 
     /// <summary>
@@ -161,7 +173,8 @@ public class AlertDetectedPresenter : MonoBehaviour, IPresentationEventHandler
     public bool CanHandle(PresentationEvent presentationEvent)
     {
         return (presentationEvent.Type == PresentationEventType.AlertDetected ||
-                presentationEvent.Type == PresentationEventType.SuspicionDetected) &&
+                presentationEvent.Type == PresentationEventType.SuspicionDetected ||
+                presentationEvent.Type == PresentationEventType.EnemyAwarenessChanged) &&
                presentationEvent.Enemy == targetEnemy;
     }
 
@@ -170,6 +183,25 @@ public class AlertDetectedPresenter : MonoBehaviour, IPresentationEventHandler
     /// </summary>
     public void Handle(PresentationEvent presentationEvent, PresentationEventHandle handle)
     {
+        if (presentationEvent.Type == PresentationEventType.EnemyAwarenessChanged)
+        {
+            presentedAwareness = presentationEvent.AwarenessState;
+            presentedPhase = presentationEvent.SuspiciousPhase;
+            PresentCurrentState();
+            if (presentedAwareness != EnemyAwarenessState.Alerted && ActorPresentationRegistry.Instance != null &&
+                ActorPresentationRegistry.Instance.TryGetFacingIndicator(targetEnemy.GridActor, out var indicator))
+                indicator.SetAwarenessPresentationVisible(true);
+            handle.Complete();
+            return;
+        }
+        presentedAwareness = presentationEvent.Type == PresentationEventType.AlertDetected
+            ? EnemyAwarenessState.Alerted : EnemyAwarenessState.Suspicious;
+        PresentCurrentState();
+        if (presentationEvent.Type == PresentationEventType.SuspicionDetected)
+        {
+            handle.Complete();
+            return;
+        }
         if (alertCoroutine != null)
         {
             Debug.LogError($"{nameof(AlertDetectedPresenter)} on {name}은 이미 발각 연출을 처리 중입니다. 새 이벤트를 자동 완료합니다. 이벤트: {presentationEvent}", this);
@@ -187,7 +219,7 @@ public class AlertDetectedPresenter : MonoBehaviour, IPresentationEventHandler
     }
 
     /// <summary>
-    /// 경고색과 현재 경계 상태 색상을 번갈아 표시한 뒤 완료 신호를 보낸다.
+    /// 머리 위 빨간 눈만 점멸하고 숨긴 뒤 완료 신호를 보낸다.
     /// </summary>
     private IEnumerator PlayAlertDetected(PresentationEvent presentationEvent, PresentationEventHandle handle)
     {
@@ -205,10 +237,10 @@ public class AlertDetectedPresenter : MonoBehaviour, IPresentationEventHandler
 
         for (int i = 0; i < flashCount; i++)
         {
-            visualController.ApplyColor(warningColor);
+            SetAlertIconVisible(true);
             yield return new WaitForSeconds(flashInterval);
 
-            ApplyCurrentStateColor();
+            SetAlertIconVisible(false);
             yield return new WaitForSeconds(flashInterval);
         }
 
@@ -225,13 +257,14 @@ public class AlertDetectedPresenter : MonoBehaviour, IPresentationEventHandler
     /// </summary>
     private void CompleteActiveAlert(PresentationEventHandle handle)
     {
-        ApplyCurrentStateColor();
+        SetAlertIconVisible(false);
+        PresentCurrentState();
         if (playAlertAnimation)
         {
             visualController.TryPlayAnimationState(idleAnimationStateName, 0f, false);
         }
 
-        if (targetEnemy.AlertState.IsAlerted &&
+        if (presentedAwareness == EnemyAwarenessState.Alerted &&
             ActorPresentationRegistry.Instance != null &&
             ActorPresentationRegistry.Instance.TryGetFacingIndicator(
                 targetEnemy.GridActor,
@@ -304,15 +337,18 @@ public class AlertDetectedPresenter : MonoBehaviour, IPresentationEventHandler
     }
 
     /// <summary>
-    /// 담당 적의 현재 논리 경계 상태에 맞는 색상을 적용한다.
+    /// 현재까지 재생된 인식 상태만 공유한다. 캐릭터 원본 색상은 변경하지 않는다.
     /// </summary>
-    private void ApplyCurrentStateColor()
+    private void PresentCurrentState()
     {
-        Color stateColor = targetEnemy.AlertState.IsAlerted
-            ? alertedColor
-            : targetEnemy.AlertState.IsSuspicious
-                ? suspiciousColor
-                : normalColor;
-        visualController.ApplyColor(stateColor);
+        ActorPresentationRegistry.Instance?.PresentEnemyState(targetEnemy.GridActor, presentedAwareness, presentedPhase);
+
     }
+    /// <summary>논리 상태와 분리된 빨간 눈 표시 상태를 변경한다.</summary>
+    private void SetAlertIconVisible(bool visible)
+    {
+        if (targetEnemy != null && ActorPresentationRegistry.Instance != null)
+            ActorPresentationRegistry.Instance.SetAlertIconVisible(targetEnemy.GridActor, visible);
+    }
+
 }

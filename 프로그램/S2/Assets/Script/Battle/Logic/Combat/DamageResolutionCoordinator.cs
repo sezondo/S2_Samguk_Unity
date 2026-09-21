@@ -1,4 +1,4 @@
-using UnityEngine;
+﻿using UnityEngine;
 
 /// <summary>
 /// 확정된 공격의 명중·빗나감 후처리와 실제 피해 적용 결과를 논리·연출 이벤트로 변환하는 기본 처리자다.
@@ -154,7 +154,7 @@ public sealed class DamageResolutionCoordinator : IActionLogicEventHandler
         ActionResolutionContext context)
     {
         bool temporarilyRevealAttacker =
-            presentationKind == AttackPresentationKind.EnemyRanged &&
+            (presentationKind == AttackPresentationKind.EnemyRanged || presentationKind == AttackPresentationKind.EnemyMelee) &&
             PlayerVisionManager.Instance != null &&
             !PlayerVisionManager.Instance.IsVisible(fromPosition);
 
@@ -164,6 +164,16 @@ public sealed class DamageResolutionCoordinator : IActionLogicEventHandler
                 attacker,
                 true,
                 "시야 밖 공격자 임시 노출"));
+        }
+
+        if (hasDamageResult)
+        {
+            if (ActorPresentationRegistry.Instance == null)
+            {
+                context.Fail("피해 연출의 초기 HP를 보존할 ActorPresentationRegistry가 없습니다.");
+                return;
+            }
+            ActorPresentationRegistry.Instance.PreserveHealthBeforeDamage(target, damageResult.HitPointBefore);
         }
 
         context.EnqueuePresentation(PresentationEvent.CombatAction(

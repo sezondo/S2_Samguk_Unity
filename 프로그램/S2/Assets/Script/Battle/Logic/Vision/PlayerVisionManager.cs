@@ -255,7 +255,7 @@ public class PlayerVisionManager : MonoBehaviour, IActionLogicEventHandler
                     continue;
                 }
 
-                if (isGuaranteedAdjacent || GridLineOfSight.HasLineOfSight(gridManager, origin, target))
+                if (CombatTargetRules.CanObserve(gridManager, origin, target, visionRange, guaranteeAdjacentVision))
                 {
                     nextVisiblePositions.Add(target);
                 }

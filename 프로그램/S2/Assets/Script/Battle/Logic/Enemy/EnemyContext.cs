@@ -27,7 +27,7 @@ public class EnemyContext : MonoBehaviour, ITacticalUnit
     [SerializeField] private EnemyActionPoint actionPoint;
     // 적 턴에 자기 행동을 결정하고 실행하는 선택 컴포넌트다. 적 턴 AI를 쓰는 씬에서 연결한다.
     [SerializeField] private EnemyTurnAgent turnAgent;
-    // 적 원거리 공격 판정과 피해 요청을 담당하는 선택 컴포넌트다. 적 턴 AI를 쓰는 씬에서 연결한다.
+    // 적 근접·원거리 공격 판정과 피해 요청을 담당한다. 적 턴 AI를 쓰는 씬에서 연결한다.
     [SerializeField] private EnemyAttackAction attackAction;
     // 평상 상태의 경비·순찰 행동과 중단된 순찰 진행을 관리하는 선택 컴포넌트다.
     [SerializeField] private EnemyRoutineController routineController;

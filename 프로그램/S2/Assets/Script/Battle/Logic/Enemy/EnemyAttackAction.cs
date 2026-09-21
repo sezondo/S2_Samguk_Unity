@@ -1,7 +1,7 @@
 using UnityEngine;
 
 /// <summary>
-/// 적의 원거리 공격 판정과 피해 적용 요청을 담당한다.
+/// 적의 근접·원거리 공격 판정과 피해 적용 요청을 담당한다.
 /// AP 소비와 행동 순서는 EnemyTurnAgent가 관리하고, 이 컴포넌트는 공격 가능 여부와 피해 이벤트 생성만 맡는다.
 /// </summary>
 public class EnemyAttackAction : MonoBehaviour
@@ -47,12 +47,27 @@ public class EnemyAttackAction : MonoBehaviour
     /// </summary>
     public bool CanAttackFrom(GridPosition attackerPosition, GridPosition targetPosition)
     {
-        return attackerPosition.ManhattanDistanceTo(targetPosition) <= AttackRange;
+        return CanAttackFrom(attackerPosition, targetPosition, EnemyPlannedActionKind.Ranged);
     }
 
     /// <summary>
-    /// 현재 적 위치에서 대상 액터를 원거리 공격할 수 있는지 확인한다.
+    /// 가상 위치에서 공격 종류에 따른 사거리와 합산 시야를 검사한다.
     /// </summary>
+    public bool CanAttackFrom(GridPosition from, GridPosition target, EnemyPlannedActionKind kind)
+    {
+        var settings=enemyContext.EnemyData.Combat;
+        if(kind==EnemyPlannedActionKind.Melee)return settings.allowMelee&&CombatTargetRules.IsMeleeAdjacent(from,target);
+        if(kind!=EnemyPlannedActionKind.Ranged||!settings.allowRanged||from.ManhattanDistanceTo(target)>AttackRange)return false;
+        // 플레이어의 합산 시야와 동일하게 발각된 아군 관측을 공유한다. 잠행 시야는 건드리지 않는다.
+        if(CombatTargetRules.CanObserve(GridManager.Instance,from,target,AttackRange,true))return true;
+        if(EnemyRegistry.Instance==null)return false;
+        foreach(var ally in EnemyRegistry.Instance.Enemies)
+            if(ally!=null&&ally!=enemyContext&&ally.isActiveAndEnabled&&ally.IsAlive&&ally.AlertState.IsAlerted&&
+                CombatTargetRules.CanObserve(GridManager.Instance,ally.GridActor.GridPosition,target,ally.EnemyData.RangedAttackRange,true))return true;
+        return false;
+    }
+
+    /// <summary>현재 위치에서 원거리 공격 가능한지 검사한다.</summary>
     public bool CanAttack(GridActor targetActor)
     {
         if (targetActor == null || !HasValidReference() || !HasValidData())
@@ -64,9 +79,9 @@ public class EnemyAttackAction : MonoBehaviour
     }
 
     /// <summary>
-    /// 대상 액터에게 원거리 공격 피해 적용을 요청하는 논리 이벤트를 발행한다.
+    /// 근접은 확정 피해, 원거리는 명중 판정 이벤트를 발행한다. AP는 호출자가 소비한다.
     /// </summary>
-    public bool TryExecuteAttack(GridActor targetActor, ActionResolutionContext resolutionContext)
+    public bool TryExecuteAttack(GridActor targetActor, ActionResolutionContext resolutionContext, EnemyPlannedActionKind kind = EnemyPlannedActionKind.Ranged)
     {
         if (resolutionContext == null)
         {
@@ -91,9 +106,9 @@ public class EnemyAttackAction : MonoBehaviour
             return false;
         }
 
-        if (!CanAttack(targetActor))
+        if (!CanAttackFrom(enemyContext.GridActor.GridPosition, targetActor.GridPosition, kind))
         {
-            LogBlockedAttack($"대상이 공격 사거리 밖입니다. 거리: {enemyContext.GridActor.GridPosition.ManhattanDistanceTo(targetActor.GridPosition)}, 최대 거리: {AttackRange}");
+            LogBlockedAttack("공격 종류·사거리·장애물 시야 조건을 만족하지 않습니다");
             return false;
         }
 
@@ -112,7 +127,10 @@ public class EnemyAttackAction : MonoBehaviour
 
         GridPosition attackerPosition = enemyContext.GridActor.GridPosition;
         GridPosition targetPosition = targetActor.GridPosition;
-        resolutionContext.Publish(new ResolveAttackLogicEvent(
+        if (kind == EnemyPlannedActionKind.Melee)
+            resolutionContext.Publish(new ApplyDamageLogicEvent(enemyContext.GridActor, targetActor, attackerPosition, targetPosition,
+                enemyContext.EnemyData.Combat.meleeDamage, AttackPresentationKind.EnemyMelee, "적 근접 공격 연출"));
+        else resolutionContext.Publish(new ResolveAttackLogicEvent(
             enemyContext.GridActor,
             targetActor,
             attackerPosition,
@@ -129,7 +147,9 @@ public class EnemyAttackAction : MonoBehaviour
 
         if (logAttack)
         {
-            Debug.Log($"{nameof(EnemyAttackAction)}: {enemyContext.name} 적이 {targetActor.name} 대상에게 원거리 공격 엄폐·명중 판정을 요청했습니다. 피해량: {AttackDamage}", this);
+            string attackName = kind == EnemyPlannedActionKind.Melee ? "근접" : "원거리";
+            int damage = kind == EnemyPlannedActionKind.Melee ? enemyContext.EnemyData.Combat.meleeDamage : AttackDamage;
+            Debug.Log($"{nameof(EnemyAttackAction)}: {enemyContext.name} 적이 {targetActor.name} 대상에게 {attackName} 공격을 요청했습니다. 피해량: {damage}", this);
         }
 
         return true;
@@ -171,6 +191,8 @@ public class EnemyAttackAction : MonoBehaviour
     public bool HasValidData()
     {
         EnemyData enemyData = enemyContext.EnemyData;
+        if (enemyData.Combat == null)
+        { Debug.LogError($"{name}: 적 전투 설정이 필요합니다.", this); return false; }
         if (enemyData.RangedAttackRange < 0)
         {
             Debug.LogError($"{nameof(EnemyAttackAction)} on {name}의 원거리 공격 사거리는 0 이상이어야 합니다.", this);
