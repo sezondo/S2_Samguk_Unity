@@ -2,7 +2,7 @@
 using UnityEngine;
 
 /// <summary>
-/// 담당 적의 발각 연출 이벤트를 받아 머리 위 빨간 눈을 점멸하고 큐 완료 신호를 보내는 Presenter다.
+/// 담당 적의 수색·발각 진입 이벤트를 받아 주황·빨간 눈을 점멸하고 큐 완료 신호를 보낸다.
 /// 발각 판정과 상태 변경에는 관여하지 않는다.
 /// </summary>
 public class AlertDetectedPresenter : MonoBehaviour, IPresentationEventHandler
@@ -14,9 +14,9 @@ public class AlertDetectedPresenter : MonoBehaviour, IPresentationEventHandler
     [SerializeField] private ActorVisualController visualController;
 
     [Header("Presentation")]
-    // 빨간 눈을 켠 구간과 끈 구간을 각각 유지할 시간이다.
+    // 수색·발각 눈을 켠 구간과 끈 구간을 각각 유지할 시간이다.
     [SerializeField] private float flashInterval = 0.12f;
-    // 발각 연출 중 빨간 눈을 표시할 횟수다.
+    // 수색·발각 진입 연출에서 눈을 표시할 횟수다.
     [SerializeField] private int flashCount = 3;
 
     [Header("Animation")]
@@ -74,6 +74,7 @@ public class AlertDetectedPresenter : MonoBehaviour, IPresentationEventHandler
     {
         UnsubscribeAwarenessState();
         SetAlertIconVisible(false);
+        SetAlertIconFlashing(false);
 
         if (ActionPresentationQueue.Instance != null)
         {
@@ -197,11 +198,7 @@ public class AlertDetectedPresenter : MonoBehaviour, IPresentationEventHandler
         presentedAwareness = presentationEvent.Type == PresentationEventType.AlertDetected
             ? EnemyAwarenessState.Alerted : EnemyAwarenessState.Suspicious;
         PresentCurrentState();
-        if (presentationEvent.Type == PresentationEventType.SuspicionDetected)
-        {
-            handle.Complete();
-            return;
-        }
+
         if (alertCoroutine != null)
         {
             Debug.LogError($"{nameof(AlertDetectedPresenter)} on {name}은 이미 발각 연출을 처리 중입니다. 새 이벤트를 자동 완료합니다. 이벤트: {presentationEvent}", this);
@@ -219,11 +216,12 @@ public class AlertDetectedPresenter : MonoBehaviour, IPresentationEventHandler
     }
 
     /// <summary>
-    /// 머리 위 빨간 눈만 점멸하고 숨긴 뒤 완료 신호를 보낸다.
+    /// 수색 진입은 주황 눈, 발각은 빨간 눈을 점멸한 뒤 상태별 기본 표시로 복귀한다.
     /// </summary>
     private IEnumerator PlayAlertDetected(PresentationEvent presentationEvent, PresentationEventHandle handle)
     {
         activeHandle = handle;
+        SetAlertIconFlashing(true);
 
         if (logAlertFlow)
         {
@@ -258,8 +256,9 @@ public class AlertDetectedPresenter : MonoBehaviour, IPresentationEventHandler
     private void CompleteActiveAlert(PresentationEventHandle handle)
     {
         SetAlertIconVisible(false);
+        SetAlertIconFlashing(false);
         PresentCurrentState();
-        if (playAlertAnimation)
+        if (playAlertAnimation && presentedAwareness == EnemyAwarenessState.Alerted)
         {
             visualController.TryPlayAnimationState(idleAnimationStateName, 0f, false);
         }
@@ -344,7 +343,14 @@ public class AlertDetectedPresenter : MonoBehaviour, IPresentationEventHandler
         ActorPresentationRegistry.Instance?.PresentEnemyState(targetEnemy.GridActor, presentedAwareness, presentedPhase);
 
     }
-    /// <summary>논리 상태와 분리된 빨간 눈 표시 상태를 변경한다.</summary>
+    /// <summary>논리 상태와 분리된 눈 점멸 진행 여부를 변경한다.</summary>
+    private void SetAlertIconFlashing(bool flashing)
+    {
+        if (targetEnemy != null && ActorPresentationRegistry.Instance != null)
+            ActorPresentationRegistry.Instance.SetAlertIconFlashing(targetEnemy.GridActor, flashing);
+    }
+
+    /// <summary>논리 상태와 분리된 주황·빨간 눈의 켜짐 상태를 변경한다.</summary>
     private void SetAlertIconVisible(bool visible)
     {
         if (targetEnemy != null && ActorPresentationRegistry.Instance != null)

@@ -139,6 +139,36 @@ public static class CharacterUiVerification
         }
         ScreenCapture.CaptureScreenshot("Temp/CharacterUI/search.png");
         for(int i=0;i<12;i++) yield return null;
+        // 수색 진입 이벤트를 실제 큐로 재생해 HUD의 켜짐·꺼짐과 종료 후 상태를 확인한다.
+        var assets = (BattleHudAssetSet)Get(overlay, "assetSet");
+        queue.Enqueue(PresentationEvent.SuspicionDetected(source.GridActor.GridPosition, source));
+        queue.PlayQueuedEvents();
+        int searchLitSegments = 0;
+        int searchDarkSegments = 0;
+        bool searchPreviouslyLit = false;
+        deadline = EditorApplication.timeSinceStartup + 8;
+        do
+        {
+            overlay.Refresh();
+            bool flashing = registry.IsAlertIconFlashing(source.GridActor);
+            bool lit = registry.IsAlertIconVisible(source.GridActor);
+            if (flashing)
+            {
+                if (lit && !searchPreviouslyLit) searchLitSegments++;
+                if (!lit && searchPreviouslyLit) searchDarkSegments++;
+                if (icons[source].enabled != lit) throw new Exception("수색 점멸과 실제 HUD 표시 불일치");
+                if (lit && icons[source].sprite != assets.EnemyInvestigating)
+                    throw new Exception("수색 점멸에 주황 눈 이외의 그림 사용");
+                CheckWhite(sourceVisual, "수색 점멸 중 원본 색 유지", false);
+            }
+            searchPreviouslyLit = lit;
+            yield return null;
+        } while (queue.IsBusy && EditorApplication.timeSinceStartup < deadline);
+        Check(!queue.IsBusy, "수색 점멸 큐 완료");
+        Check(searchLitSegments == 3 && searchDarkSegments == 3, "주황 눈 켜짐·꺼짐 각각 3회");
+        overlay.Refresh();
+        Check(icons[source].enabled && !registry.IsAlertIconFlashing(source.GridActor), "수색 점멸 종료 후 주황 눈 유지");
+        Check(source.AlertState.IsSuspicious, "수색 점멸이 논리 인식 상태를 바꾸지 않음");
         // 실제 애드 전파 경로를 실행한다. 테스트 중 논리 반응 이동도 정상 처리한다.
         Vector3 focus = grid.GridToWorld(source.GridActor.GridPosition);
         float zoomBefore = camera.orthographicSize;

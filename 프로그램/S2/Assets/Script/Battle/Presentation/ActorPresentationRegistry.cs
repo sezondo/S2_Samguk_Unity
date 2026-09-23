@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using UnityEngine;
 
@@ -19,17 +19,33 @@ public class ActorPresentationRegistry : MonoBehaviour
     // 적 머리 위 아이콘도 같은 연출 시점의 인식 상태와 조사 단계를 사용한다.
     private readonly Dictionary<GridActor, (EnemyAwarenessState awareness, SuspiciousBehaviorPhase phase)> presentedEnemyStates = new();
 
-    // 발각 연출 중 빨간 눈이 켜진 적만 보관한다. 평소에는 표시하지 않는다.
+    // 수색·발각 진입 연출에서 눈이 켜진 구간의 적을 보관한다.
     private readonly HashSet<GridActor> flashingAlertIcons = new();
+    // 켜짐·꺼짐 구간 모두를 포함해 눈 점멸 연출이 진행 중인 적이다.
+    private readonly HashSet<GridActor> activeIconFlashes = new();
 
-    /// <summary>발각 연출의 눈 점멸 상태를 HUD와 공유한다.</summary>
+    /// <summary>눈 점멸 진행 여부를 공유하고 종료 시 켜짐 상태도 정리한다.</summary>
+    public void SetAlertIconFlashing(GridActor actor, bool flashing)
+    {
+        if (flashing) activeIconFlashes.Add(actor);
+        else
+        {
+            activeIconFlashes.Remove(actor);
+            flashingAlertIcons.Remove(actor);
+        }
+    }
+
+    /// <summary>수색·발각 눈의 점멸 연출이 진행 중인지 반환한다.</summary>
+    public bool IsAlertIconFlashing(GridActor actor) => activeIconFlashes.Contains(actor);
+
+    /// <summary>수색·발각 연출의 눈 점멸 상태를 HUD와 공유한다.</summary>
     public void SetAlertIconVisible(GridActor actor, bool visible)
     {
         if (visible) flashingAlertIcons.Add(actor);
         else flashingAlertIcons.Remove(actor);
     }
 
-    /// <summary>해당 적의 빨간 눈이 현재 점멸 중 켜진 구간인지 반환한다.</summary>
+    /// <summary>해당 적의 눈이 현재 점멸 중 켜진 구간인지 반환한다.</summary>
     public bool IsAlertIconVisible(GridActor actor) => flashingAlertIcons.Contains(actor);
 
     /// <summary>현재 화면에 반영한 적 인식 상태를 HUD에 공유한다.</summary>
@@ -85,6 +101,7 @@ public class ActorPresentationRegistry : MonoBehaviour
     private void OnDestroy()
     {
         flashingAlertIcons.Clear();
+        activeIconFlashes.Clear();
         presentedHealth.Clear();
         presentedEnemyStates.Clear();
         visualByActor.Clear();
@@ -136,6 +153,7 @@ public class ActorPresentationRegistry : MonoBehaviour
         {
             visualByActor.Remove(actor);
             flashingAlertIcons.Remove(actor);
+            activeIconFlashes.Remove(actor);
             presentedHealth.Remove(actor);
             presentedEnemyStates.Remove(actor);
             ActorUnregistered?.Invoke(actor, visualController);

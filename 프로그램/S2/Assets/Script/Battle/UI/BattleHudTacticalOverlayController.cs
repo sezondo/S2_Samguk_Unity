@@ -1,4 +1,4 @@
-﻿using System;
+﻿﻿using System;
 using System.Collections.Generic;
 using TMPro;
 using UnityEngine;
@@ -136,7 +136,10 @@ public sealed class BattleHudTacticalOverlayController : MonoBehaviour
             if (visible)
             {
                 var state = registry.GetPresentedEnemyState(enemy);
-                visible = state.awareness != EnemyAwarenessState.Alerted || registry.IsAlertIconVisible(enemy.GridActor);
+                // 점멸 중에는 수색 눈도 꺼짐 구간을 반영한다. 종료 후 수색 눈은 계속 표시한다.
+                visible = registry.IsAlertIconFlashing(enemy.GridActor)
+                    ? registry.IsAlertIconVisible(enemy.GridActor)
+                    : state.awareness != EnemyAwarenessState.Alerted;
             }
             icon.enabled = visible;
             if (!visible)
