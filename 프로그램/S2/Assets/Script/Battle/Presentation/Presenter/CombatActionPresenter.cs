@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
@@ -37,6 +37,9 @@ public class CombatActionPresenter : MonoBehaviour, IPresentationEventHandler
     private bool combatPresentationStarted;
     // 현재 시작·종료 알림에 전달할 전투 연출 이벤트다.
     private PresentationEvent activePresentationEvent;
+    // 현재 전투에 대여한 공격자/대상 단발 VFX다.
+    private VfxHandle attackerEffect;
+    private VfxHandle targetEffect;
 
     // 전투 자세가 시작된 직후 검 같은 부가 Visual에 현재 이벤트를 알린다.
     public event Action<PresentationEvent> CombatPresentationStarted;
@@ -81,6 +84,7 @@ public class CombatActionPresenter : MonoBehaviour, IPresentationEventHandler
             combatCoroutine = null;
         }
 
+        ReleaseCombatEffects();
         NotifyCombatPresentationCompleted();
         RestoreActiveVisuals();
 
@@ -147,6 +151,12 @@ public class CombatActionPresenter : MonoBehaviour, IPresentationEventHandler
     private bool TryPrepareCombat(PresentationEvent presentationEvent, out CombatPresentationEntry entry)
     {
         entry = default;
+
+        if (VfxManager.Instance == null || !VfxManager.Instance.isActiveAndEnabled)
+        {
+            Debug.LogError("전투 연출에 필요한 활성 VfxManager가 없습니다.", this);
+            return false;
+        }
 
         if (!HasValidReference() || !HasValidData())
         {
@@ -233,8 +243,27 @@ public class CombatActionPresenter : MonoBehaviour, IPresentationEventHandler
             Debug.Log($"{nameof(CombatActionPresenter)}: {presentationEvent.AttackKind} 전투 연출을 시작합니다. 공격자: {presentationEvent.Actor.name}, 대상: {presentationEvent.TargetActor.name}, 결과: {resultText}", this);
         }
 
-        yield return new WaitForSeconds(entry.PresentationDuration);
+        float elapsed = 0f;
+        bool effectsStarted = false;
+        while (elapsed < entry.PresentationDuration)
+        {
+            if (!effectsStarted && elapsed >= entry.VfxDelay)
+            {
+                effectsStarted = true;
+                BeginCombatEffects(entry);
+            }
+            if (effectsStarted)
+            {
+                float age = elapsed - entry.VfxDelay;
+                float opacity = 1f - Mathf.SmoothStep(0f, 1f,
+                    Mathf.InverseLerp(entry.VfxDuration * 0.5f, entry.VfxDuration, age));
+                UpdateCombatEffects(entry, opacity);
+            }
+            elapsed += Time.deltaTime;
+            yield return null;
+        }
 
+        ReleaseCombatEffects();
         NotifyCombatPresentationCompleted();
         RestoreActiveVisuals();
 
@@ -244,6 +273,61 @@ public class CombatActionPresenter : MonoBehaviour, IPresentationEventHandler
         }
 
         CompleteActiveCombat(handle);
+    }
+
+    /// <summary>이벤트 판정에 따라 공격자 이펙트와 공용 혈흔 또는 회피를 한 번 대여한다.</summary>
+    private void BeginCombatEffects(CombatPresentationEntry entry)
+    {
+        // 맨손 충격은 접촉한 대상에만 표시하며 빗나간 경우에는 공용 회피만 표시한다.
+        if (entry.AttackerVfx != VfxId.None && !(activeAttackMissed && entry.AttackKind == AttackPresentationKind.MeleeUnarmed))
+            attackerEffect = VfxManager.TryAcquire(entry.AttackerVfx);
+        targetEffect = VfxManager.TryAcquire(activeAttackMissed ? VfxId.SharedDodge : VfxId.SharedBloodHit);
+        UpdateCombatEffects(entry, 1f);
+    }
+
+    /// <summary>논리 Actor 위치 대신 현재 표시 중인 Sprite 위치에 이펙트를 붙인다.</summary>
+    private void UpdateCombatEffects(CombatPresentationEntry entry, float opacity)
+    {
+        SpriteRenderer attacker = activeAttackerVisual.TargetRenderer;
+        SpriteRenderer target = activeTargetVisual.TargetRenderer;
+        float facing = activeAttackerVisual.IsFacingRight ? 1f : -1f;
+        if (attackerEffect != null)
+        {
+            Vector3 position = attacker.bounds.center + new Vector3(
+                entry.VfxOffset.x * attacker.bounds.size.x * facing,
+                entry.VfxOffset.y * attacker.bounds.size.y, 0f);
+            bool gun = entry.AttackKind == AttackPresentationKind.PlayerGun || entry.AttackKind == AttackPresentationKind.EnemyRanged;
+            Quaternion rotation = Quaternion.identity;
+            Vector3 scale = new(facing, 1f, 1f);
+            if (gun)
+            {
+                Vector3 direction = target.bounds.center - position;
+                rotation = Quaternion.Euler(0f, 0f, Mathf.Atan2(direction.y, direction.x) * Mathf.Rad2Deg);
+                scale = Vector3.one;
+            }
+            attackerEffect.SetTransform(position, rotation, scale);
+            attackerEffect.SetSorting(attacker.sortingLayerID, attacker.sortingOrder + 3);
+            attackerEffect.SetSingle(attacker.bounds.size.y * entry.VfxHeightRatio, opacity * activeAttackerVisual.VisionAlpha);
+            if (entry.AttackKind == AttackPresentationKind.MeleeUnarmed)
+            {
+                attackerEffect.SetTransform(target.bounds.center, Quaternion.identity, scale);
+                attackerEffect.SetSorting(target.sortingLayerID, target.sortingOrder + 2);
+                attackerEffect.SetSingle(target.bounds.size.y * entry.VfxHeightRatio, opacity * activeTargetVisual.VisionAlpha);
+            }
+        }
+        if (targetEffect != null)
+        {
+            targetEffect.SetTransform(target.bounds.center, Quaternion.identity, new Vector3(facing, 1f, 1f));
+            targetEffect.SetSorting(target.sortingLayerID, target.sortingOrder + (activeAttackMissed ? -1 : 3));
+            targetEffect.SetSingle(target.bounds.size.y * (activeAttackMissed ? 0.9f : 0.65f), opacity * activeTargetVisual.VisionAlpha);
+        }
+    }
+
+    /// <summary>정상 종료와 중단에서 단발 VFX를 모두 반납한다.</summary>
+    private void ReleaseCombatEffects()
+    {
+        attackerEffect?.Release(); targetEffect?.Release();
+        attackerEffect = null; targetEffect = null;
     }
 
     /// <summary>
@@ -379,6 +463,12 @@ public class CombatActionPresenter : MonoBehaviour, IPresentationEventHandler
                 return false;
             }
 
+            if (entry.VfxDelay < 0f || entry.VfxDuration <= 0f || entry.VfxHeightRatio <= 0f ||
+                entry.VfxDelay + entry.VfxDuration > entry.PresentationDuration)
+            {
+                Debug.LogError($"{nameof(CombatActionPresenter)}의 {entry.AttackKind} VFX 시간/크기가 올바르지 않습니다.", this);
+                return false;
+            }
             if (string.IsNullOrWhiteSpace(entry.AttackerAnimationStateName) || entry.PresentationDuration <= 0f)
             {
                 Debug.LogError($"{nameof(CombatActionPresenter)} on {name}의 {entry.AttackKind} 공격 상태 이름 또는 연출 시간이 올바르지 않습니다.", this);

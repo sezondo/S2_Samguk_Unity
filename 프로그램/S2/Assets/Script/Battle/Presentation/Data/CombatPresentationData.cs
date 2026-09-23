@@ -15,6 +15,22 @@ public struct CombatPresentationEntry
     // 공격자와 피격자의 자세를 동시에 유지할 시간이다.
     [SerializeField] private float presentationDuration;
 
+    // 해당 공격의 공격자에게 표시할 VFX다. 투척은 SwordActionPresenter가 맡으므로 None이다.
+    [SerializeField] private VfxId attackerVfx;
+    // 자세 전환 후 공격/피격 이펙트를 표시하기까지의 시간이다.
+    [SerializeField] private float vfxDelay;
+    // 단발 이펙트의 표시 시간이다. 전투 자세 유지 시간 안에 끝나야 한다.
+    [SerializeField] private float vfxDuration;
+    // 공격자 그림 높이에 대한 이펙트 캔버스 높이 비율이다.
+    [SerializeField] private float vfxHeightRatio;
+    // 공격자 그림 기준 VFX 시작점이다. 총구와 검 베기 위치를 여기서 튜닝한다.
+    [SerializeField] private Vector2 vfxOffset;
+
+    public VfxId AttackerVfx => attackerVfx;
+    public float VfxDelay => vfxDelay;
+    public float VfxDuration => vfxDuration;
+    public float VfxHeightRatio => vfxHeightRatio;
+    public Vector2 VfxOffset => vfxOffset;
     public AttackPresentationKind AttackKind => attackKind;
     public string AttackerAnimationStateName => attackerAnimationStateName;
     public float PresentationDuration => presentationDuration;

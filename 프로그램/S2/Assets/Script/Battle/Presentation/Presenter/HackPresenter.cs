@@ -2,8 +2,8 @@ using System.Collections;
 using UnityEngine;
 
 /// <summary>
-/// 해킹 연출 이벤트를 받아 임시 대기/로그 연출을 처리하는 Presenter다.
-/// 검 비행과 실제 해킹 이펙트는 후속 아트 작업에서 이 컴포넌트를 확장해 연결한다.
+/// 해킹 연출 이벤트의 연결·진행·완료를 고정 원화와 공개 마스크로 재생한다.
+/// 검 접근은 앞선 SwordMove 이벤트가 처리하며 여기서는 해킹 논리 값을 변경하지 않는다.
 /// </summary>
 public class HackPresenter : MonoBehaviour, IPresentationEventHandler
 {
@@ -23,13 +23,21 @@ public class HackPresenter : MonoBehaviour, IPresentationEventHandler
     private Coroutine hackCoroutine;
     // 현재 처리 중인 큐 이벤트 완료 핸들이다.
     private PresentationEventHandle activeHandle;
+    [Header("Hack VFX")]
+    // 해킹 문양의 월드 캔버스 크기와 중심 오프셋이다.
+    [SerializeField] private float effectSize = 2f;
+    [SerializeField] private Vector3 effectOffset = new(0f, 0.7f, 0f);
+    // 해킹 시간이 0인 데이터에서도 완료를 읽을 수 있게 하는 최소 표시 시간이다.
+    [SerializeField] private float minimumEffectDuration = 0.8f;
+    // 현재 재생 중인 네 부품 문양 대여 핸들이다.
+    private VfxHandle hackEffect;
 
     /// <summary>
     /// 필수 참조를 검사하고 연출 큐 등록을 시도한다.
     /// </summary>
     private void OnEnable()
     {
-        if (!HasValidReference())
+        if (!HasValidReference() || !HasValidData())
         {
             enabled = false;
             return;
@@ -62,6 +70,7 @@ public class HackPresenter : MonoBehaviour, IPresentationEventHandler
             hackCoroutine = null;
         }
 
+        hackEffect?.Release(); hackEffect = null;
         if (activeHandle != null && !activeHandle.IsCompleted)
         {
             activeHandle.Complete();
@@ -110,8 +119,10 @@ public class HackPresenter : MonoBehaviour, IPresentationEventHandler
             return;
         }
 
-        if (!HasValidReference())
+        if (!HasValidReference() || !HasValidData() || GridManager.Instance == null || ActorPresentationRegistry.Instance == null ||
+            VfxManager.Instance == null || !VfxManager.Instance.isActiveAndEnabled)
         {
+            Debug.LogError("해킹 연출에 필요한 참조 또는 그리드가 없습니다.", this);
             handle.Complete();
             return;
         }
@@ -119,29 +130,59 @@ public class HackPresenter : MonoBehaviour, IPresentationEventHandler
         hackCoroutine = StartCoroutine(PlayHack(presentationEvent, handle));
     }
 
-    /// <summary>
-    /// 임시 해킹 연출을 처리하고 완료 신호를 보낸다.
-    /// </summary>
-    private IEnumerator PlayHack(PresentationEvent presentationEvent, PresentationEventHandle handle)
+    /// <summary>사방 꼭지점·회로 공개·맥동·중앙 채움·섬광을 순서대로 재생한다.</summary>
+    private IEnumerator PlayHack(PresentationEvent evt, PresentationEventHandle handle)
     {
         activeHandle = handle;
-
-        if (logHackFlow)
+        hackEffect = VfxManager.TryAcquire(VfxId.HackCircuit);
+        if (hackEffect != null && hackEffect.PartCount != 4)
         {
-            Debug.Log($"{nameof(HackPresenter)}: {targetHackable.name} 해킹 연출을 시작합니다. 대상 칸: {presentationEvent.EventPosition}, 실행 칸: {presentationEvent.ExecutionPosition}", this);
+            Debug.LogError("해킹 프리팹에는 회로·중앙·섬광·꼭지점 4개 Sprite가 필요합니다.", this);
+            hackEffect.Release(); hackEffect = null;
         }
-
-        if (waitHackDuration && targetHackable.HackData.HackDuration > 0f)
+        float duration = Mathf.Max(minimumEffectDuration, waitHackDuration ? targetHackable.HackData.HackDuration : 0f);
+        float elapsed = 0f;
+        if (logHackFlow) Debug.Log($"{targetHackable.name}의 해킹 이펙트를 시작합니다.", this);
+        while (elapsed < duration)
         {
-            yield return new WaitForSeconds(targetHackable.HackData.HackDuration);
+            UpdateHackEffect(evt, Mathf.Clamp01(elapsed / duration), elapsed);
+            elapsed += Time.deltaTime;
+            yield return null;
         }
-
-        if (logHackFlow)
-        {
-            Debug.Log($"{nameof(HackPresenter)}: {targetHackable.name} 해킹 연출을 완료했습니다.", this);
-        }
-
+        hackEffect?.Release(); hackEffect = null;
+        if (logHackFlow) Debug.Log($"{targetHackable.name}의 해킹 이펙트를 완료했습니다.", this);
         CompleteActiveHack(handle);
+    }
+
+    /// <summary>점은 고정하고 셰이더 표시량과 빛만 바꿔 문양 흔들림을 방지한다.</summary>
+    private void UpdateHackEffect(PresentationEvent evt, float progress, float elapsed)
+    {
+        if (hackEffect == null || !hackEffect.IsValid) return;
+        Vector3 position = GridManager.Instance.GridToWorld(evt.EventPosition) + effectOffset;
+        float visibility = 1f;
+        int layer = SortingLayer.NameToID("Default");
+        int order = 10;
+        if (ActorPresentationRegistry.Instance.TryGetVisual(targetHackable.GridActor, out ActorVisualController visual))
+        {
+            position = visual.TargetRenderer.bounds.center;
+            visibility = visual.VisionAlpha;
+            layer = visual.TargetRenderer.sortingLayerID;
+            order = visual.TargetRenderer.sortingOrder + 3;
+        }
+        hackEffect.SetTransform(position, Quaternion.identity, Vector3.one);
+        hackEffect.SetSorting(layer, order);
+        float fade = 1f - Mathf.SmoothStep(0f, 1f, Mathf.InverseLerp(0.9f, 1f, progress));
+        float alpha = visibility * fade;
+        float reveal = Mathf.InverseLerp(0.06f, 0.42f, progress);
+        float fill = Mathf.InverseLerp(0.62f, 0.8f, progress);
+        float flash = progress < 0.8f ? 0f : progress < 0.86f
+            ? Mathf.InverseLerp(0.8f, 0.86f, progress) : 1f - Mathf.InverseLerp(0.86f, 0.96f, progress);
+        float pulse = progress >= 0.42f && progress < 0.62f ? (Mathf.Sin(elapsed * 12f) * 0.5f + 0.5f) * 0.25f : 0f;
+        Vector2 size = Vector2.one * effectSize;
+        hackEffect.SetPart(0, Vector3.zero, size, alpha, reveal, pulse);
+        hackEffect.SetPart(1, Vector3.zero, size, alpha, fill);
+        hackEffect.SetPart(2, Vector3.zero, size, alpha * flash);
+        hackEffect.SetPart(3, Vector3.zero, size, alpha);
     }
 
     /// <summary>
@@ -171,5 +212,13 @@ public class HackPresenter : MonoBehaviour, IPresentationEventHandler
         }
 
         return true;
+    }
+
+    /// <summary>해킹 이펙트의 크기와 최소 표시 시간을 검사한다.</summary>
+    public bool HasValidData()
+    {
+        if (effectSize > 0f && minimumEffectDuration > 0f) return true;
+        Debug.LogError("해킹 VFX 크기와 최소 시간은 0보다 커야 합니다.", this);
+        return false;
     }
 }

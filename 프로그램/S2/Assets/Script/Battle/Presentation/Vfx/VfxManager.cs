@@ -16,6 +16,14 @@ public enum VfxId
     MeleeSlash3,
     EnemyHit,
     EnemyDeath,
+    // 기존 직렬화 번호를 보존하고 확정 원화 식별자를 뒤에 추가한다.
+    SharedBloodHit,
+    SharedDodge,
+    YujinUnarmedImpact,
+    YujinSwordSlash,
+    YujinGunMuzzle,
+    YujinSwordTrail,
+    HackCircuit,
 }
 
 // Acquire/Release 방식으로 빌린 이펙트의 손잡이다.
@@ -26,12 +34,18 @@ public sealed class VfxHandle
     private readonly VfxId id;
     private readonly GameObject instance;
     private bool released;
+    // 풀 생성 시 수집한 부품이며 핵심 Actor 참조를 검색하는 용도가 아니다.
+    private readonly SpriteRenderer[] parts;
+    // 머티리얼을 복제하지 않고 이 인스턴스의 연출 값만 바꾼다.
+    private readonly MaterialPropertyBlock properties = new();
 
-    internal VfxHandle(VfxManager manager, VfxId id, GameObject instance)
+    /// <summary>대여 인스턴스와 생성 시 확인한 Sprite 부품을 보관한다.</summary>
+    internal VfxHandle(VfxManager manager, VfxId id, GameObject instance, SpriteRenderer[] parts)
     {
         this.manager = manager;
         this.id = id;
         this.instance = instance;
+        this.parts = parts;
     }
 
     // 이미 반납된 핸들은 다시 위치를 바꾸거나 반납하지 않게 막는다.
@@ -58,6 +72,51 @@ public sealed class VfxHandle
         }
 
         manager.Release(this);
+    }
+
+    // Presenter가 프리팹의 부품 계약을 확인할 때 사용하는 개수다.
+    public int PartCount => parts.Length;
+
+    /// <summary>프리팹 부품을 지정한 크기와 위치에 배치하고 표시 진행값을 갱신한다.</summary>
+    public void SetPart(int index, Vector3 localPosition, Vector2 size, float opacity = 1f,
+        float progress = 1f, float pulse = 0f, float repeat = 1f)
+    {
+        if (!IsValid) return;
+        if (index < 0 || index >= parts.Length || parts[index].sprite == null)
+        {
+            Debug.LogError($"VFX {id}의 {index}번 Sprite 부품 연결이 올바르지 않습니다.");
+            return;
+        }
+        SpriteRenderer part = parts[index];
+        Vector3 native = part.sprite.bounds.size;
+        part.transform.localPosition = localPosition;
+        part.transform.localRotation = Quaternion.identity;
+        part.transform.localScale = new Vector3(size.x / native.x, size.y / native.y, 1f);
+        part.GetPropertyBlock(properties);
+        properties.SetFloat("_Opacity", Mathf.Clamp01(opacity));
+        properties.SetFloat("_Progress", Mathf.Clamp01(progress));
+        properties.SetFloat("_Pulse", Mathf.Max(0f, pulse));
+        properties.SetFloat("_BodyRepeat", Mathf.Max(0.001f, repeat));
+        part.SetPropertyBlock(properties);
+    }
+
+    /// <summary>단일 원화의 비율을 유지하며 지정한 캔버스 높이로 표시한다.</summary>
+    public void SetSingle(float height, float opacity)
+    {
+        if (!IsValid || parts.Length != 1 || parts[0].sprite == null) return;
+        Vector3 native = parts[0].sprite.bounds.size;
+        SetPart(0, Vector3.zero, new Vector2(height * native.x / native.y, height), opacity);
+    }
+
+    /// <summary>Actor의 현재 정렬 기준과 상대 부품 순서를 적용한다.</summary>
+    public void SetSorting(int layer, int order)
+    {
+        if (!IsValid) return;
+        for (int i = 0; i < parts.Length; i++)
+        {
+            parts[i].sortingLayerID = layer;
+            parts[i].sortingOrder = order + i;
+        }
     }
 
     internal VfxId Id => id;
@@ -96,6 +155,17 @@ public class VfxManager : MonoBehaviour
     private readonly Dictionary<VfxId, VfxEntry> entryById = new();
     private readonly Dictionary<VfxId, Queue<GameObject>> poolById = new();
     private Transform defaultPoolRoot;
+    // 인스턴스별 부품을 생성 시 한 번 수집하며 재사용 시 표시 상태를 초기화한다.
+    private readonly Dictionary<GameObject, SpriteRenderer[]> spriteParts = new();
+    // 씬 비활성화 시 대여 핸들을 무효화해 이전 연출이 새 대여분을 건드리지 않게 한다.
+    private readonly HashSet<VfxHandle> activeHandles = new();
+
+    /// <summary>비활성화 시 재생 중인 이펙트를 모두 회수한다.</summary>
+    private void OnDisable()
+    {
+        StopAllCoroutines();
+        foreach (VfxHandle handle in new List<VfxHandle>(activeHandles)) Release(handle);
+    }
 
     private void Awake()
     {
@@ -137,9 +207,12 @@ public class VfxManager : MonoBehaviour
         return Instance.Play(id, position, rotation, scale);
     }
 
+    /// <summary>활성 씬 매니저에서 이펙트를 대여하고 참조 누락을 보고한다.</summary>
     public static VfxHandle TryAcquire(VfxId id)
     {
-        return Instance != null ? Instance.Acquire(id) : null;
+        if (Instance != null && Instance.isActiveAndEnabled) return Instance.Acquire(id);
+        Debug.LogError("이펙트를 재생할 활성 VfxManager가 씬에 없습니다.");
+        return null;
     }
 
     public bool Play(VfxId id, Vector3 position, Quaternion rotation)
@@ -163,12 +236,14 @@ public class VfxManager : MonoBehaviour
         return true;
     }
 
+    /// <summary>지정한 프리팹을 풀에서 꺼내 초기화하고 유효한 대여 핸들을 발급한다.</summary>
     public VfxHandle Acquire(VfxId id)
     {
         // Acquire는 호출자가 직접 Release해야 하는 지속 이펙트용이다.
         // 예: PlayerMeleeSlashEffect가 공격 진행률 동안 참격을 켰다가 구간이 끝나면 반납한다.
         if (id == VfxId.None || !entryById.TryGetValue(id, out VfxEntry entry) || entry.prefab == null)
         {
+            Debug.LogError($"VfxManager에 {id} 이펙트 프리팹이 등록되지 않았습니다.", this);
             return null;
         }
 
@@ -179,18 +254,22 @@ public class VfxManager : MonoBehaviour
         }
 
         ActivateInstance(instance);
-        return new VfxHandle(this, id, instance);
+        VfxHandle handle = new VfxHandle(this, id, instance, spriteParts[instance]);
+        activeHandles.Add(handle);
+        return handle;
     }
 
+    /// <summary>이 매니저가 대여한 핸들만 한 번 무효화하고 풀로 반환한다.</summary>
     public void Release(VfxHandle handle)
     {
         // 이미 반납된 핸들은 무시한다.
         // Play 코루틴과 수동 Release가 겹쳐도 같은 오브젝트가 두 번 풀에 들어가지 않게 한다.
-        if (handle == null || handle.IsReleased || handle.Instance == null)
+        if (handle == null || handle.IsReleased || handle.Instance == null || !activeHandles.Contains(handle))
         {
             return;
         }
 
+        activeHandles.Remove(handle);
         handle.MarkReleased();
         ReleaseInstance(handle.Id, handle.Instance);
     }
@@ -255,17 +334,32 @@ public class VfxManager : MonoBehaviour
         return CreateInstance(entry);
     }
 
+    /// <summary>프리팹을 생성하고 Sprite 부품을 재사용할 수 있게 한 번 수집한다.</summary>
     private GameObject CreateInstance(VfxEntry entry)
     {
         Transform parent = entry.poolRoot != null ? entry.poolRoot : defaultPoolRoot;
         GameObject instance = Instantiate(entry.prefab, parent);
         instance.name = $"{entry.prefab.name}_{entry.id}";
+        spriteParts[instance] = instance.GetComponentsInChildren<SpriteRenderer>(true);
         instance.SetActive(false);
         return instance;
     }
 
+    /// <summary>신규 Sprite 원화 상태를 초기화하고 기존 파티클 재생을 시작한다.</summary>
     private void ActivateInstance(GameObject instance)
     {
+        instance.transform.localScale = Vector3.one;
+        foreach (SpriteRenderer part in spriteParts[instance])
+        {
+            // 기존 파티클·애니메이터 프리팹의 고유 배치는 보존한다.
+            if (part.sharedMaterial == null || part.sharedMaterial.shader.name != "S2/Presentation/Effect") continue;
+            part.SetPropertyBlock(null);
+            part.color = Color.white;
+            part.enabled = true;
+            part.transform.localPosition = Vector3.zero;
+            part.transform.localRotation = Quaternion.identity;
+            part.transform.localScale = Vector3.one;
+        }
         instance.SetActive(true);
         // 프리팹 안에 ParticleSystem이 있으면 매번 처음부터 재생되게 초기화한다.
         // PNG SpriteRenderer + Animator 프리팹은 SetActive(true)만으로 사용할 수 있다.

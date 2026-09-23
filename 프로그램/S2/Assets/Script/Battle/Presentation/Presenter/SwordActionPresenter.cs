@@ -1,3 +1,4 @@
+using System.Collections;
 using UnityEngine;
 
 /// <summary>
@@ -32,13 +33,23 @@ public class SwordActionPresenter : MonoBehaviour, IPresentationEventHandler
     // 투척 또는 해킹으로 배치된 검의 그리드 칸 기준 월드 오프셋이다.
     [SerializeField] private Vector3 deployedPositionOffset;
 
-    [Header("Optional Path VFX")]
-    // 검 이동 경로에 재생할 선택 VFX다. None이면 경로 계산만 하고 재생하지 않는다.
-    [SerializeField] private VfxId pathVfxId = VfxId.None;
-    // 경로 VFX가 로컬 Y축을 길이 방향으로 사용할 때 적용할 가로 두께다.
-    [SerializeField] private float pathVfxWidth = 1f;
-    // 실제 이동 거리를 경로 VFX의 로컬 Y 스케일로 바꾸는 배율이다.
-    [SerializeField] private float pathVfxLengthScale = 1f;
+    [Header("Sword Trail")]
+    // 투척·회수·해킹 접근에 함께 쓰는 확정 궤적 프리팹 ID다.
+    [SerializeField] private VfxId pathVfxId = VfxId.YujinSwordTrail;
+    // 궤적 캔버스의 월드 높이다. 이동 거리와 독립적으로 유지한다.
+    [SerializeField] private float pathVfxWidth = 0.5f;
+    // 검 비행 속도와 최소 이동 시간이다.
+    [SerializeField] private float swordTravelSpeed = 18f;
+    [SerializeField] private float minimumTravelDuration = 0.12f;
+    // 도착 뒤 잔상이 사라지는 시간이다.
+    [SerializeField] private float trailFadeDuration = 0.18f;
+    // 끝부분은 늘리지 않고 몸통만 반복하도록 할 기본 길이다.
+    [SerializeField] private float trailTailLength = 0.65f;
+    [SerializeField] private float trailHeadLength = 0.45f;
+    // 이동 중 검 위치와 궤적을 함께 갱신하는 코루틴과 대여 핸들이다.
+    private Coroutine swordMoveCoroutine;
+    private VfxHandle trailEffect;
+    private PresentationEventHandle moveHandle;
 
     [Header("Debug")]
     // true면 검 이동과 근접 자세 시작·종료를 Unity 콘솔에 출력한다.
@@ -107,6 +118,10 @@ public class SwordActionPresenter : MonoBehaviour, IPresentationEventHandler
         }
 
         isMeleePoseActive = false;
+        if (swordMoveCoroutine != null) StopCoroutine(swordMoveCoroutine);
+        swordMoveCoroutine = null;
+        trailEffect?.Release(); trailEffect = null;
+        moveHandle?.Complete(); moveHandle = null;
     }
 
     /// <summary>
@@ -149,58 +164,81 @@ public class SwordActionPresenter : MonoBehaviour, IPresentationEventHandler
                presentationEvent.Actor == ownerActor;
     }
 
-    /// <summary>
-    /// 자신이 소유한 검의 이동 연출을 처리하고 즉시 큐 완료 신호를 보낸다.
-    /// </summary>
+    /// <summary>이벤트 목적지로 검을 비행시키고 잔상이 정리된 뒤 큐를 완료한다.</summary>
     public void Handle(PresentationEvent presentationEvent, PresentationEventHandle handle)
     {
-        if (!HasValidReference() || !HasValidData())
+        if (!HasValidReference() || !HasValidData() || GridManager.Instance == null ||
+            VfxManager.Instance == null || !VfxManager.Instance.isActiveAndEnabled || swordMoveCoroutine != null)
         {
+            Debug.LogError("검 이동 연출의 참조 또는 재생 상태가 올바르지 않습니다.", this);
             handle.Complete();
             return;
         }
+        swordMoveCoroutine = StartCoroutine(PlaySwordMove(presentationEvent, handle));
+    }
 
-        PlaySwordMove(presentationEvent);
+    /// <summary>논리 상태를 변경하지 않고 실제 검 Visual과 뒤따르는 잔상을 이동한다.</summary>
+    private IEnumerator PlaySwordMove(PresentationEvent evt, PresentationEventHandle handle)
+    {
+        moveHandle = handle;
+        Vector3 from = swordVisual.position;
+        Vector3 to = evt.SwordMoveKind == SwordMoveKind.Recall
+            ? GetRecalledWorldPosition()
+            : GridManager.Instance.GridToWorld(evt.ToPosition) + deployedPositionOffset;
+        Vector3 delta = to - from;
+        float distance = delta.magnitude;
+        float duration = Mathf.Max(minimumTravelDuration, distance / swordTravelSpeed);
+        trailEffect = VfxManager.TryAcquire(pathVfxId);
+        if (trailEffect != null && trailEffect.PartCount != 3)
+        {
+            Debug.LogError("검 궤적 프리팹에는 꼬리·몸통·앞부분 3개 Sprite가 필요합니다.", this);
+            trailEffect.Release(); trailEffect = null;
+        }
+        DeploySword(from, from - delta);
+        float elapsed = 0f;
+        while (elapsed < duration)
+        {
+            float t = Mathf.Clamp01(elapsed / duration);
+            swordVisual.position = Vector3.Lerp(from, to, t);
+            UpdateTrail(from, swordVisual.position, 1f);
+            elapsed += Time.deltaTime;
+            yield return null;
+        }
+        swordVisual.position = to;
+        if (evt.SwordMoveKind == SwordMoveKind.Recall) AttachSwordToPlayer();
+        elapsed = 0f;
+        while (elapsed < trailFadeDuration)
+        {
+            float t = Mathf.Clamp01(elapsed / trailFadeDuration);
+            UpdateTrail(Vector3.Lerp(from, to, t), to, 1f - t);
+            elapsed += Time.deltaTime;
+            yield return null;
+        }
+        trailEffect?.Release(); trailEffect = null;
+        moveHandle = null; swordMoveCoroutine = null;
+        if (logSwordFlow) Debug.Log($"검 {evt.SwordMoveKind} 비행과 잔상 연출을 완료했습니다.", this);
         handle.Complete();
     }
 
-    /// <summary>
-    /// 검의 실제 현재 위치에서 이벤트 목표 위치까지 방향과 경로를 계산해 Visual을 즉시 옮긴다.
-    /// </summary>
-    private void PlaySwordMove(PresentationEvent presentationEvent)
+    /// <summary>끝 조각의 비율과 두께를 유지하고 가운데 띠만 반복하여 현재 경로 길이를 채운다.</summary>
+    private void UpdateTrail(Vector3 from, Vector3 to, float opacity)
     {
-        GridManager gridManager = GridManager.Instance;
-        if (gridManager == null)
-        {
-            Debug.LogError($"{nameof(SwordActionPresenter)} on {name}에는 검 위치 변환에 사용할 {nameof(GridManager)}가 필요합니다.", this);
-            return;
-        }
-
-        Vector3 fromWorldPosition = swordVisual.position;
-        Vector3 toWorldPosition = presentationEvent.SwordMoveKind == SwordMoveKind.Recall
-            ? GetRecalledWorldPosition()
-            : gridManager.GridToWorld(presentationEvent.ToPosition) + deployedPositionOffset;
-
-        PlayPathVfx(fromWorldPosition, toWorldPosition);
-
-        switch (presentationEvent.SwordMoveKind)
-        {
-            case SwordMoveKind.Throw:
-            case SwordMoveKind.Hack:
-                DeploySword(toWorldPosition, fromWorldPosition);
-                break;
-            case SwordMoveKind.Recall:
-                AttachSwordToPlayer();
-                break;
-            default:
-                Debug.LogError($"{nameof(SwordActionPresenter)}: 지원하지 않는 검 이동 종류입니다. 종류: {presentationEvent.SwordMoveKind}", this);
-                break;
-        }
-
-        if (logSwordFlow)
-        {
-            Debug.Log($"{nameof(SwordActionPresenter)}: {presentationEvent.SwordMoveKind} 검 이동 연출을 완료했습니다. 시작 칸: {presentationEvent.FromPosition}, 목표 칸: {presentationEvent.ToPosition}", this);
-        }
+        if (trailEffect == null || !trailEffect.IsValid) return;
+        Vector3 direction = to - from;
+        float length = direction.magnitude;
+        float capRatio = Mathf.Min(1f, length / (trailTailLength + trailHeadLength));
+        float tail = trailTailLength * capRatio;
+        float head = trailHeadLength * capRatio;
+        float body = Mathf.Max(0f, length - tail - head);
+        trailEffect.SetTransform(from, Quaternion.Euler(0f, 0f,
+            Mathf.Atan2(direction.y, direction.x) * Mathf.Rad2Deg), Vector3.one);
+        SpriteRenderer owner = ownerVisualController.TargetRenderer;
+        trailEffect.SetSorting(owner.sortingLayerID, owner.sortingOrder + 2);
+        float alpha = length > 0.001f ? opacity : 0f;
+        trailEffect.SetPart(0, new Vector3(tail * 0.5f, 0f, 0f), new Vector2(tail, pathVfxWidth), alpha);
+        trailEffect.SetPart(1, new Vector3(tail + body * 0.5f, 0f, 0f), new Vector2(body, pathVfxWidth),
+            body > 0.001f ? alpha : 0f, repeat: body / (pathVfxWidth * 12.8f));
+        trailEffect.SetPart(2, new Vector3(length - head * 0.5f, 0f, 0f), new Vector2(head, pathVfxWidth), alpha);
     }
 
     /// <summary>
@@ -245,33 +283,6 @@ public class SwordActionPresenter : MonoBehaviour, IPresentationEventHandler
         Vector3 localPosition = recalledOffset;
         localPosition.x = Mathf.Abs(recalledOffset.x) * (ownerVisualController.IsFacingRight ? 1f : -1f);
         return ownerVisualController.transform.TransformPoint(localPosition);
-    }
-
-    /// <summary>
-    /// 검 이동 경로의 중간점, 방향, 길이를 계산해 설정된 선택 VFX를 재생한다.
-    /// </summary>
-    private void PlayPathVfx(Vector3 fromWorldPosition, Vector3 toWorldPosition)
-    {
-        if (pathVfxId == VfxId.None)
-        {
-            return;
-        }
-
-        Vector3 direction = toWorldPosition - fromWorldPosition;
-        float distance = direction.magnitude;
-        if (distance <= Mathf.Epsilon)
-        {
-            return;
-        }
-
-        Vector3 middlePosition = Vector3.Lerp(fromWorldPosition, toWorldPosition, 0.5f);
-        Quaternion rotation = Quaternion.Euler(0f, 0f, CalculateDirectionAngle(fromWorldPosition, toWorldPosition));
-        Vector3 scale = new(pathVfxWidth, distance * pathVfxLengthScale, 1f);
-
-        if (!VfxManager.TryPlay(pathVfxId, middlePosition, rotation, scale) && logSwordFlow)
-        {
-            Debug.LogWarning($"{nameof(SwordActionPresenter)}: {pathVfxId} 검 경로 VFX를 재생하지 못했습니다. 씬의 {nameof(VfxManager)}와 VFX 테이블을 확인하세요.", this);
-        }
     }
 
     /// <summary>
@@ -409,7 +420,7 @@ public class SwordActionPresenter : MonoBehaviour, IPresentationEventHandler
             return false;
         }
 
-        if (pathVfxId != VfxId.None && (pathVfxWidth <= 0f || pathVfxLengthScale <= 0f))
+        if (pathVfxId == VfxId.None || pathVfxWidth <= 0f || swordTravelSpeed <= 0f || minimumTravelDuration <= 0f || trailFadeDuration <= 0f || trailTailLength <= 0f || trailHeadLength <= 0f)
         {
             Debug.LogError($"{nameof(SwordActionPresenter)} on {name}의 검 경로 VFX 두께와 길이 배율은 0보다 커야 합니다.", this);
             return false;
