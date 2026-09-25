@@ -101,8 +101,8 @@ public static class CombatStageVerification
             Set(camera, "resultFont", AssetDatabase.LoadAssetAtPath<Font>("Assets/Resources/Fonts/NotoSansKR-VF.ttf"));
             Set(camera, "hudCanvases", UnityEngine.Object.FindObjectsByType<Canvas>(FindObjectsInactive.Include, FindObjectsSortMode.None));
             Set(camera, "minimumOrthographicSize", 2.1f);
-            Set(camera, "horizontalPadding", 1.25f);
-            Set(camera, "verticalPadding", 1.2f);
+            Set(camera, "horizontalPadding", .35f);
+            Set(camera, "verticalPadding", .3f);
             Set(camera, "focusDuration", .08f);
             Set(camera, "settleDuration", .5f);
             Set(camera, "restoreDuration", .08f);
@@ -149,6 +149,9 @@ public static class CombatStageVerification
         double deadline = EditorApplication.timeSinceStartup + 30;
         while (queue.IsBusy && EditorApplication.timeSinceStartup < deadline) yield return null;
         Check(!queue.IsBusy, "입장 큐 완료");
+        // 자동 구도 검증 중에는 실제 키보드·휠 입력이 기준 카메라 위치를 바꾸지 않게 한다. 플레이 사본에만 적용한다.
+        foreach (var mover in UnityEngine.Object.FindObjectsByType<CameraKeyboardMover>(FindObjectsSortMode.None)) mover.enabled = false;
+        foreach (var zoom in UnityEngine.Object.FindObjectsByType<CameraMouseZoom>(FindObjectsSortMode.None)) zoom.enabled = false;
         var camera = Find<CombatCameraPresenter>();
         var combat = Find<CombatActionPresenter>();
         var registry = ActorPresentationRegistry.Instance;
@@ -173,7 +176,7 @@ public static class CombatStageVerification
         foreach (var visual in registry.Visuals) visual.SetVisionAlpha(1f);
         // 플레이 사본에서 방향별 발 위치를 만들어 수평 강제 배치와 가까운 대상 밀어내기를 검출한다.
         foreach (Vector3 delta in new[] { new Vector3(6, 0), new Vector3(-6, 0), new Vector3(0, 6), new Vector3(0, -6),
-            new Vector3(5, 4), new Vector3(-5, 4), new Vector3(5, -4), new Vector3(-5, -4), new Vector3(0, 1) })
+            new Vector3(5, 4), new Vector3(-5, 4), new Vector3(5, -4), new Vector3(-5, -4), new Vector3(0, 1), new Vector3(30, 20), new Vector3(0, 30) })
         {
             targetVisual.SetCombatStaged(true);
             targetVisual.transform.position += actorVisual.GroundWorldPosition + delta - targetVisual.GroundWorldPosition;
@@ -184,8 +187,25 @@ public static class CombatStageVerification
             while (!directionFocus.IsCompleted && EditorApplication.timeSinceStartup < deadline) yield return null;
             Vector3 finalDirection = targetVisual.GroundWorldPosition - actorVisual.GroundWorldPosition;
             Check(directionFocus.IsCompleted && Vector3.Angle(initialDirection, finalDirection) < .1f &&
-                Mathf.Abs(finalDirection.magnitude - Mathf.Min(initialDirection.magnitude, 2.8f)) < .01f,
-                "방향 유지·거리 축소 " + delta);
+                Mathf.Abs(finalDirection.magnitude - initialDirection.magnitude) < .01f,
+                "방향·거리 고정 " + delta);
+            Check(actorVisual.CombatWorldOffset == Vector3.zero, "집중 중 공격자 이동 없음 " + delta);
+            foreach (float roll in new[] { 0f, 5.6f, 11.2f, -11.2f })
+            {
+                worldCamera.transform.rotation = originalRotation * Quaternion.Euler(0, 0, roll);
+                worldCamera.transform.position = (Vector3)Get(camera,"stageCameraPosition") + Vector3.right * .16f;
+                foreach (var v in new[] { actorVisual, targetVisual })
+                {
+                    Bounds bounds = v.TargetRenderer.bounds;
+                    for (int x=0;x<2;x++) for(int y=0;y<2;y++)
+                    {
+                        Vector3 corner = new Vector3(x==0?bounds.min.x:bounds.max.x,y==0?bounds.min.y:bounds.max.y,bounds.center.z);
+                        Vector3 viewport = worldCamera.WorldToViewportPoint(corner);
+                        Check(viewport.x>=0f && viewport.x<=1f && viewport.y>=.16f && viewport.y<=.84f,
+                            "두 배우 외곽·띠 안전 영역 " + delta + " 기울기 " + roll);
+                    }
+                }
+            }
             var directionRestore = new PresentationEventHandle(() => { });
             camera.Handle(PresentationEvent.CombatCameraRestore(), directionRestore);
             deadline = EditorApplication.timeSinceStartup + 3;
@@ -213,7 +233,7 @@ public static class CombatStageVerification
                 {
                     sawStage = true;
                     stagedAt = Time.time;
-                    Check(actorVisual.CombatWorldOffset.sqrMagnitude > .01f, kind + " 공격자 비주얼 접근");
+                    Check(actorVisual.CombatWorldOffset == Vector3.zero, kind + " 공격자 비주얼 위치 고정");
                     Check(Vector3.Distance(targetVisual.transform.position, targetStart) < .01f, kind + " 피격자 엄폐 위치 유지");
                     Check(otherVisual.TargetRenderer.sharedMaterial != originalMaterial, kind + " 주변 배우 흐림 적용");
                     Check(((Canvas)Get(camera, "combatCanvas")).enabled, kind + " 띠 유지");
@@ -329,7 +349,7 @@ public static class CombatStageVerification
                 enemyApproached |= enemyVisual.CombatWorldOffset.sqrMagnitude>.01f;
                 yield return null;
             }
-            Check(enemyApproached && !queue.IsBusy && enemyVisual.CombatWorldOffset==Vector3.zero,kind+" 적 접근·타격·복귀");
+            Check(!enemyApproached && !queue.IsBusy && enemyVisual.CombatWorldOffset==Vector3.zero,kind+" 적 위치 고정·타격·복귀");
             Check(player.GridActor.GridPosition==logicalPosition && player.Health.CurrentHitPoint==originalHp,kind+" 연출은 논리 불변");
         }
 

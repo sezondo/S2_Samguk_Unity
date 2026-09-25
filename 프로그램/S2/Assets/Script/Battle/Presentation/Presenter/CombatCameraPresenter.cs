@@ -8,6 +8,8 @@ using UnityEngine;
 public class CombatCameraPresenter : MonoBehaviour, IPresentationEventHandler
 {
     [Header("Combat Stage")]
+    // 시험 비교 옵션이다. false면 두 캐릭터 위치를 유지하며, true면 기존 접근 연출을 사용한다.
+    [SerializeField] private bool moveAttackerForCombat = false;
     // 논리 Actor와 현재 화면 비주얼을 연결하는 등록소다.
     [SerializeField] private ActorPresentationRegistry presentationRegistry;
     // 기존 접근 방향을 유지하며 줄일 근접·원거리/해킹 최대 간격이다. 이미 가까우면 이동하지 않는다.
@@ -108,7 +110,7 @@ public class CombatCameraPresenter : MonoBehaviour, IPresentationEventHandler
         Vector3 towardTarget = target - stagedAttacker.GroundWorldPosition;
         towardTarget.z = 0f;
         float approachDistance = Mathf.Max(0f, towardTarget.magnitude - separation);
-        attackerDestinationOffset = towardTarget.normalized * approachDistance;
+        attackerDestinationOffset = moveAttackerForCombat ? towardTarget.normalized * approachDistance : Vector3.zero;
         source = stagedAttacker.TargetRenderer.bounds.center + attackerDestinationOffset;
         if (stagedTarget != null) target = stagedTarget.TargetRenderer.bounds.center;
         else target += Vector3.up * 0.7f;
@@ -198,6 +200,9 @@ public class CombatCameraPresenter : MonoBehaviour, IPresentationEventHandler
     /// <summary>띠를 순간 가속하고 대상 방향 카메라 쏠림을 한 번 시작한다.</summary>
     private void BeginImpact()
     {
+        // 공격·피격 Sprite가 커진 경우에도 원래 구도 중심을 유지하며 잘림을 방지한다.
+        targetCamera.orthographicSize = Mathf.Max(targetCamera.orthographicSize,
+            CalculateFocusOrthographicSize(stageCameraPosition, stageCameraPosition));
         boostUntil = Time.time + 0.18f;
         if (impactCoroutine != null) StopCoroutine(impactCoroutine);
         impactCoroutine = StartCoroutine(ImpactRoutine());
@@ -320,12 +325,12 @@ public class CombatCameraPresenter : MonoBehaviour, IPresentationEventHandler
 
     [Header("Framing")]
     // 공격 시작점과 대상점 좌우에 확보할 월드 단위 여백이다.
-    [SerializeField] private float horizontalPadding = 2f;
+    [SerializeField] private float horizontalPadding = 0.35f;
     // 공격 시작점과 대상점 상하에 확보할 월드 단위 여백이다.
-    [SerializeField] private float verticalPadding = 1.5f;
+    [SerializeField] private float verticalPadding = 0.3f;
     // 가까운 공격에서 카메라가 이 값보다 확대되지 않도록 제한하는 최소 Orthographic Size다.
     [SerializeField] private float minimumOrthographicSize = 3.5f;
-    // 먼 공격에서 카메라가 이 값보다 축소되지 않도록 제한하는 최대 Orthographic Size다.
+    // 기존 접근 모드의 최대 Orthographic Size다. 위치 고정 모드는 두 배우 표시를 우선해 이 상한을 넘을 수 있다.
     [SerializeField] private float maximumOrthographicSize = 8.5f;
 
     [Header("Timing")]
@@ -583,17 +588,39 @@ public class CombatCameraPresenter : MonoBehaviour, IPresentationEventHandler
     /// </summary>
     private float CalculateFocusOrthographicSize(Vector3 sourceWorldPosition, Vector3 targetWorldPosition)
     {
-        float halfWidth = Mathf.Abs(targetWorldPosition.x - sourceWorldPosition.x) * 0.5f + horizontalPadding;
-        float halfHeight = Mathf.Abs(targetWorldPosition.y - sourceWorldPosition.y) * 0.5f + verticalPadding;
-        float sizeForWidth = halfWidth / targetCamera.aspect;
-        // 띠에 가려지지 않는 중앙 영역 안에 배우와 결과 텍스트 여백을 확보한다.
+        Vector3 center = CalculateFocusPosition(sourceWorldPosition, targetWorldPosition);
+        Bounds bounds = new Bounds(sourceWorldPosition, Vector3.zero);
+        bounds.Encapsulate(targetWorldPosition);
         if (stagedAttacker != null)
         {
-            halfHeight = Mathf.Max(halfHeight, stagedAttacker.TargetRenderer.bounds.extents.y + 0.6f);
-            if (stagedTarget != null) halfHeight = Mathf.Max(halfHeight, stagedTarget.TargetRenderer.bounds.extents.y + 0.6f);
+            Bounds actorBounds = stagedAttacker.TargetRenderer.bounds;
+            actorBounds.center += attackerDestinationOffset - stagedAttacker.CombatWorldOffset;
+            bounds.Encapsulate(actorBounds);
         }
-        float requiredSize = Mathf.Max(halfHeight / (1f - borderHeight * 2f), sizeForWidth);
-        return Mathf.Clamp(requiredSize, minimumOrthographicSize, maximumOrthographicSize);
+        if (stagedTarget != null) bounds.Encapsulate(stagedTarget.TargetRenderer.bounds);
+        // 원래 카메라 회전 기준으로 전체 Sprite 외곽을 투영한다.
+        Quaternion inverse = Quaternion.Inverse(savedRotation);
+        float halfWidth = 0f, halfHeight = 0f;
+        for (int x = 0; x < 2; x++)
+        for (int y = 0; y < 2; y++)
+        {
+            Vector3 corner = new Vector3(x == 0 ? bounds.min.x : bounds.max.x,
+                y == 0 ? bounds.min.y : bounds.max.y, center.z);
+            Vector3 local = inverse * (corner - center);
+            halfWidth = Mathf.Max(halfWidth, Mathf.Abs(local.x));
+            halfHeight = Mathf.Max(halfHeight, Mathf.Abs(local.y));
+        }
+        halfWidth += horizontalPadding + Mathf.Abs(impactDistance);
+        halfHeight += verticalPadding + Mathf.Abs(impactDistance);
+        // 기울어지는 도중의 모든 각도를 보수적으로 포함하고 띠 안쪽 영역에 배치한다.
+        float sin = Mathf.Sin(Mathf.Min(90f, Mathf.Abs(impactRoll)) * Mathf.Deg2Rad);
+        float rotatedWidth = halfWidth + halfHeight * sin;
+        float rotatedHeight = halfHeight + halfWidth * sin;
+        float requiredSize = Mathf.Max(rotatedWidth / targetCamera.aspect,
+            rotatedHeight / (1f - borderHeight * 2f));
+        return moveAttackerForCombat
+            ? Mathf.Clamp(requiredSize, minimumOrthographicSize, maximumOrthographicSize)
+            : Mathf.Max(requiredSize, minimumOrthographicSize);
     }
 
     /// <summary>
