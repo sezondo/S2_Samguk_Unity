@@ -237,7 +237,9 @@ public class ActionPresentationQueue : MonoBehaviour
                 Debug.Log($"{nameof(ActionPresentationQueue)}: 연출 이벤트 실행을 시작했습니다. 이벤트: {presentationEvent}", this);
             }
 
-            yield return WaitUntilCompleted(presentationEvent, handle, () => completed);
+            // 즉시 완료한 투척 배치와 다음 타격 사이에는 프레임을 끼우지 않는다.
+            if (!completed)
+                yield return WaitUntilCompleted(presentationEvent, handle, () => completed);
 
             if (logQueueFlow)
             {

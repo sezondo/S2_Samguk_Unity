@@ -331,20 +331,22 @@ public readonly struct PresentationEvent
     public static PresentationEvent CombatCameraFocus(
         GridPosition sourcePosition,
         GridPosition targetPosition,
-        string message = null)
+        string message = null,
+        GridActor attacker = null, GridActor target = null,
+        AttackPresentationKind attackKind = AttackPresentationKind.None, HackableObject hackable = null)
     {
         return new PresentationEvent(
             PresentationEventType.CombatCameraFocus,
+            attacker,
+            target,
             null,
-            null,
-            null,
-            null,
+            hackable,
             sourcePosition,
             targetPosition,
             targetPosition,
             targetPosition,
             MovePresentationPhase.None,
-            AttackPresentationKind.None,
+            attackKind,
             default,
             false,
             message);

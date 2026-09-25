@@ -219,6 +219,8 @@ public static class CoverAttachmentVerification
             first.GridActor.GridPosition, AttackPresentationKind.PlayerGun, AttackResult.GuaranteedHit(),
             new DamageResult(true, 100, 100, 0, false, true), true));
         Require(combatQueue.PlayQueuedEvents(), "실제 전투 큐 시작");
+        // 전투 시작에 추가된 준비 박자가 끝난 뒤 실제 공격 방향을 검사한다.
+        yield return 0.15f;
         Require(!secondVisual.IsFacingRight, "전투 Presenter의 공격 방향 우선");
         yield return 2.0f;
         Require(!combatQueue.IsPlaying && secondVisual.IsFacingRight, "전투 큐 종료 후 공격자 엄폐 복귀");

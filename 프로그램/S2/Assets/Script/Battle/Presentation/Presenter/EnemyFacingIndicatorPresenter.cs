@@ -362,7 +362,7 @@ public class EnemyFacingIndicatorPresenter : MonoBehaviour, IPresentationEventHa
             return;
         }
 
-        bool visible = awarenessPresentationVisible && !visualController.IsDeathPresentation && visualController.VisionAlpha > 0.001f;
+        bool visible = !visualController.IsCombatStaged && awarenessPresentationVisible && !visualController.IsDeathPresentation && visualController.VisionAlpha > 0.001f;
         SetRendererEnabled(visible);
         if (!visible)
         {

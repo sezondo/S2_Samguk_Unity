@@ -1,4 +1,4 @@
-using UnityEngine;
+﻿using UnityEngine;
 
 /// <summary>인접 엄폐물 하나를 안정적으로 선택하고 자세·방향·표시 위치를 요청한다.</summary>
 public class LowCoverIdlePresenter : MonoBehaviour
@@ -85,7 +85,7 @@ public class LowCoverIdlePresenter : MonoBehaviour
     /// <summary>대기 요청 전에 실제 표시 도착 칸의 엄폐를 확정하여 일반 Idle이 한 프레임 끼지 않게 한다.</summary>
     private void PrepareIdleCover()
     {
-        if (!initialized || visualController.IsMovingPresentation || visualController.IsDeathPresentation) return;
+        if (!initialized || visualController.IsMovingPresentation || visualController.IsDeathPresentation || visualController.IsCombatStaged) return;
         // 논리 위치는 뒤에 대기 중인 이동까지 앞서갈 수 있으므로 현재 연출 위치를 사용한다.
         GridPosition position = gridManager.WorldToGrid(visualController.transform.position - visualController.CoverWorldOffset);
         SelectCover(position);

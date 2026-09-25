@@ -1,4 +1,4 @@
-using System.Collections;
+﻿using System.Collections;
 using UnityEngine;
 
 /// <summary>
@@ -38,7 +38,7 @@ public class SwordActionPresenter : MonoBehaviour, IPresentationEventHandler
     [SerializeField] private VfxId pathVfxId = VfxId.YujinSwordTrail;
     // 궤적 캔버스의 월드 높이다. 이동 거리와 독립적으로 유지한다.
     [SerializeField] private float pathVfxWidth = 0.5f;
-    // 검 비행 속도와 최소 이동 시간이다.
+    // 회수·해킹 접근의 비행 속도와 최소 이동 시간이다.
     [SerializeField] private float swordTravelSpeed = 18f;
     [SerializeField] private float minimumTravelDuration = 0.12f;
     // 도착 뒤 잔상이 사라지는 시간이다.
@@ -174,20 +174,33 @@ public class SwordActionPresenter : MonoBehaviour, IPresentationEventHandler
             handle.Complete();
             return;
         }
-        swordMoveCoroutine = StartCoroutine(PlaySwordMove(presentationEvent, handle));
+        var started = StartCoroutine(PlaySwordMove(presentationEvent, handle));
+        swordMoveCoroutine = moveHandle == null ? null : started;
     }
 
-    /// <summary>논리 상태를 변경하지 않고 실제 검 Visual과 뒤따르는 잔상을 이동한다.</summary>
+    /// <summary>투척은 즉시 도착시켜 전체 잔상과 타격을 한 컷으로 표시하고, 회수·해킹만 비행을 재생한다.</summary>
     private IEnumerator PlaySwordMove(PresentationEvent evt, PresentationEventHandle handle)
     {
         moveHandle = handle;
+        bool combatThrow = evt.SwordMoveKind == SwordMoveKind.Throw && combatActionPresenter.CameraPresenter.IsCombatActive;
+        if (combatThrow && !combatActionPresenter.TryBeginSwordThrow(evt, ownerVisualController))
+        {
+            moveHandle = null;
+            handle.Complete();
+            yield break;
+        }
+        if (isRecalledVisual) ApplyRecalledPosition();
         Vector3 from = swordVisual.position;
         Vector3 to = evt.SwordMoveKind == SwordMoveKind.Recall
             ? GetRecalledWorldPosition()
             : GridManager.Instance.GridToWorld(evt.ToPosition) + deployedPositionOffset;
+        if (combatThrow && combatActionPresenter.CameraPresenter.TryGetTargetCenter(out Vector3 targetCenter))
+            to = targetCenter;
         Vector3 delta = to - from;
         float distance = delta.magnitude;
-        float duration = Mathf.Max(minimumTravelDuration, distance / swordTravelSpeed);
+        // 투척의 비행 대기를 없애 다음 타격 이벤트까지 같은 프레임에 처리한다.
+        float duration = evt.SwordMoveKind == SwordMoveKind.Throw
+            ? 0f : Mathf.Max(minimumTravelDuration, distance / swordTravelSpeed);
         trailEffect = VfxManager.TryAcquire(pathVfxId);
         if (trailEffect != null && trailEffect.PartCount != 3)
         {
@@ -205,7 +218,11 @@ public class SwordActionPresenter : MonoBehaviour, IPresentationEventHandler
             yield return null;
         }
         swordVisual.position = to;
+        UpdateTrail(from, to, 1f);
         if (evt.SwordMoveKind == SwordMoveKind.Recall) AttachSwordToPlayer();
+        // 대상이 있으면 전체 잔상을 표시한 이 프레임에 다음 타격을 시작한다.
+        bool impactFollows = combatThrow && combatActionPresenter.CameraPresenter.HasActorTarget;
+        if (impactFollows) handle.Complete();
         elapsed = 0f;
         while (elapsed < trailFadeDuration)
         {
@@ -216,6 +233,12 @@ public class SwordActionPresenter : MonoBehaviour, IPresentationEventHandler
         }
         trailEffect?.Release(); trailEffect = null;
         moveHandle = null; swordMoveCoroutine = null;
+        if (combatThrow)
+            combatActionPresenter.CameraPresenter.DeferUntilRestored(() =>
+            {
+                if (swordVisual != null && !isRecalledVisual)
+                    swordVisual.position = GridManager.Instance.GridToWorld(evt.ToPosition) + deployedPositionOffset;
+            });
         if (logSwordFlow) Debug.Log($"검 {evt.SwordMoveKind} 비행과 잔상 연출을 완료했습니다.", this);
         handle.Complete();
     }
@@ -306,7 +329,7 @@ public class SwordActionPresenter : MonoBehaviour, IPresentationEventHandler
     {
         if (presentationEvent.Actor != ownerActor ||
             presentationEvent.AttackKind != AttackPresentationKind.MeleeWithSword ||
-            !swordState.IsRecalled)
+            !isRecalledVisual)
         {
             return;
         }
@@ -334,7 +357,7 @@ public class SwordActionPresenter : MonoBehaviour, IPresentationEventHandler
     {
         if (presentationEvent.Actor != ownerActor ||
             presentationEvent.AttackKind != AttackPresentationKind.MeleeWithSword ||
-            !swordState.IsRecalled)
+            !isRecalledVisual)
         {
             return;
         }

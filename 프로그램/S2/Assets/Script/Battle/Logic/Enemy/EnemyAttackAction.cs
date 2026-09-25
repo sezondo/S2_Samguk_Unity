@@ -1,4 +1,4 @@
-using UnityEngine;
+﻿using UnityEngine;
 
 /// <summary>
 /// 적의 근접·원거리 공격 판정과 피해 적용 요청을 담당한다.
@@ -143,7 +143,7 @@ public class EnemyAttackAction : MonoBehaviour
         resolutionContext.EnqueuePresentation(PresentationEvent.CombatCameraFocus(
             attackerPosition,
             targetPosition,
-            "적 원거리 공격 카메라 포커스"));
+            "적 원거리 공격 카메라 포커스", enemyContext.GridActor, targetActor, kind == EnemyPlannedActionKind.Melee ? AttackPresentationKind.EnemyMelee : AttackPresentationKind.EnemyRanged));
 
         if (logAttack)
         {

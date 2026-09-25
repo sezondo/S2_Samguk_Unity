@@ -162,14 +162,12 @@ public class PlayerSwordThrowAction : MonoBehaviour
         // 검 위치 변경을 피해 요청보다 먼저 처리해 검 이동 뒤 새 시야가 열린 다음 타격 연출이 이어지게 한다.
         resolutionContext.Publish(new SwordThrownLogicEvent(playerContext.GridActor, fromPosition, targetPosition));
         bool requestedDamage = TryRequestDamageAtTarget(fromPosition, targetPosition, resolutionContext);
-        if (requestedDamage)
-        {
-            // 회수 상태면 플레이어 칸, 배치 상태면 검의 기존 칸부터 대상을 함께 잡는다.
-            resolutionContext.EnqueuePresentation(PresentationEvent.CombatCameraFocus(
-                fromPosition,
-                targetPosition,
-                "검 투척 공격 카메라 포커스"));
-        }
+        // 빈 칸 투척도 같은 집중 연출을 사용한다. 대상 참조는 논리 점유 해제 전에 기록한다.
+        GridManager.Instance.TryGetActorAt(targetPosition, out GridActor focusTarget);
+        if (!requestedDamage || focusTarget == playerContext.GridActor) focusTarget = null;
+        resolutionContext.EnqueuePresentation(PresentationEvent.CombatCameraFocus(
+            fromPosition, targetPosition, "검 투척 카메라 포커스",
+            playerContext.GridActor, focusTarget, AttackPresentationKind.SwordThrow));
 
         // 피해 여부와 관계없이 검 이동을 먼저 보여주고, 피해가 있으면 CombatAction이 뒤이어 재생된다.
         resolutionContext.EnqueuePresentation(PresentationEvent.SwordMove(
@@ -178,6 +176,8 @@ public class PlayerSwordThrowAction : MonoBehaviour
             targetPosition,
             SwordMoveKind.Throw,
             "검 투척 이동 연출"));
+        if (!requestedDamage)
+            resolutionContext.EnqueuePresentation(PresentationEvent.CombatCameraRestore("빈 칸 투척 복귀"));
 
         if (logActionState)
         {

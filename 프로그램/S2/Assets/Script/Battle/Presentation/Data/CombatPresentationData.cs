@@ -17,7 +17,7 @@ public struct CombatPresentationEntry
 
     // 해당 공격의 공격자에게 표시할 VFX다. 투척은 SwordActionPresenter가 맡으므로 None이다.
     [SerializeField] private VfxId attackerVfx;
-    // 자세 전환 후 공격/피격 이펙트를 표시하기까지의 시간이다.
+    // 공통 카메라 준비 이후 타격 전 추가 대기다. 자세·결과·이펙트는 함께 시작하며 현재 튜닝은 0이다.
     [SerializeField] private float vfxDelay;
     // 단발 이펙트의 표시 시간이다. 전투 자세 유지 시간 안에 끝나야 한다.
     [SerializeField] private float vfxDuration;

@@ -142,7 +142,7 @@ public class PlayerMeleeAttackAction : MonoBehaviour
         resolutionContext.EnqueuePresentation(PresentationEvent.CombatCameraFocus(
             attackerPosition,
             targetPosition,
-            "근접 공격 카메라 포커스"));
+            "근접 공격 카메라 포커스", playerContext.GridActor, targetActor, attackKind));
 
         if (logActionState)
         {

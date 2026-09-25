@@ -1,4 +1,4 @@
-using System.Collections;
+﻿using System.Collections;
 using UnityEngine;
 
 /// <summary>
@@ -10,6 +10,9 @@ public class HackPresenter : MonoBehaviour, IPresentationEventHandler
     [Header("Target")]
     // 이 Presenter가 해킹 연출을 처리할 해킹 대상이다.
     [SerializeField] private HackableObject targetHackable;
+
+    // 해킹 구도와 완료 순간 강조를 공유할 카메라 Presenter다.
+    [SerializeField] private CombatCameraPresenter cameraPresenter;
 
     [Header("Presentation")]
     // true면 HackableData.HackDuration만큼 대기한 뒤 큐 완료 신호를 보낸다.
@@ -143,9 +146,16 @@ public class HackPresenter : MonoBehaviour, IPresentationEventHandler
         float duration = Mathf.Max(minimumEffectDuration, waitHackDuration ? targetHackable.HackData.HackDuration : 0f);
         float elapsed = 0f;
         if (logHackFlow) Debug.Log($"{targetHackable.name}의 해킹 이펙트를 시작합니다.", this);
+        bool completionPresented = false;
         while (elapsed < duration)
         {
-            UpdateHackEffect(evt, Mathf.Clamp01(elapsed / duration), elapsed);
+            float progress = Mathf.Clamp01(elapsed / duration);
+            if (!completionPresented && progress >= 0.8f)
+            {
+                completionPresented = true;
+                cameraPresenter.PresentHackCompletion(evt);
+            }
+            UpdateHackEffect(evt, progress, elapsed);
             elapsed += Time.deltaTime;
             yield return null;
         }
@@ -200,6 +210,11 @@ public class HackPresenter : MonoBehaviour, IPresentationEventHandler
     /// </summary>
     public bool HasValidReference()
     {
+        if (cameraPresenter == null)
+        {
+            Debug.LogError("해킹 연출 카메라 참조가 없습니다.", this);
+            return false;
+        }
         if (targetHackable == null)
         {
             Debug.LogError($"{nameof(HackPresenter)} on {name}에는 해킹 연출 대상 {nameof(HackableObject)} 참조가 필요합니다.", this);

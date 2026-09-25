@@ -162,6 +162,9 @@ public class PlayerHackAction : MonoBehaviour
         HackCanceled?.Invoke();
 
         resolutionContext.Publish(new HackCompletedLogicEvent(playerContext.GridActor, target, targetPosition, executionPosition));
+        resolutionContext.EnqueuePresentation(PresentationEvent.CombatCameraFocus(
+            playerContext.GridActor.GridPosition, targetPosition, "해킹 집중 연출",
+            playerContext.GridActor, target.GridActor, hackable: target));
         if (usesSword)
         {
             // 검 능력 유닛은 해킹 연출 전에 검 Visual을 실제 실행 칸으로 이동시킨다.
@@ -174,6 +177,7 @@ public class PlayerHackAction : MonoBehaviour
         }
 
         resolutionContext.EnqueuePresentation(PresentationEvent.Hack(playerContext.GridActor, target, targetPosition, executionPosition, "해킹 연출"));
+        resolutionContext.EnqueuePresentation(PresentationEvent.CombatCameraRestore("해킹 카메라 복귀"));
 
         if (logActionState)
         {

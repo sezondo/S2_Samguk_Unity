@@ -168,7 +168,7 @@ public class PlayerGunAttackAction : MonoBehaviour
         resolutionContext.EnqueuePresentation(PresentationEvent.CombatCameraFocus(
             attackerPosition,
             targetPosition,
-            "총 공격 카메라 포커스"));
+            "총 공격 카메라 포커스", playerContext.GridActor, targetActor, AttackPresentationKind.PlayerGun));
 
         if (logActionState)
         {

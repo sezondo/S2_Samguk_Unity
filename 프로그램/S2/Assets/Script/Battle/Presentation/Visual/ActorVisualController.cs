@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.Serialization;
@@ -45,7 +45,49 @@ public class ActorVisualController : MonoBehaviour
     // 소품별 앞/뒤 정렬 요청이다. 뒤쪽 요청은 건물 전면 보정보다 낮은 상한을 적용한다.
     private readonly Dictionary<SpriteRenderer, bool> propSortingRequests = new();
 
+    // 전투 접근만을 위한 월드 오프셋이며 논리 Transform과 엄폐 오프셋에는 관여하지 않는다.
+    private Vector3 combatWorldOffset;
+    // 진입부터 복귀까지 엄폐 재선택과 자세 초기화를 막는다.
+    private bool isCombatStaged;
+    // 주변 인물 흐림 동안 원본 머티리얼과 전용 인스턴스를 보관한다.
+    private Material materialBeforeCombatBlur;
+    private Material combatBlurMaterial;
+    public bool IsCombatStaged => isCombatStaged;
+    public Vector3 CombatWorldOffset => combatWorldOffset;
     public Vector3 CoverWorldOffset => coverWorldOffset;
+
+    /// <summary>엄폐 상태를 보존한 채 접근·복귀 구간의 표시 위치를 잠근다.</summary>
+    public void SetCombatStaged(bool staged) => isCombatStaged = staged;
+
+    /// <summary>기존 오프셋과의 차이만 더해 논리 위치와 원래 엄폐 위치를 보존한다.</summary>
+    public void SetCombatWorldOffset(Vector3 offset)
+    {
+        transform.position += offset - combatWorldOffset;
+        combatWorldOffset = offset;
+    }
+
+    /// <summary>다른 배우를 흐리게 표시하고 강도가 0이면 원본 머티리얼을 돌려준다.</summary>
+    public void SetCombatBackground(Material template, float amount)
+    {
+        if (targetRenderer == null) return;
+        if (amount <= 0f)
+        {
+            if (combatBlurMaterial == null) return;
+            targetRenderer.sharedMaterial = materialBeforeCombatBlur;
+            Destroy(combatBlurMaterial);
+            combatBlurMaterial = null;
+            materialBeforeCombatBlur = null;
+            return;
+        }
+        if (combatBlurMaterial == null)
+        {
+            if (template == null) { Debug.LogError("전투 배경 흐림 머티리얼이 없습니다.", this); return; }
+            materialBeforeCombatBlur = targetRenderer.sharedMaterial;
+            combatBlurMaterial = new Material(template);
+            targetRenderer.sharedMaterial = combatBlurMaterial;
+        }
+        combatBlurMaterial.SetFloat("_FocusAmount", Mathf.Clamp01(amount));
+    }
     public bool IsMovingPresentation => isMovingPresentation;
     public bool IsDeathPresentation => isDeathPresentation;
 
@@ -152,6 +194,9 @@ public class ActorVisualController : MonoBehaviour
     /// <summary>표시를 중단하면 건물·소품의 임시 정렬 요청을 해제한다.</summary>
     private void OnDisable()
     {
+        SetCombatWorldOffset(Vector3.zero);
+        SetCombatBackground(null, 0f);
+        isCombatStaged = false;
         // 재활성화 시 이전 표시 보정이 누적되지 않게 되돌린다.
         transform.position -= coverWorldOffset;
         coverWorldOffset = coverOffsetStart = coverOffsetTarget = Vector3.zero;
@@ -228,13 +273,13 @@ public class ActorVisualController : MonoBehaviour
     /// <summary>이동 기준 월드 위치에 현재 엄폐 보정만 합쳐 표시한다.</summary>
     public void SetPresentationPosition(Vector3 worldPosition)
     {
-        transform.position = worldPosition + coverWorldOffset;
+        transform.position = worldPosition + coverWorldOffset + combatWorldOffset;
     }
 
     /// <summary>선택된 엄폐물의 자세·방향·접촉 오프셋을 하나의 요청으로 적용한다.</summary>
     public void SetCoverPresentation(bool low, bool wall, Vector3 offset, int horizontalSide, float duration)
     {
-        if (isDeathPresentation || isMovingPresentation) return;
+        if (isDeathPresentation || isMovingPresentation || isCombatStaged) return;
         bool hadCover = useLowCoverIdle || useWallCoverIdle;
         bool hasCover = low || wall;
         if (hasCover && (!hadCover || coverSide != horizontalSide))
@@ -258,7 +303,7 @@ public class ActorVisualController : MonoBehaviour
     /// <summary>논리 위치와 무관하게 현재 그림의 엄폐 오프셋만 부드럽게 보간한다.</summary>
     private void Update()
     {
-        if (isDeathPresentation || isCombatPresentation || coverWorldOffset == coverOffsetTarget) return;
+        if (isDeathPresentation || isCombatStaged || isCombatPresentation || coverWorldOffset == coverOffsetTarget) return;
         coverTransitionElapsed += Time.deltaTime;
         float time = coverTransitionDuration <= 0f ? 1f : Mathf.Clamp01(coverTransitionElapsed / coverTransitionDuration);
         Vector3 next = Vector3.Lerp(coverOffsetStart, coverOffsetTarget, Mathf.SmoothStep(0f, 1f, time));
@@ -300,6 +345,14 @@ public class ActorVisualController : MonoBehaviour
             coverOffsetStart = coverOffsetTarget = coverWorldOffset;
         }
         else if (!attacker) FaceFromTo(from, to);
+        ApplyRequestedFacing();
+    }
+
+    /// <summary>전투 무대의 실제 좌우 배치 방향을 자세에 적용한다.</summary>
+    public void SetCombatFacing(bool right)
+    {
+        hasCombatFacing = true;
+        combatFacingRight = right;
         ApplyRequestedFacing();
     }
 
@@ -450,11 +503,11 @@ public class ActorVisualController : MonoBehaviour
             finally { resolvingIdleRequest = false; }
         }
 
-        if (stateName == "Idle" && useLowCoverIdle)
+        if (stateName == "Idle" && useLowCoverIdle && !isCombatStaged)
         {
             stateName = "LowCoverIdle";
         }
-        else if (stateName == "Idle" && useWallCoverIdle)
+        else if (stateName == "Idle" && useWallCoverIdle && !isCombatStaged)
         {
             stateName = "WallCoverIdle";
         }
@@ -477,7 +530,8 @@ public class ActorVisualController : MonoBehaviour
         }
         else
         {
-            animator.Play(stateName);
+            animator.Play(stateName, 0, 0f);
+            animator.Update(0f);
         }
 
         currentAnimationStateName = stateName;

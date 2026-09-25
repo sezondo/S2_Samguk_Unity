@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
@@ -12,6 +12,24 @@ public class CombatActionPresenter : MonoBehaviour, IPresentationEventHandler
     [Header("Reference")]
     // 논리 Actor를 화면 표시용 ActorVisualController로 변환할 씬 단위 등록소다.
     [SerializeField] private ActorPresentationRegistry presentationRegistry;
+
+    // 진입·타격 카메라와 복귀 시점의 자세 정리를 담당하는 명시적 참조다.
+    [SerializeField] private CombatCameraPresenter cameraPresenter;
+    public CombatCameraPresenter CameraPresenter => cameraPresenter;
+
+    /// <summary>검 출발 시 투척 자세만 먼저 시작한다. 피격·결과·타격 알림은 검 도착 이벤트에서 처리한다.</summary>
+    public bool TryBeginSwordThrow(PresentationEvent evt, ActorVisualController visual)
+    {
+        if (!HasValidReference() || !HasValidData() || visual == null || !visual.HasValidAnimationReference()) return false;
+        if (!presentationData.TryGetEntry(AttackPresentationKind.SwordThrow, out CombatPresentationEntry entry))
+        {
+            Debug.LogError("검 투척 출발에 필요한 공격 연출 데이터가 없습니다.", this);
+            return false;
+        }
+        visual.BeginCombatPresentation(evt.FromPosition, evt.ToPosition, true, false);
+        cameraPresenter.AlignAttackerFacing(visual);
+        return visual.TryPlayAnimationState(entry.AttackerAnimationStateName, presentationData.CrossFadeDuration);
+    }
 
     [Header("Data")]
     // 공격 종류별 애니메이션 상태와 동시 연출 시간을 보관하는 데이터다.
@@ -216,6 +234,8 @@ public class CombatActionPresenter : MonoBehaviour, IPresentationEventHandler
         activeHandle = handle;
         activePresentationEvent = presentationEvent;
 
+        // 기존 VFX 지연은 준비 박자로 사용하고 자세·결과·이펙트는 같은 프레임에 맞춘다.
+        if (entry.VfxDelay > 0f && presentationEvent.AttackKind != AttackPresentationKind.SwordThrow) yield return new WaitForSeconds(entry.VfxDelay);
         GridPosition attackerPosition = presentationEvent.FromPosition;
         GridPosition targetPosition = presentationEvent.ToPosition;
         if (presentationEvent.HasDamageResult)
@@ -225,7 +245,8 @@ public class CombatActionPresenter : MonoBehaviour, IPresentationEventHandler
 
         activeAttackerVisual.TryPlayAnimationState(
             entry.AttackerAnimationStateName,
-            presentationData.CrossFadeDuration);
+            presentationData.CrossFadeDuration,
+            presentationEvent.AttackKind != AttackPresentationKind.SwordThrow);
 
         string targetStateName = activeAttackMissed
             ? presentationData.MissAnimationStateName
@@ -234,6 +255,8 @@ public class CombatActionPresenter : MonoBehaviour, IPresentationEventHandler
                 : presentationData.HitAnimationStateName;
         activeTargetVisual.TryPlayAnimationState(targetStateName, presentationData.CrossFadeDuration);
 
+        cameraPresenter.AlignAttackerFacing(activeAttackerVisual);
+        cameraPresenter.PresentImpact(presentationEvent, activeTargetVisual);
         combatPresentationStarted = true;
         CombatPresentationStarted?.Invoke(presentationEvent);
 
@@ -247,14 +270,14 @@ public class CombatActionPresenter : MonoBehaviour, IPresentationEventHandler
         bool effectsStarted = false;
         while (elapsed < entry.PresentationDuration)
         {
-            if (!effectsStarted && elapsed >= entry.VfxDelay)
+            if (!effectsStarted && elapsed >= 0f)
             {
                 effectsStarted = true;
                 BeginCombatEffects(entry);
             }
             if (effectsStarted)
             {
-                float age = elapsed - entry.VfxDelay;
+                float age = elapsed;
                 float opacity = 1f - Mathf.SmoothStep(0f, 1f,
                     Mathf.InverseLerp(entry.VfxDuration * 0.5f, entry.VfxDuration, age));
                 UpdateCombatEffects(entry, opacity);
@@ -264,8 +287,10 @@ public class CombatActionPresenter : MonoBehaviour, IPresentationEventHandler
         }
 
         ReleaseCombatEffects();
-        NotifyCombatPresentationCompleted();
-        RestoreActiveVisuals();
+        // 복귀 중에도 공격/피격 자세를 유지하며 카메라가 복귀 완료 후 정리한다.
+        if (cameraPresenter.IsCombatActive)
+            cameraPresenter.DeferUntilRestored(() => { NotifyCombatPresentationCompleted(); RestoreActiveVisuals(); ClearActiveCombat(); });
+        else { NotifyCombatPresentationCompleted(); RestoreActiveVisuals(); }
 
         if (logCombatFlow)
         {
@@ -362,7 +387,8 @@ public class CombatActionPresenter : MonoBehaviour, IPresentationEventHandler
     private void CompleteActiveCombat(PresentationEventHandle handle)
     {
         combatCoroutine = null;
-        ClearActiveCombat();
+        activeHandle = null;
+        if (!cameraPresenter.IsCombatActive) ClearActiveCombat();
         handle.Complete();
     }
 
@@ -399,6 +425,11 @@ public class CombatActionPresenter : MonoBehaviour, IPresentationEventHandler
     /// </summary>
     public bool HasValidReference()
     {
+        if (cameraPresenter == null)
+        {
+            Debug.LogError("전투 연출 카메라 참조가 없습니다.", this);
+            return false;
+        }
         if (presentationRegistry == null)
         {
             Debug.LogError($"{nameof(CombatActionPresenter)} on {name}에는 {nameof(ActorPresentationRegistry)} 참조가 필요합니다.", this);

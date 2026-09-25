@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using UnityEngine;
 
@@ -8,6 +8,8 @@ using UnityEngine;
 public class ActorPresentationRegistry : MonoBehaviour
 {
     public static ActorPresentationRegistry Instance { get; private set; }
+    // 전투 집중 연출이 현재 화면 배우들을 순회할 때 사용하는 읽기 전용 등록 목록이다.
+    public IEnumerable<ActorVisualController> Visuals => visualByActor.Values;
 
     // 논리 Actor를 기준으로 등록된 시각 제어 컴포넌트를 찾는 맵이다.
     private readonly Dictionary<GridActor, ActorVisualController> visualByActor = new();
