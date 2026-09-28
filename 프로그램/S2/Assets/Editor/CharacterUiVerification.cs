@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.IO;
@@ -36,13 +36,75 @@ public static class CharacterUiVerification
         EditorApplication.isPlaying = true;
     }
 
+    /// <summary>저장 씬을 바꾸지 않고 안개 속 적 아이콘 노출 회귀만 검사한다.</summary>
+    [MenuItem("Tools/S2/Verify Fog Enemy Icons")]
+    public static void VerifyFogIcons()
+    {
+        Verify();
+        SessionState.SetBool("S2.CharacterUI.FogOnly", true);
+    }
+
+    /// <summary>화면 시야와 그림 알파가 다를 때 숨김을 우선하고 재노출·임시 노출을 확인한다.</summary>
+    private static IEnumerator RunFogIcons()
+    {
+        var queue = ActionPresentationQueue.Instance;
+        double deadline = EditorApplication.timeSinceStartup + 30;
+        while (queue.IsBusy && EditorApplication.timeSinceStartup < deadline) yield return null;
+        Check(!queue.IsBusy, "입장 연출 완료");
+        var overlay = UnityEngine.Object.FindFirstObjectByType<BattleHudTacticalOverlayController>();
+        var presenter = PlayerVisionPresenter.Instance;
+        var registry = ActorPresentationRegistry.Instance;
+        var icons = (Dictionary<EnemyContext, UnityEngine.UI.Image>)Get(overlay, "enemyStateIcons");
+        var forced = (HashSet<GridActor>)Get(presenter, "forcedVisibleActors");
+        Check(presenter != null && presenter.PresentedSnapshot != null, "화면 시야 초기화");
+        Check(icons.Count > 0, "실제 적 아이콘 존재");
+        foreach (var pair in icons)
+        {
+            var actor = pair.Key.GridActor;
+            Check(registry.TryGetVisual(actor, out var visual), "적 비주얼 연결");
+            bool wasVisible = presenter.ShouldShowEnemyActorInSnapshot(actor);
+            float alpha = visual.VisionAlpha;
+            var position = actor.GridPosition;
+            try
+            {
+                presenter.SetMovedEnemyVisibility(actor, false);
+                visual.SetVisionAlpha(1f);
+                overlay.Refresh();
+                Check(!pair.Value.enabled, "시야 밖에서는 알파 1이어도 아이콘 숨김");
+                presenter.SetMovedEnemyVisibility(actor, true);
+                overlay.Refresh();
+                Check(pair.Value.enabled, "시야 진입 후 평상 눈 표시");
+                visual.SetVisionAlpha(0f);
+                overlay.Refresh();
+                Check(!pair.Value.enabled, "그림이 숨겨진 동안 아이콘 숨김");
+                visual.SetVisionAlpha(1f);
+                presenter.SetMovedEnemyVisibility(actor, false);
+                forced.Add(actor);
+                overlay.Refresh();
+                Check(pair.Value.enabled, "공격자 임시 노출 유지");
+                forced.Remove(actor);
+                overlay.Refresh();
+                Check(!pair.Value.enabled, "임시 노출 종료 뒤 다시 숨김");
+                Check(actor.GridPosition == position, "논리 위치 보존");
+            }
+            finally
+            {
+                forced.Remove(actor);
+                presenter.SetMovedEnemyVisibility(actor, wasVisible);
+                visual.SetVisionAlpha(alpha);
+                overlay.Refresh();
+            }
+        }
+    }
     /// <summary>플레이 초기화 뒤 검사 루틴을 연결한다.</summary>
     private static void OnMode(PlayModeStateChange mode)
     {
         if (mode != PlayModeStateChange.EnteredPlayMode || !SessionState.GetBool(Pending, false)) return;
         SessionState.SetBool(Pending, false);
         results.Clear(); callbackFailure = null;
-        routine = Run(); nextStep = EditorApplication.timeSinceStartup + 1;
+        routine = SessionState.GetBool("S2.CharacterUI.FogOnly", false) ? RunFogIcons() : Run();
+        SessionState.SetBool("S2.CharacterUI.FogOnly", false);
+        nextStep = EditorApplication.timeSinceStartup + 1;
         EditorApplication.update += Tick;
     }
 
@@ -98,6 +160,7 @@ public static class CharacterUiVerification
                 enemy.transform.parent.name + " 사용자 화면 기준 추가 높이 보정 유지");
             Check(visual.TargetRenderer.transform.parent == visual.transform, enemy.transform.parent.name + " 그림 위치만 자식에서 보정");
             Check(Mathf.Abs(visual.transform.lossyScale.x - .45f) < .001f, enemy.transform.parent.name + " 기존 크기 유지");
+            PlayerVisionPresenter.Instance.SetMovedEnemyVisibility(enemy.GridActor, true);
             visual.SetVisionAlpha(1);
         }
         Check(!UnityEngine.Object.FindObjectsByType<LineRenderer>(FindObjectsSortMode.None).Any(r=>r.name.Contains("TemporaryRing")), "노란 임시 링 없음");

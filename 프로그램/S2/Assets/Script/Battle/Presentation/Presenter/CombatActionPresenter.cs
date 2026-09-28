@@ -218,6 +218,15 @@ public class CombatActionPresenter : MonoBehaviour, IPresentationEventHandler
             return false;
         }
 
+        // 배우별 원화는 표시 컴포넌트의 명시적 데이터로 선택한다. 연결된 데이터의 누락은 오류다.
+        CombatPresentationData actorData = activeAttackerVisual.CombatPresentationOverride;
+        if (actorData != null && (!HasValidData(actorData) || !actorData.TryGetEntry(presentationEvent.AttackKind, out entry)))
+        {
+            Debug.LogError($"{actorData.name}에 유효한 {presentationEvent.AttackKind} 공격 연출이 없습니다.", this);
+            ClearActiveCombat();
+            return false;
+        }
+
         activeAttackMissed = !presentationEvent.AttackResult.IsHit;
         activeTargetKilled = presentationEvent.HasDamageResult && presentationEvent.DamageResult.KilledByThisDamage;
         return true;
@@ -324,7 +333,7 @@ public class CombatActionPresenter : MonoBehaviour, IPresentationEventHandler
             bool gun = entry.AttackKind == AttackPresentationKind.PlayerGun || entry.AttackKind == AttackPresentationKind.EnemyRanged;
             Quaternion rotation = Quaternion.identity;
             Vector3 scale = new(facing, 1f, 1f);
-            if (gun)
+            if (gun || entry.SpanToTarget)
             {
                 Vector3 direction = target.bounds.center - position;
                 rotation = Quaternion.Euler(0f, 0f, Mathf.Atan2(direction.y, direction.x) * Mathf.Rad2Deg);
@@ -333,6 +342,14 @@ public class CombatActionPresenter : MonoBehaviour, IPresentationEventHandler
             attackerEffect.SetTransform(position, rotation, scale);
             attackerEffect.SetSorting(attacker.sortingLayerID, attacker.sortingOrder + 3);
             attackerEffect.SetSingle(attacker.bounds.size.y * entry.VfxHeightRatio, opacity * activeAttackerVisual.VisionAlpha);
+            if (entry.SpanToTarget)
+            {
+                // 비행 대기 없이 실제 두 표시 위치 사이를 한 컷의 잔상으로 잇는다.
+                Vector3 end = target.bounds.center;
+                attackerEffect.SetTransform((position + end) * 0.5f, rotation, Vector3.one);
+                attackerEffect.SetPart(0, Vector3.zero, new Vector2(Vector3.Distance(position, end),
+                    attacker.bounds.size.y * entry.VfxHeightRatio), opacity * activeAttackerVisual.VisionAlpha);
+            }
             if (entry.AttackKind == AttackPresentationKind.MeleeUnarmed)
             {
                 attackerEffect.SetTransform(target.bounds.center, Quaternion.identity, scale);
@@ -448,7 +465,10 @@ public class CombatActionPresenter : MonoBehaviour, IPresentationEventHandler
     /// <summary>
     /// 전투 연출 데이터의 상태 이름, 유지 시간과 공격 종류 중복 여부를 검사한다.
     /// </summary>
-    public bool HasValidData()
+    public bool HasValidData() => HasValidData(presentationData);
+
+    /// <summary>공통 데이터와 배우별 공격 데이터에 동일한 검증 규칙을 적용한다.</summary>
+    private bool HasValidData(CombatPresentationData presentationData)
     {
         if (presentationData == null)
         {

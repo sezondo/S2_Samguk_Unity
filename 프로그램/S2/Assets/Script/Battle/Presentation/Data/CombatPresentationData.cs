@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using UnityEngine;
 
@@ -25,6 +25,10 @@ public struct CombatPresentationEntry
     [SerializeField] private float vfxHeightRatio;
     // 공격자 그림 기준 VFX 시작점이다. 총구와 검 베기 위치를 여기서 튜닝한다.
     [SerializeField] private Vector2 vfxOffset;
+
+    // true면 원화를 현재 발사점부터 대상 중심까지 늘려 즉시 잔상으로 표시한다.
+    [SerializeField] private bool spanToTarget;
+    public bool SpanToTarget => spanToTarget;
 
     public VfxId AttackerVfx => attackerVfx;
     public float VfxDelay => vfxDelay;

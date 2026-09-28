@@ -1,4 +1,4 @@
-﻿using System.Collections;
+using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 
@@ -75,6 +75,9 @@ public class PlayerVisionPresenter : MonoBehaviour, IPresentationEventHandler
 
     public static PlayerVisionPresenter Instance { get; private set; }
     public PlayerVisionSnapshot PresentedSnapshot => presentedSnapshot;
+    // 안개를 공개하지 않고 목표 표식만 위에 그리기 위한 정렬 기준이다.
+    public string FogSortingLayerName => fogSortingLayerName;
+    public int FogSortingOrder => fogSortingOrder;
 
     /// <summary>
     /// 씬의 단일 시야 Presenter를 등록하고 필수 참조와 표시 데이터를 검사한다.
@@ -241,9 +244,9 @@ public class PlayerVisionPresenter : MonoBehaviour, IPresentationEventHandler
     }
 
     /// <summary>
-    /// 현재 화면에 적용된 스냅샷 시점에 지정한 적 Actor가 보여야 하는지 확인한다.
+    /// 현재 화면의 스냅샷·이동 완료·임시 노출 상태를 기준으로 적과 HUD의 표시 여부를 함께 판단한다.
     /// </summary>
-    private bool ShouldShowEnemyActorInSnapshot(GridActor actor)
+    public bool ShouldShowEnemyActorInSnapshot(GridActor actor)
     {
         if (revealAllForDebug || IsActorForcedVisible(actor))
         {

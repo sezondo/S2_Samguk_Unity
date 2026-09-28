@@ -99,6 +99,8 @@ public sealed class BattleHudTacticalOverlayController : MonoBehaviour
             EnemyContext enemy = enemies[i];
             if (enemy == null || enemyStateIcons.ContainsKey(enemy)) continue;
             Image icon = Instantiate(enemyStateIconPrefab, enemyStateIconRoot);
+            // 첫 시야 갱신 전에는 프리팹의 기본 표시 상태를 노출하지 않는다.
+            icon.enabled = false;
             icon.name = $"EnemyState_{enemy.name}";
             enemyStateIcons.Add(enemy, icon);
         }
@@ -126,13 +128,16 @@ public sealed class BattleHudTacticalOverlayController : MonoBehaviour
             SetGridBracket(selectedUnitBracket.rectTransform, selectedVisual.transform.position - selectedVisual.CoverWorldOffset);
         }
 
+        PlayerVisionPresenter visionPresenter = PlayerVisionPresenter.Instance;
         foreach (KeyValuePair<EnemyContext, Image> pair in enemyStateIcons)
         {
             EnemyContext enemy = pair.Key;
             Image icon = pair.Value;
             ActorVisualController enemyVisual = null;
             bool visible = enemy != null && registry.TryGetVisual(enemy.GridActor, out enemyVisual) &&
-                !enemyVisual.IsDeathPresentation && enemyVisual.VisionAlpha > 0.01f;
+                !enemyVisual.IsDeathPresentation && enemyVisual.VisionAlpha > 0.01f &&
+                visionPresenter != null && visionPresenter.isActiveAndEnabled &&
+                visionPresenter.ShouldShowEnemyActorInSnapshot(enemy.GridActor);
             if (visible)
             {
                 var state = registry.GetPresentedEnemyState(enemy);

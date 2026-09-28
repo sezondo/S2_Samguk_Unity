@@ -37,6 +37,8 @@ public class StageGoal : MonoBehaviour
     [SerializeField] private float gizmoZOffset = -0.1f;
 
     public GridPosition GoalPosition => goalPosition;
+    // 목표 표시도 판정과 동일한 그리드 변환을 사용한다.
+    public GridManager GridManager => gridManager;
 
     /// <summary>
     /// 목표 판정과 표시 설정에 필요한 참조와 데이터가 유효한지 확인한다.

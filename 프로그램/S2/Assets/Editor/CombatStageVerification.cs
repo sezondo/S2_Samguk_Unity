@@ -353,6 +353,62 @@ public static class CombatStageVerification
             Check(player.GridActor.GridPosition==logicalPosition && player.Health.CurrentHitPoint==originalHp,kind+" 연출은 논리 불변");
         }
 
+        // 천하회 네 공격은 실제 큐에서 원화 선택·회피·거리 대응·풀 반납을 검증한다.
+        foreach (var spec in new[] {
+            ("천하회_망치", AttackPresentationKind.EnemyMelee, VfxId.CheonhaHammer),
+            ("천하회_작은못", AttackPresentationKind.EnemyMelee, VfxId.CheonhaClub),
+            ("천하회_작은못", AttackPresentationKind.EnemyRanged, VfxId.CheonhaCrossbow),
+            ("천하회_큰못", AttackPresentationKind.EnemyRanged, VfxId.CheonhaBow) })
+        {
+            var source = enemies.First(e => e.EnemyData.name == spec.Item1);
+            registry.TryGetVisual(source.GridActor, out var visual);
+            Check(visual.CombatPresentationOverride != null, spec.Item3+" 배우별 설정 연결");
+            Check(visual.CombatPresentationOverride.TryGetEntry(spec.Item2,out var settings) && settings.AttackerVfx==spec.Item3, spec.Item3+" 원화 매핑");
+            Vector3 sourceBefore = visual.transform.position;
+            foreach (bool hit in new[] { true, false })
+            {
+                // 실제 교전 거리의 플레이 사본에서 좌우·대각 잔상을 확인한다. 저장된 배치는 바꾸지 않는다.
+                visual.SetCombatStaged(true);
+                Vector3 delta = settings.SpanToTarget ? new Vector3(hit ? 4f : -2f, hit ? 1.2f : 3f) : new Vector3(hit ? 1.6f : -1.6f, .2f);
+                visual.transform.position += actorVisual.GroundWorldPosition + delta - visual.GroundWorldPosition;
+                queue.Enqueue(PresentationEvent.CombatCameraFocus(source.GridActor.GridPosition,logicalPosition,"천하회 검증",source.GridActor,player.GridActor,spec.Item2));
+                queue.Enqueue(PresentationEvent.CombatAction(source.GridActor,player.GridActor,source.GridActor.GridPosition,logicalPosition,spec.Item2,
+                    hit ? AttackResult.GuaranteedHit() : new AttackResult(false,50,50,99,CoverResult.None()),new DamageResult(true,2,10,8,false,false),hit));
+                queue.Enqueue(PresentationEvent.CombatCameraRestore()); queue.PlayQueuedEvents();
+                bool checkedEffect=false; VfxHandle borrowed=null;
+                deadline=EditorApplication.timeSinceStartup+10;
+                while(queue.IsBusy && EditorApplication.timeSinceStartup<deadline)
+                {
+                    var effect=(VfxHandle)Get(combat,"attackerEffect");
+                    if(effect!=null && !checkedEffect)
+                    {
+                        checkedEffect=true; borrowed=effect;
+                        Check((VfxId)Get(effect,"id")==spec.Item3, spec.Item3+" 실제 대여 "+hit);
+                        var targetFx=(VfxHandle)Get(combat,"targetEffect");
+                        Check((VfxId)Get(targetFx,"id")== (hit?VfxId.SharedBloodHit:VfxId.SharedDodge),spec.Item3+" 피격/회피 분기 "+hit);
+                        Check(actorVisual.CurrentAnimationStateName==(hit?"Hit":"Dodge"), spec.Item3+" 대상 자세 동시 표시 "+hit);
+                        if(settings.SpanToTarget)
+                        {
+                            var instance=(GameObject)Get(effect,"instance");
+                            var parts=(SpriteRenderer[])Get(effect,"parts");
+                            var sr=visual.TargetRenderer;
+                            var from=sr.bounds.center+new Vector3(settings.VfxOffset.x*sr.bounds.size.x*(visual.IsFacingRight?1:-1),settings.VfxOffset.y*sr.bounds.size.y,0);
+                            var to=actorVisual.TargetRenderer.bounds.center;
+                            float width=parts[0].sprite.bounds.size.x*parts[0].transform.localScale.x;
+                            Check(Vector3.Distance(instance.transform.position,(from+to)*.5f)<.001f && Mathf.Abs(width-Vector3.Distance(from,to))<.001f,spec.Item3+" 표시 위치 간 길이/중심 "+hit);
+                            Check(Vector3.Dot(instance.transform.right,(to-from).normalized)>.999f,spec.Item3+" 피격자 방향 정렬 "+hit);
+                        }
+                        if(hit) ScreenCapture.CaptureScreenshot(Folder+spec.Item3+".png");
+                    }
+                    yield return null;
+                }
+                Check(checkedEffect && !queue.IsBusy && borrowed!=null && !borrowed.IsValid,spec.Item3+" 재생 완료와 풀 반납 "+hit);
+                Check(player.Health.CurrentHitPoint==originalHp && player.GridActor.GridPosition==logicalPosition,spec.Item3+" 논리 위치/체력 불변 "+hit);
+                visual.transform.position = sourceBefore;
+            }
+        }
+
+
         var hack = Find<HackPresenter>();
         var hackable=(HackableObject)Get(hack,"targetHackable");
         bool hackedBefore=hackable.IsHacked;

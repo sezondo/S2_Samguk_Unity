@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
@@ -24,6 +24,11 @@ public enum VfxId
     YujinGunMuzzle,
     YujinSwordTrail,
     HackCircuit,
+    // 천하회 확정 공격 원화이며 기존 ID 순서는 유지한다.
+    CheonhaHammer,
+    CheonhaClub,
+    CheonhaCrossbow,
+    CheonhaBow,
 }
 
 // Acquire/Release 방식으로 빌린 이펙트의 손잡이다.

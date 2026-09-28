@@ -91,6 +91,11 @@ public class ActorVisualController : MonoBehaviour
     public bool IsMovingPresentation => isMovingPresentation;
     public bool IsDeathPresentation => isDeathPresentation;
 
+    [Header("Combat Presentation")]
+    // 지정한 배우만 공격별 연출 데이터를 교체한다. 비어 있으면 씬 공통 데이터를 사용한다.
+    [SerializeField] private CombatPresentationData combatPresentationOverride;
+    public CombatPresentationData CombatPresentationOverride => combatPresentationOverride;
+
     [Header("Visual Components")]
     // Actor를 화면에 표시하는 스프라이트 렌더러다.
     [SerializeField] private SpriteRenderer targetRenderer;
