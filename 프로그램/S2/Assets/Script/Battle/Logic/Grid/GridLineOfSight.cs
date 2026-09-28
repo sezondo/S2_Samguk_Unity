@@ -13,6 +13,14 @@ public static class GridLineOfSight
     /// </summary>
     public static bool HasLineOfSight(GridManager gridManager, GridPosition origin, GridPosition target)
     {
+        return gridManager != null && gridManager.IsInside(origin) && gridManager.IsInside(target) &&
+            !TryGetFirstBlockingCell(gridManager, origin, target, out _);
+    }
+
+    /// <summary>같은 시선 규칙으로 첫 차단 칸을 반환해 공격 판정과 조준 표시가 일치하게 한다.</summary>
+    public static bool TryGetFirstBlockingCell(GridManager gridManager, GridPosition origin, GridPosition target, out GridPosition blocked)
+    {
+        blocked = target;
         if (gridManager == null || !gridManager.IsInside(origin) || !gridManager.IsInside(target))
         {
             return false;
@@ -20,7 +28,7 @@ public static class GridLineOfSight
 
         if (origin == target)
         {
-            return true;
+            return false;
         }
 
         int deltaX = target.x - origin.x;
@@ -47,7 +55,8 @@ public static class GridLineOfSight
                 if (gridManager.IsSightBlocked(horizontalSide) &&
                     gridManager.IsSightBlocked(verticalSide))
                 {
-                    return false;
+                    blocked = horizontalSide;
+                    return true;
                 }
 
                 currentX += stepX;
@@ -69,10 +78,11 @@ public static class GridLineOfSight
             GridPosition currentPosition = new(currentX, currentY);
             if (currentPosition != target && gridManager.IsSightBlocked(currentPosition))
             {
-                return false;
+                blocked = currentPosition;
+                return true;
             }
         }
 
-        return true;
+        return false;
     }
 }

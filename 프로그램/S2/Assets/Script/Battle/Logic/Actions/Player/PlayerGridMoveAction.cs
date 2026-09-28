@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using UnityEngine;
 
@@ -14,18 +14,6 @@ public class PlayerGridMoveAction : MonoBehaviour
     [SerializeField] private TacticalUnitContext playerContext;
     // true면 플레이어 턴일 때만 이동 행동을 선택하고 실행할 수 있다.
     [SerializeField] private bool requirePlayerTurn = true;
-
-    [Header("Path Preview")]
-    // 이동 행동 선택 중 마우스를 올린 목표 칸까지의 경로를 런타임 하이라이트로 표시할지 정한다.
-    [SerializeField] private bool showPathPreview = true;
-    // 이동 경로 미리보기 하이라이트 색이다.
-    [SerializeField] private Color pathPreviewColor = new(0.2f, 1f, 0.45f, 0.75f);
-    // 이동 경로 미리보기 하이라이트가 그리드 한 칸에서 차지할 비율이다.
-    [SerializeField] private float pathPreviewCellScale = 0.55f;
-    // 이동 범위 하이라이트보다 위에 보이도록 사용할 렌더러 정렬 순서다.
-    [SerializeField] private int pathPreviewSortingOrder = 30;
-    // 이동 경로 미리보기 하이라이트를 월드 좌표에서 살짝 앞뒤로 보낼 때 쓰는 Z 오프셋이다.
-    [SerializeField] private float pathPreviewZOffset = -0.08f;
 
     [Header("Log")]
     // 이동 행동 선택, 취소, 완료 같은 상태 로그를 출력할지 정한다.
@@ -50,8 +38,6 @@ public class PlayerGridMoveAction : MonoBehaviour
 
     // 같은 오브젝트의 그리드 말 컴포넌트다.
     private GridActor actor;
-    // 이동 경로 미리보기 오브젝트 표시를 담당하는 런타임 하이라이터다.
-    private GridCellHighlighter pathPreviewHighlighter;
     // 플레이어가 현재 이동 행동을 선택한 상태인지 나타낸다.
     private bool isMoveSelected;
     // 마지막으로 경로 미리보기를 계산한 마우스 칸이다.
@@ -61,6 +47,11 @@ public class PlayerGridMoveAction : MonoBehaviour
 
     // 외부 UI나 표시 컴포넌트가 이동 선택 상태를 읽을 때 사용한다.
     public bool IsMoveSelected => isMoveSelected;
+    // 표시 계층이 핵심 참조와 현재 경로를 읽는 전용 접근점이다.
+    public TacticalUnitContext UnitContext => playerContext;
+    public IReadOnlyList<GridPosition> PreviewPath => pathPreviewPositions;
+    // 표시 중인 AP 한도 변경을 감지해 오래된 범위를 지운다.
+    private int displayedMoveRange;
     // 현재 AP로 한 번에 이동할 수 있는 최대 칸 수다.
     public int MoveRange => CalculateAffordableMoveSegmentCount() * MoveDistancePerActionPoint;
     // AP 1개 구간당 이동 가능한 칸 수다.
@@ -88,7 +79,6 @@ public class PlayerGridMoveAction : MonoBehaviour
         }
 
         actor = playerContext.GridActor;
-        pathPreviewHighlighter = CreatePathPreviewHighlighter();
     }
 
     /// <summary>
@@ -100,16 +90,16 @@ public class PlayerGridMoveAction : MonoBehaviour
         ClearMoveSelectionPresentation();
     }
 
-    /// <summary>
-    /// 컴포넌트가 제거될 때 런타임 미리보기 오브젝트를 정리한다.
-    /// </summary>
-    private void OnDestroy()
+    /// <summary>외부 AP 변화가 발생하면 선택 중인 범위와 경로를 다시 검증한다.</summary>
+    private void Update()
     {
-        if (pathPreviewHighlighter != null)
-        {
-            Destroy(pathPreviewHighlighter.gameObject);
-            pathPreviewHighlighter = null;
-        }
+        if (!isMoveSelected || displayedMoveRange == MoveRange) return;
+        if (MoveRange <= 0) { CancelMoveAction(); return; }
+        bool hadTarget = hasPreviewTargetPosition;
+        GridPosition target = lastPreviewTargetPosition;
+        ClearPathPreview();
+        RefreshMovablePositions();
+        if (hadTarget) RefreshPathPreview(target);
     }
 
     /// <summary>
@@ -280,6 +270,7 @@ public class PlayerGridMoveAction : MonoBehaviour
     /// </summary>
     private void RefreshMovablePositions()
     {
+        displayedMoveRange = MoveRange;
         movablePositions.Clear();
         ClearMoveRangeSegments();
         distanceByMovablePosition.Clear();
@@ -307,6 +298,7 @@ public class PlayerGridMoveAction : MonoBehaviour
     /// </summary>
     public void RefreshPathPreview(GridPosition targetPosition)
     {
+        if (!isMoveSelected) { ClearPathPreview(); return; }
         if (hasPreviewTargetPosition && lastPreviewTargetPosition == targetPosition)
         {
             return;
@@ -319,7 +311,6 @@ public class PlayerGridMoveAction : MonoBehaviour
         if (GridPathfinder.TryFindPath(GridManager.Instance, actor.GridPosition, targetPosition, MoveRange, pathPreviewPositions))
         {
             MovePathPreviewShown?.Invoke(pathPreviewPositions);
-            ShowPathPreview();
             return;
         }
 
@@ -333,11 +324,6 @@ public class PlayerGridMoveAction : MonoBehaviour
     {
         hasPreviewTargetPosition = false;
         pathPreviewPositions.Clear();
-
-        if (pathPreviewHighlighter != null)
-        {
-            pathPreviewHighlighter.Hide();
-        }
 
         MovePathPreviewHidden?.Invoke();
     }
@@ -363,19 +349,6 @@ public class PlayerGridMoveAction : MonoBehaviour
     }
 
     /// <summary>
-    /// 현재 계산된 이동 경로 미리보기를 런타임 하이라이트 오브젝트로 표시한다.
-    /// </summary>
-    private void ShowPathPreview()
-    {
-        if (!showPathPreview || pathPreviewHighlighter == null)
-        {
-            return;
-        }
-
-        pathPreviewHighlighter.Show(pathPreviewPositions);
-    }
-
-    /// <summary>
     /// 이동이 막힌 목표 칸과 사유를 로그로 남긴다.
     /// </summary>
     private void LogBlockedTarget(GridPosition targetPosition, string reason)
@@ -389,7 +362,7 @@ public class PlayerGridMoveAction : MonoBehaviour
     /// <summary>
     /// 이동 경로 길이 기준으로 실제 소비할 AP를 계산한다.
     /// </summary>
-    private int CalculateMoveActionPointCost(int pathLength)
+    public int CalculateMoveActionPointCost(int pathLength)
     {
         if (pathLength <= 0)
         {
@@ -443,17 +416,6 @@ public class PlayerGridMoveAction : MonoBehaviour
         blueMovePositions.Clear();
         yellowMovePositions.Clear();
         redMovePositions.Clear();
-    }
-
-    /// <summary>
-    /// 이동 경로 미리보기 전용 런타임 하이라이터를 만든다.
-    /// </summary>
-    private GridCellHighlighter CreatePathPreviewHighlighter()
-    {
-        GameObject highlighterObject = new($"{nameof(PlayerGridMoveAction)}_PathPreviewHighlighter");
-        GridCellHighlighter highlighter = highlighterObject.AddComponent<GridCellHighlighter>();
-        highlighter.ConfigureFallbackStyle(pathPreviewColor, pathPreviewCellScale, pathPreviewSortingOrder, pathPreviewZOffset);
-        return highlighter;
     }
 
     /// <summary>

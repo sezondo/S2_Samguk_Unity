@@ -225,34 +225,28 @@ public class PlayerMeleeAttackAction : MonoBehaviour
     /// </summary>
     private bool TryValidateTarget(GridPosition targetPosition, out GridActor targetActor)
     {
+        bool valid = TryPreviewTarget(targetPosition, out targetActor, out string reason);
+        if (!valid) LogBlockedTarget(targetPosition, reason);
+        return valid;
+    }
+
+    /// <summary>실제 실행과 같은 주변 8칸·대상·AP 조건을 자원 소비 없이 검사한다.</summary>
+    public bool TryPreviewTarget(GridPosition targetPosition, out GridActor targetActor, out string reason)
+    {
         targetActor = null;
-
-        GridPosition attackerPosition = playerContext.GridActor.GridPosition;
-        bool isAdjacentEightDirection = CombatTargetRules.IsMeleeAdjacent(attackerPosition, targetPosition);
-        if (!isAdjacentEightDirection)
-        {
-            LogBlockedTarget(targetPosition, "근접 공격은 플레이어 주변 8방향 1칸만 가능합니다");
-            return false;
-        }
-
-        if (PlayerVisionManager.Instance != null && !PlayerVisionManager.Instance.IsVisible(targetPosition))
-        {
-            LogBlockedTarget(targetPosition, "현재 플레이어 시야 밖입니다");
-            return false;
-        }
-
-        if (!GridManager.Instance.TryGetActorAt(targetPosition, out targetActor) || targetActor == playerContext.GridActor)
-        {
-            LogBlockedTarget(targetPosition, "피해를 줄 대상이 없습니다");
-            return false;
-        }
-
-        if (targetActor.GetComponent<IDamageable>() == null)
-        {
-            LogBlockedTarget(targetPosition, $"{targetActor.name} 대상에는 {nameof(IDamageable)}이 없습니다");
-            return false;
-        }
-
+        reason = "공격 대상 없음";
+        var grid = GridManager.Instance;
+        if (!isActiveAndEnabled || playerContext == null || grid == null || !grid.IsInside(targetPosition)) return false;
+        if (PlayerVisionManager.Instance == null || !PlayerVisionManager.Instance.IsVisible(targetPosition))
+        { reason = "시야 밖"; return false; }
+        if (!grid.TryGetActorAt(targetPosition, out targetActor) || targetActor == playerContext.GridActor ||
+            targetActor.GetComponent<IDamageable>() == null)
+        { targetActor = null; return false; }
+        if (!CombatTargetRules.IsMeleeAdjacent(playerContext.GridActor.GridPosition, targetPosition))
+        { reason = "사거리 밖"; return false; }
+        if (!playerContext.ActionPoint.CanSpend(playerContext.UnitData.MeleeAttackActionPointCost))
+        { reason = "AP 부족"; return false; }
+        reason = "공격 가능";
         return true;
     }
 

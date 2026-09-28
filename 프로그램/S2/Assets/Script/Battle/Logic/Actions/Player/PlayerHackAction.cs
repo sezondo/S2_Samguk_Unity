@@ -41,6 +41,9 @@ public class PlayerHackAction : MonoBehaviour
 
     public bool IsHackSelected => isHackSelected;
     public int HackRange => playerContext.UnitData.HackRange;
+    // 검 능력 유닛은 배치된 검, 그 외 유닛은 본체를 해킹 거리의 기준으로 사용한다.
+    public GridPosition HackOriginPosition => playerContext.HasAbility(UnitAbilityType.Sword) && playerContext.SwordState != null
+        ? playerContext.SwordState.CurrentPosition : playerContext.GridActor.GridPosition;
 
     // 해킹 행동 선택 상태가 됐을 때 발생한다.
     public event Action HackSelected;
@@ -125,16 +128,12 @@ public class PlayerHackAction : MonoBehaviour
             return false;
         }
 
-        if (!TryValidateTarget(target, out GridPosition targetPosition))
+        if (!TryPreviewTarget(target, out GridPosition executionPosition, out string reason))
         {
+            LogBlockedTarget(target, reason);
             return false;
         }
-
-        if (!TryFindExecutionPosition(targetPosition, out GridPosition executionPosition))
-        {
-            LogBlockedTarget(target, "해킹 연출을 실행할 대상 주변 8칸을 찾지 못했습니다");
-            return false;
-        }
+        GridPosition targetPosition = target.GridPosition;
 
         int cost = playerContext.UnitData.HackActionPointCost;
         ActionPoint actionPoint = playerContext.ActionPoint;
@@ -265,47 +264,24 @@ public class PlayerHackAction : MonoBehaviour
     }
 
     /// <summary>
-    /// 해킹 대상이 실행 가능한 대상인지 검사하고 대상 위치를 반환한다.
+    /// 자원 소비 없이 실행과 같은 조건을 검사하고 대상 주변 실행 칸을 반환한다.
     /// </summary>
-    private bool TryValidateTarget(HackableObject target, out GridPosition targetPosition)
+    public bool TryPreviewTarget(HackableObject target, out GridPosition executionPosition, out string reason)
     {
-        targetPosition = GridPosition.Zero;
-
-        if (target == null)
-        {
-            LogBlockedTarget(null, "해킹 대상이 없습니다");
-            return false;
-        }
-
-        if (!target.enabled || !target.HasValidReference() || !target.HasValidData())
-        {
-            LogBlockedTarget(target, "해킹 대상 참조나 데이터가 유효하지 않습니다");
-            return false;
-        }
-
-        if (target.IsHacked)
-        {
-            LogBlockedTarget(target, "이미 해킹된 대상입니다");
-            return false;
-        }
-
-        targetPosition = target.GridPosition;
-        if (PlayerVisionManager.Instance != null && !PlayerVisionManager.Instance.IsVisible(targetPosition))
-        {
-            LogBlockedTarget(target, "현재 플레이어 시야 밖입니다");
-            return false;
-        }
-
-        GridPosition hackOriginPosition = playerContext.HasAbility(UnitAbilityType.Sword) && playerContext.SwordState != null
-            ? playerContext.SwordState.CurrentPosition
-            : playerContext.GridActor.GridPosition;
-        int distance = hackOriginPosition.ManhattanDistanceTo(targetPosition);
-        if (distance > HackRange)
-        {
-            LogBlockedTarget(target, $"해킹 가능 거리 밖입니다. 거리: {distance}, 최대 거리: {HackRange}");
-            return false;
-        }
-
+        executionPosition = GridPosition.Zero;
+        reason = "해킹 대상 없음";
+        if (!isActiveAndEnabled || playerContext == null || GridManager.Instance == null || target == null) return false;
+        if (!target.isActiveAndEnabled || !target.HasValidReference() || !target.HasValidData()) return false;
+        if (PlayerVisionManager.Instance == null || !PlayerVisionManager.Instance.IsVisible(target.GridPosition))
+        { reason = "시야 밖"; return false; }
+        if (target.IsHacked) { reason = "해킹 완료"; return false; }
+        if (HackOriginPosition.ManhattanDistanceTo(target.GridPosition) > HackRange)
+        { reason = "사거리 밖"; return false; }
+        if (!playerContext.ActionPoint.CanSpend(playerContext.UnitData.HackActionPointCost))
+        { reason = "AP 부족"; return false; }
+        if (!TryFindExecutionPosition(target.GridPosition, out executionPosition))
+        { reason = "실행 공간 없음"; return false; }
+        reason = "해킹 가능";
         return true;
     }
 

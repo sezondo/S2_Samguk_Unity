@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using UnityEngine;
 
 /// <summary>
@@ -271,57 +271,36 @@ public class PlayerGunAttackAction : MonoBehaviour
     /// </summary>
     private bool TryValidateTarget(GridPosition targetPosition, out GridActor targetActor)
     {
+        bool valid = TryPreviewTarget(targetPosition, out targetActor, out string reason);
+        if (!valid) LogBlockedTarget(targetPosition, reason);
+        return valid;
+    }
+
+    /// <summary>자원을 소비하지 않고 실행과 동일한 대상·시야·사거리·사선 조건을 검사한다.</summary>
+    public bool TryPreviewTarget(GridPosition targetPosition, out GridActor targetActor, out string reason)
+    {
         targetActor = null;
-
-        if (!GridManager.Instance.IsInside(targetPosition))
-        {
-            LogBlockedTarget(targetPosition, "보드 범위 밖입니다");
-            return false;
-        }
-
-        GridPosition attackerPosition = playerContext.GridActor.GridPosition;
-        int distance = attackerPosition.ManhattanDistanceTo(targetPosition);
-        if (!CombatTargetRules.CanRangedAttack(attackerPosition, targetPosition, GunAttackRange, true))
-        {
-            LogBlockedTarget(targetPosition, $"총 공격 사거리 밖입니다. 거리: {distance}, 최대 거리: {GunAttackRange}");
-            return false;
-        }
-
-        if (AttackResolutionCoordinator.Instance == null)
-        {
-            if (logBlockedTarget)
-            {
-                Debug.LogError($"{nameof(PlayerGunAttackAction)} on {name}에는 활성 {nameof(AttackResolutionCoordinator)}가 필요합니다.", this);
-            }
-
-            return false;
-        }
-
-        if (PlayerVisionManager.Instance != null && !PlayerVisionManager.Instance.IsVisible(targetPosition))
-        {
-            LogBlockedTarget(targetPosition, "현재 플레이어 시야 밖입니다");
-            return false;
-        }
-
-        if (!GridManager.Instance.TryGetActorAt(targetPosition, out targetActor) || targetActor == playerContext.GridActor)
-        {
-            LogBlockedTarget(targetPosition, "피해를 줄 대상이 없습니다");
-            return false;
-        }
-
-        ActorHealth targetHealth = targetActor.GetComponent<ActorHealth>();
-        if (targetHealth != null && targetHealth.IsDead)
-        {
-            LogBlockedTarget(targetPosition, $"{targetActor.name} 대상은 이미 전투불능입니다");
-            return false;
-        }
-
-        if (targetActor.GetComponent<IDamageable>() == null)
-        {
-            LogBlockedTarget(targetPosition, $"{targetActor.name} 대상에는 {nameof(IDamageable)}이 없습니다");
-            return false;
-        }
-
+        reason = "공격 대상 없음";
+        GridManager grid = GridManager.Instance;
+        if (!isActiveAndEnabled || playerContext == null || grid == null || !grid.IsInside(targetPosition)) return false;
+        // 숨겨진 적의 존재를 UI에 전달하지 않도록 점유 조회보다 시야 검사를 먼저 한다.
+        if (PlayerVisionManager.Instance == null || !PlayerVisionManager.Instance.IsVisible(targetPosition))
+        { reason = "시야 밖"; return false; }
+        if (!grid.TryGetActorAt(targetPosition, out targetActor) || targetActor == playerContext.GridActor)
+        { targetActor = null; return false; }
+        ActorHealth health = targetActor.GetComponent<ActorHealth>();
+        if ((health != null && health.IsDead) || targetActor.GetComponent<IDamageable>() == null)
+        { targetActor = null; return false; }
+        GridPosition from = playerContext.GridActor.GridPosition;
+        if (!CombatTargetRules.CanRangedAttack(from, targetPosition, GunAttackRange, true))
+        { reason = "사거리 밖"; return false; }
+        if (!GridLineOfSight.HasLineOfSight(grid, from, targetPosition))
+        { reason = "벽에 막힘"; return false; }
+        if (!playerContext.ActionPoint.CanSpend(playerContext.UnitData.GunAttackActionPointCost))
+        { reason = "AP 부족"; return false; }
+        if (!playerContext.GunAmmo.CanSpend(AmmoCost))
+        { reason = "탄약 부족"; return false; }
+        reason = "공격 가능";
         return true;
     }
 

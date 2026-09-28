@@ -141,13 +141,19 @@ public sealed class BattleHudBaseController : MonoBehaviour
             case BattleHudActionType.Gun:
                 actionNameText.text = "총격";
                 actionDetailText.text = $"AP {data.GunAttackActionPointCost} · 탄약 1 · 피해 {data.GunAttackDamage} · 사거리 {data.GunAttackRange}";
+                if (hoveredAction == null && unit.GunAttackAction != null && unit.GunAttackAction.IsGunAttackSelected &&
+                    ActionPresentationQueue.Instance != null && !ActionPresentationQueue.Instance.IsBusy &&
+                    PlayerInputReader.Instance != null && PlayerInputReader.Instance.TryGetPointerGridPosition(out GridPosition target))
+                {
+                    RefreshGunTargetInfo(unit, target);
+                }
                 break;
             case BattleHudActionType.Melee:
                 actionNameText.text = "근접 공격";
                 int damage = unit.SwordState != null && unit.SwordState.IsRecalled
                     ? data.MeleeDamageWithSword
                     : data.MeleeDamageWithoutSword;
-                actionDetailText.text = $"AP {data.MeleeAttackActionPointCost} · 피해 {damage}";
+                actionDetailText.text = $"AP {data.MeleeAttackActionPointCost} · 피해 {damage} · 주변 8칸";
                 break;
             case BattleHudActionType.SwordThrow:
                 actionNameText.text = "검 투척";
@@ -162,6 +168,33 @@ public sealed class BattleHudBaseController : MonoBehaviour
                 actionDetailText.text = $"AP {data.HackActionPointCost} · 사거리 {data.HackRange}";
                 break;
         }
+        if (hoveredAction == null && ActionRangeOverlay.TryGetSelection(unit, out var selected, out _, out _) && selected == action.Value &&
+            presentationQueue != null && !presentationQueue.IsBusy && PlayerInputReader.Instance != null &&
+            PlayerInputReader.Instance.TryGetPointerGridPosition(out GridPosition pointer))
+            RefreshAdditionalTargetInfo(unit, selected, pointer);
+    }
+
+    /// <summary>검 투척·근접·해킹의 대상 상태를 기존 하단 행동 정보에 표시한다.</summary>
+    private void RefreshAdditionalTargetInfo(TacticalUnitContext unit, BattleHudActionType action, GridPosition target)
+    {
+        if (!ActionRangeOverlay.TryDescribeTarget(unit, action, target, out _, out string reason, out _)) return;
+        string label = action == BattleHudActionType.Melee ? "근접 공격" : action == BattleHudActionType.SwordThrow ? "검 투척" : "해킹";
+        actionNameText.text = $"{label} · {reason}";
+    }
+
+    /// <summary>실제로 공개된 대상만 기존 하단 행동 정보에 표시한다.</summary>
+    private void RefreshGunTargetInfo(TacticalUnitContext unit, GridPosition target)
+    {
+        ControllableUnitData data = unit.UnitData;
+        bool valid = unit.GunAttackAction.TryPreviewTarget(target, out GridActor actor, out string reason);
+        if (actor == null || PlayerVisionPresenter.Instance == null ||
+            !PlayerVisionPresenter.Instance.ShouldShowEnemyActorInSnapshot(actor) ||
+            ActorPresentationRegistry.Instance == null ||
+            !ActorPresentationRegistry.Instance.TryGetVisual(actor, out var visual) || visual.VisionAlpha <= .01f) return;
+        actionNameText.text = valid ? "총격 · 공격 가능" : $"총격 · {reason}";
+        if (valid && AttackResolutionCoordinator.Instance.TryPreviewAttack(unit.GridActor.GridPosition, target, data.GunAttackAccuracy, out AttackPreviewResult preview))
+            actionDetailText.text = $"명중 {preview.FinalHitChance}% · AP {data.GunAttackActionPointCost} · 탄약 1" +
+                (preview.CoverResult.HasCover ? $" · 엄폐 {preview.CoverResult.HitChanceModifier}%" : "");
     }
 
     /// <summary>

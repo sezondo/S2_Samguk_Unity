@@ -1,4 +1,4 @@
-﻿﻿using System;
+﻿using System;
 using System.Collections.Generic;
 using TMPro;
 using UnityEngine;
@@ -28,6 +28,12 @@ public sealed class BattleHudTacticalOverlayController : MonoBehaviour
     [SerializeField] private Image enemyStateIconPrefab;
     // 머리 기준점과 상태 아이콘 아래쪽 사이의 화면 픽셀 여백이다.
     [SerializeField] private float enemyIconGapPixels = 8f;
+
+    // 총격 사거리·조준선을 그리는 필수 머티리얼과 런타임 표시기다.
+    [SerializeField] private Material gunLineMaterial;
+    private GunRangeOverlay gunOverlay;
+    // 검 투척·근접·해킹은 같은 선 머티리얼로 별도 행동 범위를 표시한다.
+    private ActionRangeOverlay actionOverlay;
 
     // 전술 오버레이 Sprite를 제공하는 HUD 에셋이다.
     private BattleHudAssetSet assetSet;
@@ -72,6 +78,10 @@ public sealed class BattleHudTacticalOverlayController : MonoBehaviour
         attackResolutionCoordinator = battleAttackResolutionCoordinator;
         worldCamera = battleWorldCamera;
         getSelectedAction = selectedActionResolver;
+        gunOverlay?.Dispose();
+        gunOverlay = new GunRangeOverlay(gunLineMaterial);
+        actionOverlay?.Dispose();
+        actionOverlay = new ActionRangeOverlay(gunLineMaterial);
         selectedUnitBracket.enabled = false;
         ClearPointerPreview();
     }
@@ -158,6 +168,10 @@ public sealed class BattleHudTacticalOverlayController : MonoBehaviour
             SetWorldOverlayPosition(icon.rectTransform, headPosition, new Vector2(0f, halfIconHeight + enemyIconGapPixels));
         }
 
+        GridPosition? gunPointer = null;
+        if (PlayerInputReader.Instance != null && PlayerInputReader.Instance.TryGetPointerGridPosition(out GridPosition cell)) gunPointer = cell;
+        gunOverlay?.Refresh(activeUnit, enemyRegistry, gunPointer);
+        actionOverlay?.Refresh(activeUnit, enemyRegistry, gunPointer);
         RefreshPointerTarget(activeUnit);
     }
 
@@ -175,7 +189,7 @@ public sealed class BattleHudTacticalOverlayController : MonoBehaviour
     /// </summary>
     public bool HasValidReference()
     {
-        bool valid = hudCanvas != null && selectedUnitBracket != null && targetBracket != null &&
+        bool valid = gunLineMaterial != null && hudCanvas != null && selectedUnitBracket != null && targetBracket != null &&
                      hitPreviewRoot != null && hitChanceText != null && coverModifierText != null &&
                      enemyStateIconRoot != null && enemyStateIconPrefab != null;
         if (!valid)
@@ -201,33 +215,24 @@ public sealed class BattleHudTacticalOverlayController : MonoBehaviour
             return;
         }
 
+        if (selectedAction == BattleHudActionType.Move || selectedAction == BattleHudActionType.Gun ||
+            selectedAction == BattleHudActionType.Melee || selectedAction == BattleHudActionType.SwordThrow || selectedAction == BattleHudActionType.Hack)
+        {
+            // 이동·공격·해킹은 월드 표시와 하단 행동 정보만 사용한다.
+            return;
+        }
+
         targetBracket.sprite = GetTargetBracketSprite(selectedAction.Value);
         targetBracket.enabled = targetBracket.sprite != null;
         SetGridBracket(targetBracket.rectTransform, GridManager.Instance.GridToWorld(pointerPosition));
 
-        if (selectedAction != BattleHudActionType.Gun ||
-            !GridManager.Instance.TryGetActorAt(pointerPosition, out GridActor targetActor) ||
-            targetActor == activeUnit.GridActor ||
-            targetActor.GetComponent<IDamageable>() == null ||
-            activeUnit.GridActor.GridPosition.ManhattanDistanceTo(pointerPosition) > activeUnit.UnitData.GunAttackRange ||
-            (PlayerVisionManager.Instance != null && !PlayerVisionManager.Instance.IsVisible(pointerPosition)) ||
-            (targetActor.GetComponent<ActorHealth>() is ActorHealth targetHealth && targetHealth.IsDead) ||
-            !attackResolutionCoordinator.TryPreviewAttack(
-                activeUnit.GridActor.GridPosition,
-                pointerPosition,
-                activeUnit.UnitData.GunAttackAccuracy,
-                out AttackPreviewResult preview))
-        {
-            return;
-        }
-
-        hitChanceText.text = $"{preview.FinalHitChance}%";
-        coverModifierText.text = preview.CoverResult.HasCover
-            ? $"낮은 엄폐 {preview.CoverResult.HitChanceModifier}%"
-            : "엄폐 없음";
-        hitPreviewRoot.gameObject.SetActive(true);
-        SetWorldOverlayPosition(hitPreviewRoot, targetActor.transform.position, new Vector2(185f, 55f));
     }
+
+    /// <summary>HUD가 비활성화되면 행동 범위 표시도 숨긴다.</summary>
+    private void OnDisable() { gunOverlay?.Hide(); actionOverlay?.Hide(); }
+
+    /// <summary>HUD 제거 시 행동 표시기가 소유한 메시를 해제한다.</summary>
+    private void OnDestroy() { gunOverlay?.Dispose(); actionOverlay?.Dispose(); }
 
     /// <summary>
     /// 적 인식 상태와 조사 단계에 대응하는 상태 아이콘을 반환한다.
