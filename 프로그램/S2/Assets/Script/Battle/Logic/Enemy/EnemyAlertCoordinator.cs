@@ -1,4 +1,4 @@
-﻿using System.Collections.Generic;
+using System.Collections.Generic;
 using UnityEngine;
 
 /// <summary>
@@ -140,10 +140,19 @@ public class EnemyAlertCoordinator : MonoBehaviour, IActionLogicEventHandler
                 Debug.Log($"{nameof(EnemyAlertCoordinator)}: {detectedPosition} 칸 사건을 {sourceEnemy.name} 기준 {distance}칸 거리의 {enemy.name} 적에게 전파했습니다. 원인: {reason}", this);
             }
 
+            // 애드 연출 동안만 시야 밖 몸체를 안개 위에 표시하고, 후속 반응 전에 정상 시야로 복원한다.
+            context.EnqueuePresentation(PresentationEvent.ActorVisibilityOverride(
+                enemy.GridActor,
+                true,
+                "애드 연출 대상 임시 노출"));
             context.EnqueuePresentation(PresentationEvent.AlertDetected(
                 detectedPosition,
                 enemy,
                 "적 경계 상태 전환 연출"));
+            context.EnqueuePresentation(PresentationEvent.ActorVisibilityOverride(
+                enemy.GridActor,
+                false,
+                "애드 연출 대상 임시 노출 해제"));
             context.Publish(new EnemyAlertedLogicEvent(enemy, sourceEnemy, detectedPosition, knownPlayerPosition, reason));
         }
     }

@@ -115,6 +115,8 @@ public class ActorVisualController : MonoBehaviour
     private string currentAnimationStateName;
     // 경계·피격 같은 기존 색상 연출이 요청한 원본 표시 색이다.
     private Color presentationColor = Color.white;
+    // 시야 알파가 합성되기 전의 원본 색상을 한 번 보관했는지 나타낸다.
+    private bool hasInitializedPresentationColor;
     // 플레이어 시야가 적용하는 별도 표시 알파다. 기존 색상 연출 알파와 곱해서 사용한다.
     private float visionAlpha = 1f;
     // 시야 밖 공격자 임시 노출 전에 사용하던 SpriteRenderer Sorting Layer ID다.
@@ -258,7 +260,7 @@ public class ActorVisualController : MonoBehaviour
     }
 
     /// <summary>
-    /// 시작 시 SpriteRenderer의 현재 반전값을 화면상 바라보는 방향으로 변환한다.
+    /// 원본 표시 색상을 보존하고 SpriteRenderer의 반전값을 화면상 바라보는 방향으로 변환한다.
     /// </summary>
     private void Awake()
     {
@@ -268,7 +270,7 @@ public class ActorVisualController : MonoBehaviour
             return;
         }
 
-        presentationColor = targetRenderer.color;
+        InitializePresentationColor();
         IsFacingRight = artworkFacesRight ? !targetRenderer.flipX : targetRenderer.flipX;
         requestedFacingRight = IsFacingRight;
         coverFacingRight = IsFacingRight;
@@ -383,6 +385,8 @@ public class ActorVisualController : MonoBehaviour
     public void ApplyColor(Color color)
     {
         presentationColor = color;
+        // Awake보다 먼저 전달된 명시적 색상 요청도 이후 초기화에서 덮어쓰지 않는다.
+        hasInitializedPresentationColor = true;
         ApplyCompositeColor();
     }
 
@@ -432,6 +436,20 @@ public class ActorVisualController : MonoBehaviour
     }
 
     /// <summary>
+    /// 첫 색상 합성 전에 원본 색상을 보관하며 Awake에서는 이미 보관한 값을 유지한다.
+    /// </summary>
+    private void InitializePresentationColor()
+    {
+        if (hasInitializedPresentationColor || targetRenderer == null)
+        {
+            return;
+        }
+
+        presentationColor = targetRenderer.color;
+        hasInitializedPresentationColor = true;
+    }
+
+    /// <summary>
     /// 연출 색상과 시야 알파를 합쳐 실제 SpriteRenderer 색상에 적용한다.
     /// </summary>
     private void ApplyCompositeColor()
@@ -441,6 +459,8 @@ public class ActorVisualController : MonoBehaviour
             return;
         }
 
+        // 다른 오브젝트의 OnEnable에서 시야 요청이 먼저 와도 투명해진 색상을 원본으로 저장하지 않는다.
+        InitializePresentationColor();
         Color finalColor = presentationColor;
         finalColor.a *= visionAlpha;
         targetRenderer.color = finalColor;
