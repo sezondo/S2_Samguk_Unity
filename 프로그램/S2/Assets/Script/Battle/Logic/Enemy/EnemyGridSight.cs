@@ -3,7 +3,8 @@ using System.Collections.Generic;
 using UnityEngine;
 
 /// <summary>
-/// 적의 4방향 부채꼴 시야와 장애물을 무시하는 인접 청각 감지 칸을 계산한다.
+/// 적의 4방향 부채꼴 시야와 가까운 기척 감지 칸을 계산한다.
+/// 첫 근접 테두리는 벽을 무시하고, 두 번째 이후 테두리는 정면 시야와 같은 벽 차단을 따른다.
 /// 정면 시야는 각 후보 칸까지의 시선을 검사해 고정·동적 구조물 뒤쪽을 제외한다.
 /// </summary>
 [RequireComponent(typeof(GridActor))]
@@ -140,7 +141,7 @@ public class EnemyGridSight : MonoBehaviour
     }
 
     /// <summary>
-    /// 지정한 플레이어 칸이 현재 전방 시야 또는 근접 절대 감지에 들어오는지 확인한다.
+    /// 지정한 플레이어 칸이 전방 시야 또는 테두리별 기척 감지에 들어오는지 확인한다.
     /// </summary>
     public bool CanDetectPlayer(GridPosition targetPosition)
     {
@@ -196,7 +197,8 @@ public class EnemyGridSight : MonoBehaviour
 
         for (int forwardDistance = 1; forwardDistance <= data.SightRange; forwardDistance++)
         {
-            int maximumLateralOffset = forwardDistance - 1;
+            // 첫 줄은 3칸이며, 전방 한 칸마다 양옆으로 한 칸씩 넓어진다.
+            int maximumLateralOffset = forwardDistance;
             for (int lateralOffset = -maximumLateralOffset; lateralOffset <= maximumLateralOffset; lateralOffset++)
             {
                 GridPosition position =
@@ -214,7 +216,7 @@ public class EnemyGridSight : MonoBehaviour
     }
 
     /// <summary>
-    /// 바라보는 방향과 장애물에 무관하게 주변 8방향의 청각 근접 감지 칸을 추가한다.
+    /// 방향과 무관하게 근접 기척을 감지한다. 바로 인접한 8칸만 벽을 무시하며 바깥 테두리는 시선을 검사한다.
     /// </summary>
     private void AddAdjacentDetection(GridManager gridManager)
     {
@@ -237,7 +239,9 @@ public class EnemyGridSight : MonoBehaviour
                 }
 
                 GridPosition position = origin + new GridPosition(x, y);
-                if (gridManager.IsInside(position))
+                int ringDistance = Mathf.Max(Mathf.Abs(x), Mathf.Abs(y));
+                if (gridManager.IsInside(position) &&
+                    (ringDistance == 1 || GridLineOfSight.HasLineOfSight(gridManager, origin, position)))
                 {
                     AddDetectedPosition(position);
                 }

@@ -12,8 +12,8 @@ public class EnemyData : ScriptableObject
     [SerializeField] private int sightRange = 5;
     // true면 바라보는 방향과 무관하게 주변 칸을 근접 감지한다.
     [SerializeField] private bool useAdjacentDetection = true;
-    // 근접 감지에 사용할 주변 칸 반경이다. 1이면 인접한 8칸을 검사한다.
-    [SerializeField] private int adjacentDetectionRange = 1;
+    // 기척 감지의 최대 테두리 거리다. 첫 테두리 8칸만 벽을 무시하고 바깥 테두리는 시선 차단을 따른다.
+    [SerializeField] private int adjacentDetectionRange = 2;
 
     [Header("Suspicion")]
     // 도깨비검 기척을 360도 원형으로 감지하는 최대 거리다.
