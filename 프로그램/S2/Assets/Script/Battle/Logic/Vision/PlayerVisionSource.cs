@@ -5,7 +5,7 @@ public readonly struct PlayerVisionSource
     public readonly GridPosition Origin;
     // 원형 시야의 반경이다.
     public readonly int Radius;
-    // 기존 플레이어 주변 8칸의 근접 시야 예외 적용 여부다.
+    // 주변 8칸을 거리 안에 포함할지 여부다. 벽 차단은 무시하지 않는다.
     public readonly bool GuaranteeAdjacent;
 
     /// <summary>현재 원점, 반경과 근접 시야 정책을 값으로 복사한다.</summary>

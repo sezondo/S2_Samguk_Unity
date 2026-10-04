@@ -132,9 +132,9 @@ public sealed class EnemyPlanningWorld : IEnemyPlanningWorld
     {
         foreach (var unit in targets)
         {
-            if (CombatTargetRules.CanObserve(grid, unit.GridActor.GridPosition, position, unit.UnitData.VisionRange, true))
+            if (PlayerVisionGeometry.CanObserve(grid, unit.GridActor.GridPosition, position, unit.UnitData.VisionRange, true))
                 return true;
-            if (unit.HasAbility(UnitAbilityType.Sword) && unit.SwordState != null && !unit.SwordState.IsRecalled && CombatTargetRules.CanObserve(grid, unit.SwordState.CurrentPosition, position, unit.UnitData.SwordVisionRange, false))
+            if (unit.HasAbility(UnitAbilityType.Sword) && unit.SwordState != null && !unit.SwordState.IsRecalled && PlayerVisionGeometry.CanObserve(grid, unit.SwordState.CurrentPosition, position, unit.UnitData.SwordVisionRange, false))
                 return true;
         }
 

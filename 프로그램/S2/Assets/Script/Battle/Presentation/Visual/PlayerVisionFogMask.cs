@@ -42,6 +42,7 @@ public sealed class PlayerVisionFogMask
         if (snapshot == null) throw new ArgumentNullException(nameof(snapshot));
         if (output == null || output.Length != current.Length) throw new ArgumentException("안개 색 버퍼 크기가 맞지 않습니다.");
         Array.Clear(current, 0, current.Length);
+        Func<GridPosition, bool> isBlocked = snapshot.IsSightBlocked;
         foreach (PlayerVisionSource source in snapshot.Sources)
         {
             int minX = Mathf.Max(Padding * samples, Mathf.FloorToInt((source.Origin.x - source.Radius + Padding + 0.5f) * samples));
@@ -55,9 +56,7 @@ public sealed class PlayerVisionFogMask
                 if (current[index] > 0f) continue;
                 float gridX = (x + 0.5f) / samples - Padding - 0.5f;
                 float gridY = (y + 0.5f) / samples - Padding - 0.5f;
-                float dx = gridX - source.Origin.x, dy = gridY - source.Origin.y;
-                if (dx * dx + dy * dy > source.Radius * source.Radius) continue;
-                if (HasLineOfSight(snapshot, source, gridX, gridY))
+                if (PlayerVisionGeometry.CanSeePoint(source, gridX, gridY, isBlocked))
                     current[index] = explored[index] = 1f;
             }
         }
@@ -73,36 +72,9 @@ public sealed class PlayerVisionFogMask
         }
     }
 
-    /// <summary>연속 좌표까지 셀 경계를 따라 시선을 추적한다. 벽 끝에서 뒤로 퍼지는 그림자를 자연스럽게 만든다.</summary>
+    /// <summary>논리 아군 시야와 같은 관측 표본·거리·모서리 차단 규칙으로 안개 지점을 검사한다.</summary>
     public static bool HasLineOfSight(PlayerVisionSnapshot snapshot, PlayerVisionSource source, float targetX, float targetY)
-    {
-        int x = source.Origin.x, y = source.Origin.y;
-        int endX = Mathf.FloorToInt(targetX + 0.5f), endY = Mathf.FloorToInt(targetY + 0.5f);
-        if (source.GuaranteeAdjacent && Mathf.Max(Mathf.Abs(endX - x), Mathf.Abs(endY - y)) <= 1)
-            return true;
-        float dx = targetX - x, dy = targetY - y;
-        int stepX = Math.Sign(dx), stepY = Math.Sign(dy);
-        float deltaX = stepX == 0 ? float.PositiveInfinity : 1f / Mathf.Abs(dx);
-        float deltaY = stepY == 0 ? float.PositiveInfinity : 1f / Mathf.Abs(dy);
-        float nextX = 0.5f * deltaX, nextY = 0.5f * deltaY;
-        int maxSteps = Mathf.Abs(endX - x) + Mathf.Abs(endY - y) + 1;
-        for (int i = 0; i < maxSteps && (x != endX || y != endY); i++)
-        {
-            if (Mathf.Abs(nextX - nextY) < 0.000001f)
-            {
-                // 기존 LOS처럼 정확한 모서리는 양쪽이 모두 막혔을 때만 차단한다.
-                if (snapshot.IsSightBlocked(new GridPosition(x + stepX, y)) &&
-                    snapshot.IsSightBlocked(new GridPosition(x, y + stepY))) return false;
-                x += stepX; y += stepY; nextX += deltaX; nextY += deltaY;
-            }
-            else if (nextX < nextY) { x += stepX; nextX += deltaX; }
-            else { y += stepY; nextY += deltaY; }
-            // 도착 칸의 벽 표면은 기존 판정처럼 관측할 수 있다.
-            if ((x != endX || y != endY) && snapshot.IsSightBlocked(new GridPosition(x, y))) return false;
-        }
-        return x == endX && y == endY;
-    }
-
+        => PlayerVisionGeometry.CanSeePoint(source, targetX, targetY, snapshot.IsSightBlocked);
     /// <summary>두 번의 분리형 박스 필터로 원과 그림자 경계를 완만하게 만든다.</summary>
     private void Blur(float[] input, float[] output)
     {

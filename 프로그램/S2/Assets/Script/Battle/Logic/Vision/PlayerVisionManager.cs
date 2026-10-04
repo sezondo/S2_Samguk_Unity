@@ -8,7 +8,7 @@ using UnityEngine;
 /// </summary>
 public class PlayerVisionManager : MonoBehaviour, IActionLogicEventHandler
 {
-    // 플레이어 유닛이 벽 모서리와 무관하게 항상 인식하는 주변 8칸의 거리다.
+    // 플레이어 주변 근접 시야의 거리다. 벽 차단은 동일하게 검사한다.
     private const int GuaranteedAdjacentVisionRange = 1;
 
     [Header("Reference")]
@@ -131,6 +131,8 @@ public class PlayerVisionManager : MonoBehaviour, IActionLogicEventHandler
             return false;
         }
 
+        // 한 번 읽은 차단물 집합을 모든 관측 표본에서 재사용해 Tilemap 조회를 줄인다.
+        CaptureSightBlockers();
         nextVisiblePositions.Clear();
         visionSources.Clear();
         IReadOnlyList<TacticalUnitContext> playerUnits = context.TacticalUnitRegistry.PlayerControllableUnits;
@@ -155,7 +157,6 @@ public class PlayerVisionManager : MonoBehaviour, IActionLogicEventHandler
         int previousExploredCount = exploredPositions.Count;
         exploredPositions.UnionWith(visiblePositions);
         bool exploredChanged = previousExploredCount != exploredPositions.Count;
-        CaptureSightBlockers();
         if (!visibleChanged && !exploredChanged && CurrentSnapshot != null &&
             CurrentSnapshot.HasSameGeometry(visionSources, sightBlockers))
         {
@@ -231,12 +232,14 @@ public class PlayerVisionManager : MonoBehaviour, IActionLogicEventHandler
     }
 
     /// <summary>
-    /// 연속 안개용 원점을 기록하고 원형 논리 시야를 합산한다. 기존 플레이어 주변 8칸 예외를 유지한다.
+    /// 연속 안개용 원점을 기록하고 원형 논리 시야를 합산한다. 주변 8칸도 벽을 투시하지 않고 검사한다.
     /// </summary>
     private void AddVisionArea(GridPosition origin, int visionRange, bool guaranteeAdjacentVision)
     {
         visionSources.Add(new PlayerVisionSource(origin, visionRange, guaranteeAdjacentVision));
         GridManager gridManager = context.GridManager;
+        Func<GridPosition, bool> isBlocked = sightBlockers.Contains;
+        var source = new PlayerVisionSource(origin, visionRange, guaranteeAdjacentVision);
         int squaredRange = visionRange * visionRange;
         for (int xOffset = -visionRange; xOffset <= visionRange; xOffset++)
         {
@@ -255,7 +258,7 @@ public class PlayerVisionManager : MonoBehaviour, IActionLogicEventHandler
                     continue;
                 }
 
-                if (CombatTargetRules.CanObserve(gridManager, origin, target, visionRange, guaranteeAdjacentVision))
+                if (PlayerVisionGeometry.CanSeeCell(source, target, isBlocked))
                 {
                     nextVisiblePositions.Add(target);
                 }

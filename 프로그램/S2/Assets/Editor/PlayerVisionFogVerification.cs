@@ -25,7 +25,8 @@ public static class PlayerVisionFogVerification
             Assert(!PlayerVisionFogMask.HasLineOfSight(snapshot, source, 8, 6), "벽 뒤 차단");
             Assert(PlayerVisionFogMask.HasLineOfSight(snapshot, source, 6, 6), "벽 표면 표시");
             Assert(PlayerVisionFogMask.HasLineOfSight(snapshot, source, 7, 7), "벽 옆 근거리 노출");
-            Assert(!PlayerVisionFogMask.HasLineOfSight(snapshot, source, 11, 7), "멀수록 넓어지는 벽 그림자");
+            Assert(PlayerVisionFogMask.HasLineOfSight(snapshot, source, 11, 7), "칸 내부 관측점으로 열린 모서리 노출");
+            Assert(!PlayerVisionFogMask.HasLineOfSight(snapshot, source, 12, 7), "벽 뒤 먼 영역 그림자 유지");
             walls.Clear();
             Assert(!PlayerVisionFogMask.HasLineOfSight(snapshot, source, 8, 6), "스냅샷 차단물 독립 복사");
             Assert(PlayerVisionFogMask.HasLineOfSight(Snapshot(new[] { source }, walls), source, 8, 6), "문 개방 이후 새 시야");
@@ -38,6 +39,19 @@ public static class PlayerVisionFogVerification
             Assert(PlayerVisionFogMask.HasLineOfSight(Snapshot(new[] { cornerSource }, walls), cornerSource, 5, 5), "한쪽 모서리 통과");
             report.AppendLine("기존 대각선 모서리 규칙 통과");
 
+            // 인접 예외도 닫힌 벽 모서리를 투시하지 않고, 열린 모서리에서는 실제로 시야가 넓어진다.
+            walls.Clear();
+            walls.UnionWith(new[] { new GridPosition(4, 3), new GridPosition(3, 4) });
+            var adjacentSource = new PlayerVisionSource(new GridPosition(3, 3), 6, true);
+            Assert(!PlayerVisionGeometry.CanSeeCell(adjacentSource, new GridPosition(4, 4), walls.Contains), "인접 닫힌 모서리 투시 금지");
+            walls.Clear();
+            walls.Add(new GridPosition(4, 3));
+            Assert(!PlayerVisionGeometry.CanSeeCell(adjacentSource, new GridPosition(5, 3), walls.Contains), "바로 뒤 벽 투시 금지");
+            Assert(PlayerVisionGeometry.CanSeeCell(adjacentSource, new GridPosition(3, 4), walls.Contains), "열린 인접 칸 표시");
+            Assert(!PlayerVisionGeometry.CanSeeCell(adjacentSource, new GridPosition(10, 3), walls.Contains), "시야 거리 유지");
+            walls.Add(adjacentSource.Origin);
+            Assert(!PlayerVisionGeometry.CanSeeCell(adjacentSource, new GridPosition(3, 4), walls.Contains), "벽 내부 관측점 제외");
+            report.AppendLine("인접 벽·닫힌 틈·거리·벽 내부 관측점 차단 통과");
             var mask = new PlayerVisionFogMask(16, 16, 12, 1f, 0.35f);
             var colors = new Color32[mask.Width * mask.Height];
             Color remembered = new(0.16f, 0.17f, 0.18f, 0.65f);
@@ -80,12 +94,12 @@ public static class PlayerVisionFogVerification
                 for (int y = 0; y < grid.Height; y++)
                 for (int x = 0; x < grid.Width; x++)
                 {
-                    Assert(GridLineOfSight.HasLineOfSight(grid, origin, new GridPosition(x, y)) ==
-                        PlayerVisionFogMask.HasLineOfSight(real, probe, x, y), $"칸 중심 LOS 일치 {origin}→{x},{y}");
+                    Assert(PlayerVisionGeometry.CanObserve(grid, origin, new GridPosition(x, y), probe.Radius, false) ==
+                        PlayerVisionGeometry.CanSeeCell(probe, new GridPosition(x, y), real.IsSightBlocked), $"아군 논리·스냅샷 시야 일치 {origin}→{x},{y}");
                     comparisons++;
                 }
             }
-            report.AppendLine($"현재 씬 칸 중심 LOS 비교 {comparisons}건 통과");
+            report.AppendLine($"현재 씬 아군 논리·스냅샷 시야 비교 {comparisons}건 통과");
             var realMask = new PlayerVisionFogMask(grid.Width, grid.Height, 12, grid.CellSize, 0.35f);
             var realColors = new Color32[realMask.Width * realMask.Height];
             var realSnapshot = Snapshot(new[] { new PlayerVisionSource(new GridPosition(8, 5), 6, true) }, walls);
@@ -94,6 +108,11 @@ public static class PlayerVisionFogVerification
             timer.Stop();
             SaveMask(realMask, realColors, "scene-mask.png");
             report.AppendLine($"현재 {grid.Width}×{grid.Height} 보드 계산 {timer.Elapsed.TotalMilliseconds:F2}ms");
+            // 불투명 흰색으로 관측 영역을 표시해 투명 PNG의 검은 배경과 구별한다.
+            var preview = new PlayerVisionFogMask(16, 16, 12, 1f, 0.35f);
+            var previewColors = new Color32[preview.Width * preview.Height];
+            preview.BuildColors(snapshot, Color.black, Color.black, Color.white, previewColors);
+            SaveMask(preview, previewColors, "corner-preview.png");
             report.AppendLine("PASS");
             File.WriteAllText(Output + "/result.txt", report.ToString());
             Debug.Log("부드러운 시야 검증 통과: " + report);

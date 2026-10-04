@@ -38,7 +38,7 @@ public class SwordActionPresenter : MonoBehaviour, IPresentationEventHandler
     [SerializeField] private VfxId pathVfxId = VfxId.YujinSwordTrail;
     // 궤적 캔버스의 월드 높이다. 이동 거리와 독립적으로 유지한다.
     [SerializeField] private float pathVfxWidth = 0.5f;
-    // 회수·해킹 접근의 비행 속도와 최소 이동 시간이다.
+    // 일반 투척·회수·해킹 접근의 비행 속도와 최소 이동 시간이다.
     [SerializeField] private float swordTravelSpeed = 18f;
     [SerializeField] private float minimumTravelDuration = 0.12f;
     // 도착 뒤 잔상이 사라지는 시간이다.
@@ -178,7 +178,7 @@ public class SwordActionPresenter : MonoBehaviour, IPresentationEventHandler
         swordMoveCoroutine = moveHandle == null ? null : started;
     }
 
-    /// <summary>투척은 즉시 도착시켜 전체 잔상과 타격을 한 컷으로 표시하고, 회수·해킹만 비행을 재생한다.</summary>
+    /// <summary>전투 투척은 타격과 같은 컷으로 표시하고, 일반 투척·회수·해킹은 비행을 재생한다.</summary>
     private IEnumerator PlaySwordMove(PresentationEvent evt, PresentationEventHandle handle)
     {
         moveHandle = handle;
@@ -198,8 +198,8 @@ public class SwordActionPresenter : MonoBehaviour, IPresentationEventHandler
             to = targetCenter;
         Vector3 delta = to - from;
         float distance = delta.magnitude;
-        // 투척의 비행 대기를 없애 다음 타격 이벤트까지 같은 프레임에 처리한다.
-        float duration = evt.SwordMoveKind == SwordMoveKind.Throw
+        // 전투 투척만 비행 대기를 없애 타격과 연결하고, 정찰 투척은 실제 이동을 보여준다.
+        float duration = combatThrow
             ? 0f : Mathf.Max(minimumTravelDuration, distance / swordTravelSpeed);
         trailEffect = VfxManager.TryAcquire(pathVfxId);
         if (trailEffect != null && trailEffect.PartCount != 3)
