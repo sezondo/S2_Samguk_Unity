@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections;
 using UnityEngine;
 
@@ -75,6 +75,7 @@ public class StoryRunner : MonoBehaviour
         context.DialoguePresenter.HideImmediately();
         context.StandingPresenter.HideAllImmediately();
         context.ComicPanelPresenter.HideImmediately();
+        context.BackgroundPresenter.ResetComicCut();
 
         ExecuteCommandsUntilBlocked();
         return true;
@@ -124,6 +125,7 @@ public class StoryRunner : MonoBehaviour
         context.DialoguePresenter.HideImmediately();
         context.StandingPresenter.HideAllImmediately();
         context.ComicPanelPresenter.HideImmediately();
+        context.BackgroundPresenter.ResetComicCut();
         context.FadePresenter.SetAlphaImmediately(0f);
         Finish(StoryCompletionReason.Skipped);
     }
@@ -171,13 +173,24 @@ public class StoryRunner : MonoBehaviour
                         command.SpeakerName,
                         command.DialogueText,
                         command.UseTypewriter,
-                        command.CharactersPerSecond))
+                        command.CharactersPerSecond,
+                        command.HideSpeakerName))
                 {
                     return false;
                 }
 
                 playbackState = StoryPlaybackState.WaitingForDialogueInput;
                 return true;
+
+            case StoryCommandType.HideDialogue:
+                context.DialoguePresenter.HideImmediately();
+                return true;
+
+            case StoryCommandType.ShowComicCut:
+                playbackState = StoryPlaybackState.WaitingForTimedCommand;
+                return context.BackgroundPresenter.PlayComicCut(
+                    command.VisualSprite, command.ComicCutVertices, command.Duration,
+                    HandleTimedCommandCompleted);
 
             case StoryCommandType.ChangeBackground:
                 return context.BackgroundPresenter.ShowBackground(command.VisualSprite);
@@ -226,7 +239,7 @@ public class StoryRunner : MonoBehaviour
     }
 
     /// <summary>
-    /// 페이드가 끝난 뒤 다음 선형 Story 명령을 실행한다.
+    /// 페이드 또는 컷 진입 전환이 끝난 뒤 다음 선형 Story 명령을 실행한다.
     /// </summary>
     private void HandleTimedCommandCompleted()
     {
@@ -287,6 +300,7 @@ public class StoryRunner : MonoBehaviour
     {
         StopActiveRoutines();
         context.FadePresenter.StopFade();
+        context.BackgroundPresenter.ResetComicCut();
         activeSequence = null;
         currentCommandIndex = -1;
         playbackState = StoryPlaybackState.Idle;
@@ -295,7 +309,7 @@ public class StoryRunner : MonoBehaviour
     }
 
     /// <summary>
-    /// Runner가 관리하는 Wait와 Presenter 페이드 코루틴을 중단한다.
+    /// Runner가 관리하는 Wait·페이드·컷 진입 전환을 중단한다.
     /// </summary>
     private void StopActiveRoutines()
     {
@@ -303,6 +317,11 @@ public class StoryRunner : MonoBehaviour
         {
             StopCoroutine(waitRoutine);
             waitRoutine = null;
+        }
+
+        if (context != null && context.BackgroundPresenter != null)
+        {
+            context.BackgroundPresenter.StopComicCutTransition();
         }
 
         if (context != null && context.FadePresenter != null)
@@ -378,6 +397,10 @@ public class StoryRunner : MonoBehaviour
                 !string.IsNullOrWhiteSpace(command.DialogueText) &&
                 (!command.UseTypewriter || command.CharactersPerSecond > 0f),
 
+            StoryCommandType.ShowComicCut =>
+                !string.IsNullOrWhiteSpace(command.ComicCutId) &&
+                context.BackgroundPresenter.HasValidData(command.VisualSprite, command.ComicCutVertices, command.Duration),
+
             StoryCommandType.ChangeBackground =>
                 command.VisualSprite != null,
 
@@ -394,7 +417,7 @@ public class StoryRunner : MonoBehaviour
             StoryCommandType.ShowComicPanel =>
                 command.ComicPanelSprite != null,
 
-            StoryCommandType.HideComicPanel =>
+            StoryCommandType.HideComicPanel or StoryCommandType.HideDialogue =>
                 true,
 
             StoryCommandType.Fade or StoryCommandType.Wait =>

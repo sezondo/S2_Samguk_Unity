@@ -1,4 +1,4 @@
-using TMPro;
+﻿using TMPro;
 using UnityEngine;
 
 /// <summary>
@@ -83,9 +83,9 @@ public class StoryDialoguePresenter : MonoBehaviour
     }
 
     /// <summary>
-    /// 새 화자와 본문을 대화창에 표시하고 설정에 따라 타이핑을 시작한다.
+    /// 새 본문을 표시하고 독백 설정에 따라 화자 이름을 숨긴 뒤 타이핑을 시작한다.
     /// </summary>
-    public bool ShowDialogue(string speakerName, string body, bool useTypewriter, float speed)
+    public bool ShowDialogue(string speakerName, string body, bool useTypewriter, float speed, bool hideSpeakerName = false)
     {
         if (!isActiveAndEnabled || !HasValidReference())
         {
@@ -98,7 +98,8 @@ public class StoryDialoguePresenter : MonoBehaviour
             return false;
         }
 
-        speakerNameText.text = speakerName;
+        speakerNameText.text = hideSpeakerName ? string.Empty : speakerName;
+        speakerNameText.enabled = !hideSpeakerName;
         dialogueBodyText.text = body;
         dialogueBodyText.ForceMeshUpdate();
 
