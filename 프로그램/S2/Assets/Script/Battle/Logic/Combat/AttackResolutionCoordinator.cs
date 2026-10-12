@@ -116,8 +116,13 @@ public sealed class AttackResolutionCoordinator : MonoBehaviour, IActionLogicEve
 
         int roll = Random.Range(0, 100);
 
+        // 튜토리얼의 지정 공격에만 결과를 고정하고 실제 엄폐 계산과 표시 확률은 유지한다.
+        bool isHit = roll < finalHitChance;
+        if (BattleTutorialController.Instance != null && BattleTutorialController.Instance.TryGetForcedHit(resolveAttack, out bool forcedHit))
+            isHit = forcedHit;
+
         AttackResult attackResult = new(
-            roll < finalHitChance,
+            isHit,
             resolveAttack.BaseHitChance,
             finalHitChance,
             roll,

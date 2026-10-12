@@ -4,14 +4,15 @@ using UnityEngine.UI;
 
 public class SpeechBubbleView : MonoBehaviour
 {
-    private const string DefaultKoreanFontResourcePath = "Fonts/NotoSansKR-VF";
-    private static TMP_FontAsset cachedKoreanFontAsset;
-
     [Header("Root")]
     [SerializeField] private Camera worldCamera;
 
     [Header("Bubble")]
     [SerializeField] private Image bubbleImage;
+    // 흰색 말풍선의 별도 꼬리와 몸통 접합부다. 기존 프리팹에서는 생략할 수 있다.
+    [SerializeField] private Image tailImage, tailJoinImage;
+    // 밝은 바탕에서는 짙은 청록, 기존 어두운 바탕에서는 밝은 청록을 사용한다.
+    [SerializeField] private Color speakerNameColor = new(.46f, .78f, .79f, 1);
 
     [Header("Text")]
     [SerializeField] private TMP_Text dialogueText;
@@ -38,15 +39,7 @@ public class SpeechBubbleView : MonoBehaviour
     private void Awake()
     {
         ResolveReferences();
-        if (!HasRequiredLayoutReferences())
-        {
-            enabled = false;
-            return;
-        }
-
-        ApplyKoreanFontIfAvailable();
-        CacheDefaultTextStyle();
-        Hide();
+        if (dialogueText != null) CacheDefaultTextStyle();
     }
 
     private void Update()
@@ -69,9 +62,14 @@ public class SpeechBubbleView : MonoBehaviour
         FollowSpeakerAnchor();
     }
 
+    /// <summary>Presenter에서 카메라와 Canvas 참조를 명시적으로 전달받는다.</summary>
+    public void Initialize(Camera camera, Canvas parentCanvas)
+    { worldCamera = camera; canvas = parentCanvas; ResolveReferences(); CacheDefaultTextStyle(); }
+
+    /// <summary>화자 이름과 대사를 줄바꿈 가능한 말풍선에 표시한다.</summary>
     public void Show(Transform anchor, DialogueLineData line)
     {
-        if (line == null)
+        if (!HasRequiredLayoutReferences() || anchor == null || line == null)
         {
             Debug.LogError($"{nameof(SpeechBubbleView)}: {name} 오브젝트가 비어 있는 대사 줄을 받았습니다.", this);
             return;
@@ -82,7 +80,7 @@ public class SpeechBubbleView : MonoBehaviour
         gameObject.SetActive(true);
 
         ApplyLineTextStyle(line);
-        dialogueText.text = line.text ?? string.Empty;
+        dialogueText.text = $"<size=80%><b><color=#{ColorUtility.ToHtmlStringRGB(speakerNameColor)}>{line.speakerTag}</color></b></size>\n{line.text}";
         dialogueText.ForceMeshUpdate();
 
         RebuildLayout();
@@ -90,6 +88,7 @@ public class SpeechBubbleView : MonoBehaviour
         FollowSpeakerAnchor();
     }
 
+    /// <summary>말풍선과 타이핑 상태를 정리한다.</summary>
     public void Hide()
     {
         visible = false;
@@ -109,6 +108,7 @@ public class SpeechBubbleView : MonoBehaviour
         gameObject.SetActive(false);
     }
 
+    /// <summary>첫 진행 입력으로 현재 문장을 즉시 완성한다.</summary>
     public void CompleteText()
     {
         visibleCharacterCount = totalCharacterCount;
@@ -123,12 +123,6 @@ public class SpeechBubbleView : MonoBehaviour
     private void ResolveReferences()
     {
         root = transform as RectTransform;
-        canvas = GetComponentInParent<Canvas>();
-
-        if (worldCamera == null)
-        {
-            worldCamera = Camera.main;
-        }
 
         if (bubbleImage != null)
         {
@@ -137,22 +131,8 @@ public class SpeechBubbleView : MonoBehaviour
 
         if (dialogueText != null)
         {
-            dialogueText.textWrappingMode = TextWrappingModes.NoWrap;
-            dialogueText.overflowMode = TextOverflowModes.Overflow;
-        }
-    }
-
-    private void ApplyKoreanFontIfAvailable()
-    {
-        if (dialogueText == null)
-        {
-            return;
-        }
-
-        TMP_FontAsset fontAsset = ResolveKoreanFontAsset();
-        if (fontAsset != null)
-        {
-            dialogueText.font = fontAsset;
+            dialogueText.textWrappingMode = TextWrappingModes.Normal;
+            dialogueText.overflowMode = TextOverflowModes.Truncate;
         }
     }
 
@@ -201,76 +181,40 @@ public class SpeechBubbleView : MonoBehaviour
         }
     }
 
-    private TMP_FontAsset ResolveKoreanFontAsset()
-    {
-        if (cachedKoreanFontAsset != null)
-        {
-            return cachedKoreanFontAsset;
-        }
-
-        Font sourceFont = koreanSourceFont != null
-            ? koreanSourceFont
-            : Resources.Load<Font>(DefaultKoreanFontResourcePath);
-
-        if (sourceFont == null)
-        {
-            return null;
-        }
-
-        cachedKoreanFontAsset = TMP_FontAsset.CreateFontAsset(sourceFont);
-        cachedKoreanFontAsset.atlasPopulationMode = AtlasPopulationMode.Dynamic;
-        cachedKoreanFontAsset.isMultiAtlasTexturesEnabled = true;
-        return cachedKoreanFontAsset;
-    }
-
+    /// <summary>긴 대사도 화면 밖으로 늘어나지 않게 너비를 제한하고 높이를 계산한다.</summary>
     private void RebuildLayout()
     {
-        if (!HasRequiredLayoutReferences())
-        {
-            return;
-        }
-
+        dialogueText.rectTransform.SetSizeWithCurrentAnchors(RectTransform.Axis.Horizontal, 480f);
         dialogueText.ForceMeshUpdate();
-
-        RectTransform textRect = dialogueText.rectTransform;
-        RectTransform bubbleRect = bubbleImage.rectTransform;
-        float textScale = ResolveHorizontalScale(textRect);
-        float bubbleScale = ResolveHorizontalScale(bubbleRect);
-
-        float textVisualWidth = dialogueText.preferredWidth * textScale;
-        float targetVisualWidth = textVisualWidth + horizontalOffset;
-        float bubbleLocalWidth = targetVisualWidth / bubbleScale;
-
-        SetWidth(bubbleRect, bubbleLocalWidth);
+        float height = dialogueText.GetPreferredValues(dialogueText.text, 480f, 0f).y + 36f;
+        root.sizeDelta = new Vector2(520f, Mathf.Max(100f, height));
+        // 재사용된 짧은 말풍선의 높이로 잘린 글자 수를 타이핑 종료점으로 삼지 않는다.
+        dialogueText.ForceMeshUpdate();
     }
 
+    /// <summary>화자를 따라가되 화면 가장자리와 하단 전투 HUD를 피한다.</summary>
     private void FollowSpeakerAnchor()
     {
-        if (root == null || canvas == null || speakerAnchor == null)
-        {
-            return;
-        }
-
-        Camera cameraForWorld = worldCamera != null ? worldCamera : Camera.main;
-        Vector2 screenPoint = RectTransformUtility.WorldToScreenPoint(cameraForWorld, speakerAnchor.position) + screenOffset;
-
-        if (canvas.renderMode == RenderMode.ScreenSpaceOverlay)
-        {
-            root.position = screenPoint;
-            return;
-        }
-
-        RectTransform canvasRect = canvas.transform as RectTransform;
-        Camera cameraForUi = canvas.worldCamera;
-        if (canvasRect != null && RectTransformUtility.ScreenPointToLocalPointInRectangle(canvasRect, screenPoint, cameraForUi, out Vector2 localPoint))
-        {
-            root.anchoredPosition = localPoint;
-        }
+        if (!HasRequiredLayoutReferences() || speakerAnchor == null) return;
+        var canvasRect = (RectTransform)canvas.transform;
+        Vector2 screenPoint = worldCamera.WorldToScreenPoint(speakerAnchor.position);
+        Camera uiCamera = canvas.renderMode == RenderMode.ScreenSpaceOverlay ? null : canvas.worldCamera;
+        RectTransformUtility.ScreenPointToLocalPointInRectangle(canvasRect, screenPoint, uiCamera, out var localPoint);
+        float speakerX = localPoint.x;
+        localPoint += screenOffset;
+        Rect bounds = canvasRect.rect;
+        localPoint.x = Mathf.Clamp(localPoint.x, bounds.xMin + root.rect.width * 0.5f + 20f, bounds.xMax - root.rect.width * 0.5f - 20f);
+        localPoint.y = Mathf.Clamp(localPoint.y, bounds.yMin + 250f, bounds.yMax - root.rect.height - 190f);
+        root.anchoredPosition = localPoint;
+        // 몸통이 화면 가장자리에서 이동해도 꼬리는 실제 화자 쪽을 가리킨다.
+        float tailX = Mathf.Clamp(speakerX - localPoint.x, -root.rect.width * .5f + 44f, root.rect.width * .5f - 44f);
+        if (tailImage != null) tailImage.rectTransform.anchoredPosition = new Vector2(tailX, 5f);
+        if (tailJoinImage != null) tailJoinImage.rectTransform.anchoredPosition = new Vector2(tailX, 2f);
     }
 
     private bool HasRequiredLayoutReferences()
     {
-        if (root != null && canvas != null && bubbleImage != null && dialogueText != null)
+        if (root != null && canvas != null && worldCamera != null && bubbleImage != null && dialogueText != null && dialogueText.font != null)
         {
             return true;
         }

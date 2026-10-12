@@ -1,0 +1,113 @@
+PASS 111
+모든 메뉴·수첩 참조
+메뉴가 기존 HUD·말풍선보다 앞에 표시됨
+튜토리얼 안내 정지·입력 잠금
+수첩 뒤 이동 요청 차단
+팝업 중 진행·위치 유지
+수첩 페이지 1
+문구 영역 1: left_title
+문구 영역 1: intro
+문구 영역 1: distance_0
+문구 영역 1: distance_1
+문구 영역 1: distance_2
+문구 영역 1: distance_3
+문구 영역 1: movement_cost
+문구 영역 1: ap_use
+문구 영역 1: right_title
+문구 영역 1: step_number_1
+문구 영역 1: step_1
+문구 영역 1: step_number_2
+문구 영역 1: step_2
+문구 영역 1: step_number_3
+문구 영역 1: step_3
+문구 영역 1: right_note_mark_610
+문구 영역 1: right_note_610
+수첩 페이지 2
+문구 영역 2: left_title
+문구 영역 2: intro
+문구 영역 2: before_label
+문구 영역 2: enemy_unknown
+문구 영역 2: after_label
+문구 영역 2: key
+문구 영역 2: unknown
+문구 영역 2: right_title
+문구 영역 2: step_number_1
+문구 영역 2: step_1
+문구 영역 2: step_number_2
+문구 영역 2: step_2
+문구 영역 2: step_number_3
+문구 영역 2: step_3
+문구 영역 2: right_note_mark_607
+문구 영역 2: right_note_607
+수첩 페이지 3
+문구 영역 3: left_title
+문구 영역 3: attack_dir
+문구 영역 3: label_유진
+문구 영역 3: label_엄폐물
+문구 영역 3: label_적
+문구 영역 3: cover_rule
+문구 영역 3: flow_아군 턴
+문구 영역 3: flow_턴 종료
+문구 영역 3: flow_적 턴
+문구 영역 3: right_title
+문구 영역 3: 권총_title
+문구 영역 3: 권총_body
+문구 영역 3: 검_근접아이콘_title
+문구 영역 3: 검_근접아이콘_body
+문구 영역 3: 주먹_title
+문구 영역 3: 주먹_body
+문구 영역 3: right_note_mark_667
+문구 영역 3: right_note_667
+문구 영역 3: fixed_results
+수첩 페이지 4
+문구 영역 4: left_title
+문구 영역 4: intro
+문구 영역 4: label_유진
+문구 영역 4: label_도깨비검
+문구 영역 4: label_발견한 적
+문구 영역 4: key
+문구 영역 4: left_note_mark_736
+문구 영역 4: left_note_736
+문구 영역 4: right_title
+문구 영역 4: step_number_1
+문구 영역 4: step_1
+문구 영역 4: step_number_2
+문구 영역 4: step_2
+문구 영역 4: step_number_3
+문구 영역 4: step_3
+문구 영역 4: sword_cost
+문구 영역 4: right_note_mark_655
+문구 영역 4: right_note_655
+수첩 페이지 5
+문구 영역 5: left_title
+문구 영역 5: intro
+문구 영역 5: terminal_label
+문구 영역 5: door_label
+문구 영역 5: connect_label
+문구 영역 5: locked
+문구 영역 5: opened
+문구 영역 5: key
+문구 영역 5: stage_note
+문구 영역 5: right_title
+문구 영역 5: step_number_1
+문구 영역 5: step_1
+문구 영역 5: step_number_2
+문구 영역 5: step_2
+문구 영역 5: step_number_3
+문구 영역 5: step_3
+문구 영역 5: hack_cost
+문구 영역 5: right_note_mark_636
+문구 영역 5: right_note_636
+문구 영역 5: blocked
+안내 덮기 후 튜토리얼 재개
+메뉴 열기·설정 준비 중
+일반 메뉴에서 대사 진행 차단
+메뉴에서 매뉴얼 열기
+수첩에서 메뉴로 복귀
+종료 확인 기본 선택 취소
+종료 취소 후 메뉴 복귀
+HUD 수첩 버튼
+HUD 수첩 덮기 후 게임 복귀
+버튼 누름 상태
+버튼 뗌·포인터 이탈 복원
+PASS 실제 종료 버튼으로 재생 중단·편집 모드 복귀

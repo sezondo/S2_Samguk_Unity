@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using UnityEngine;
 
@@ -111,6 +111,7 @@ public class PlayerUnitControlManager : MonoBehaviour
     /// </summary>
     public bool TryProcessSelectionInput()
     {
+        if (BattleMenuController.BlocksInput) return false;
         if (processedSelectionFrame == Time.frameCount)
         {
             return selectionConsumedThisFrame;
@@ -142,7 +143,8 @@ public class PlayerUnitControlManager : MonoBehaviour
     /// </summary>
     public bool TrySelectUnit(TacticalUnitContext unit)
     {
-        if ((ActionPresentationQueue.Instance != null && ActionPresentationQueue.Instance.IsBusy) ||
+        if ((BattleTutorialController.Instance != null && (!BattleTutorialController.Instance.AllowsGameplayInput || unit != BattleTutorialController.Instance.Context.player)) ||
+            (ActionPresentationQueue.Instance != null && ActionPresentationQueue.Instance.IsBusy) ||
             (TurnManager.Instance != null && !TurnManager.Instance.IsPlayerTurn))
             return false;
 

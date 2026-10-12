@@ -1,0 +1,5212 @@
+{
+  "pages": [
+    {
+      "id": "01",
+      "title": "이동과 행동력",
+      "canvas": [
+        1672,
+        941
+      ],
+      "active_tab": "이동",
+      "parents": {
+        "fixed": "표지와 색인, 버튼은 종이와 분리",
+        "left": "왼쪽 종이 내용",
+        "right": "오른쪽 종이 내용"
+      },
+      "layers": [
+        {
+          "id": "fixed_cover",
+          "kind": "image",
+          "asset": "표지_종이단면",
+          "rect": [
+            0,
+            0,
+            1672,
+            941
+          ],
+          "parent": "fixed"
+        },
+        {
+          "id": "종이_왼쪽",
+          "kind": "image",
+          "asset": "종이_왼쪽",
+          "rect": [
+            176,
+            52,
+            657,
+            832
+          ],
+          "parent": "left"
+        },
+        {
+          "id": "종이_오른쪽",
+          "kind": "image",
+          "asset": "종이_오른쪽",
+          "rect": [
+            838,
+            52,
+            637,
+            832
+          ],
+          "parent": "right"
+        },
+        {
+          "id": "책등_제본",
+          "kind": "image",
+          "asset": "책등_제본",
+          "rect": [
+            832,
+            52,
+            7,
+            832
+          ],
+          "parent": "fixed"
+        },
+        {
+          "id": "tab_0",
+          "kind": "image",
+          "asset": "색인_빈탭_1",
+          "rect": [
+            1477,
+            124,
+            143,
+            116
+          ],
+          "parent": "fixed"
+        },
+        {
+          "id": "active_tab",
+          "kind": "image",
+          "asset": "색인_선택탭",
+          "rect": [
+            1480,
+            130,
+            124,
+            104
+          ],
+          "parent": "fixed"
+        },
+        {
+          "id": "tab_text_0",
+          "kind": "text",
+          "text": "이동",
+          "rect": [
+            1484,
+            151,
+            112,
+            55
+          ],
+          "font_size": 28,
+          "bold": true,
+          "align": "center",
+          "color": "#20201e",
+          "parent": "fixed"
+        },
+        {
+          "id": "tab_1",
+          "kind": "image",
+          "asset": "색인_빈탭_2",
+          "rect": [
+            1477,
+            245,
+            143,
+            109
+          ],
+          "parent": "fixed"
+        },
+        {
+          "id": "tab_text_1",
+          "kind": "text",
+          "text": "시야",
+          "rect": [
+            1484,
+            272,
+            112,
+            55
+          ],
+          "font_size": 28,
+          "bold": true,
+          "align": "center",
+          "color": "#20201e",
+          "parent": "fixed"
+        },
+        {
+          "id": "tab_2",
+          "kind": "image",
+          "asset": "색인_빈탭_3",
+          "rect": [
+            1477,
+            357,
+            143,
+            111
+          ],
+          "parent": "fixed"
+        },
+        {
+          "id": "tab_text_2",
+          "kind": "text",
+          "text": "전투",
+          "rect": [
+            1484,
+            384,
+            112,
+            55
+          ],
+          "font_size": 28,
+          "bold": true,
+          "align": "center",
+          "color": "#20201e",
+          "parent": "fixed"
+        },
+        {
+          "id": "tab_3",
+          "kind": "image",
+          "asset": "색인_빈탭_4",
+          "rect": [
+            1477,
+            474,
+            143,
+            106
+          ],
+          "parent": "fixed"
+        },
+        {
+          "id": "tab_text_3",
+          "kind": "text",
+          "text": "침입",
+          "rect": [
+            1484,
+            501,
+            112,
+            55
+          ],
+          "font_size": 28,
+          "bold": true,
+          "align": "center",
+          "color": "#20201e",
+          "parent": "fixed"
+        },
+        {
+          "id": "left_title",
+          "kind": "text",
+          "text": "이동과 행동력",
+          "rect": [
+            238,
+            119,
+            550,
+            80
+          ],
+          "font_size": 53,
+          "bold": true,
+          "align": "left",
+          "color": "#20201e",
+          "parent": "left"
+        },
+        {
+          "id": "제목_청록붓선_14",
+          "kind": "image",
+          "asset": "제목_청록붓선",
+          "rect": [
+            236,
+            210,
+            548,
+            17
+          ],
+          "parent": "left"
+        },
+        {
+          "id": "right_title",
+          "kind": "text",
+          "text": "골목을 이동하는 법",
+          "rect": [
+            904,
+            119,
+            550,
+            80
+          ],
+          "font_size": 53,
+          "bold": true,
+          "align": "left",
+          "color": "#20201e",
+          "parent": "right"
+        },
+        {
+          "id": "제목_청록붓선_16",
+          "kind": "image",
+          "asset": "제목_청록붓선",
+          "rect": [
+            902,
+            210,
+            548,
+            17
+          ],
+          "parent": "right"
+        },
+        {
+          "id": "close_button",
+          "kind": "image",
+          "asset": "닫기버튼_빈몸통",
+          "rect": [
+            1217,
+            774,
+            212,
+            80
+          ],
+          "parent": "fixed"
+        },
+        {
+          "id": "close_text",
+          "kind": "text",
+          "text": "수첩 덮기",
+          "rect": [
+            1217,
+            795,
+            212,
+            50
+          ],
+          "font_size": 25,
+          "bold": true,
+          "align": "center",
+          "color": "#e4dfd1",
+          "parent": "fixed"
+        },
+        {
+          "id": "intro",
+          "kind": "text",
+          "text": "이동 거리 3칸마다 행동력(AP) 1을 사용합니다.\n시작 칸은 이동 거리에 포함하지 않습니다.",
+          "rect": [
+            246,
+            252,
+            548,
+            83
+          ],
+          "font_size": 25,
+          "bold": true,
+          "align": "left",
+          "color": "#20201e",
+          "parent": "left"
+        },
+        {
+          "id": "이동_칸프레임_20",
+          "kind": "image",
+          "asset": "이동_칸프레임",
+          "rect": [
+            242,
+            356,
+            137,
+            153
+          ],
+          "parent": "left"
+        },
+        {
+          "id": "distance_0",
+          "kind": "text",
+          "text": "시작",
+          "rect": [
+            242,
+            515,
+            137,
+            48
+          ],
+          "font_size": 29,
+          "bold": true,
+          "align": "center",
+          "color": "#20201e",
+          "parent": "left"
+        },
+        {
+          "id": "이동_칸프레임_22",
+          "kind": "image",
+          "asset": "이동_칸프레임",
+          "rect": [
+            382,
+            356,
+            137,
+            153
+          ],
+          "parent": "left"
+        },
+        {
+          "id": "distance_1",
+          "kind": "text",
+          "text": "1칸",
+          "rect": [
+            382,
+            515,
+            137,
+            48
+          ],
+          "font_size": 29,
+          "bold": true,
+          "align": "center",
+          "color": "#20201e",
+          "parent": "left"
+        },
+        {
+          "id": "이동_칸프레임_24",
+          "kind": "image",
+          "asset": "이동_칸프레임",
+          "rect": [
+            522,
+            356,
+            137,
+            153
+          ],
+          "parent": "left"
+        },
+        {
+          "id": "distance_2",
+          "kind": "text",
+          "text": "2칸",
+          "rect": [
+            522,
+            515,
+            137,
+            48
+          ],
+          "font_size": 29,
+          "bold": true,
+          "align": "center",
+          "color": "#20201e",
+          "parent": "left"
+        },
+        {
+          "id": "이동_칸프레임_26",
+          "kind": "image",
+          "asset": "이동_칸프레임",
+          "rect": [
+            662,
+            356,
+            137,
+            153
+          ],
+          "parent": "left"
+        },
+        {
+          "id": "distance_3",
+          "kind": "text",
+          "text": "3칸",
+          "rect": [
+            662,
+            515,
+            137,
+            48
+          ],
+          "font_size": 29,
+          "bold": true,
+          "align": "center",
+          "color": "#20201e",
+          "parent": "left"
+        },
+        {
+          "id": "유진_이동_28",
+          "kind": "image",
+          "asset": "유진_이동",
+          "rect": [
+            269,
+            379,
+            75,
+            121
+          ],
+          "parent": "left"
+        },
+        {
+          "id": "목표_모서리_29",
+          "kind": "image",
+          "asset": "목표_모서리",
+          "rect": [
+            671,
+            369,
+            105,
+            125
+          ],
+          "parent": "left"
+        },
+        {
+          "id": "선_청록_30",
+          "kind": "image",
+          "asset": "선_청록",
+          "rect": [
+            330,
+            432,
+            120,
+            10
+          ],
+          "parent": "left",
+          "angle": 0
+        },
+        {
+          "id": "화살촉_청록_31",
+          "kind": "image",
+          "asset": "화살촉_청록",
+          "rect": [
+            446,
+            421,
+            26,
+            32
+          ],
+          "parent": "left",
+          "angle": 0
+        },
+        {
+          "id": "선_청록_32",
+          "kind": "image",
+          "asset": "선_청록",
+          "rect": [
+            470,
+            432,
+            120,
+            10
+          ],
+          "parent": "left",
+          "angle": 0
+        },
+        {
+          "id": "화살촉_청록_33",
+          "kind": "image",
+          "asset": "화살촉_청록",
+          "rect": [
+            586,
+            421,
+            26,
+            32
+          ],
+          "parent": "left",
+          "angle": 0
+        },
+        {
+          "id": "선_청록_34",
+          "kind": "image",
+          "asset": "선_청록",
+          "rect": [
+            610,
+            432,
+            120,
+            10
+          ],
+          "parent": "left",
+          "angle": 0
+        },
+        {
+          "id": "화살촉_청록_35",
+          "kind": "image",
+          "asset": "화살촉_청록",
+          "rect": [
+            726,
+            421,
+            26,
+            32
+          ],
+          "parent": "left",
+          "angle": 0
+        },
+        {
+          "id": "제목_청록붓선_36",
+          "kind": "image",
+          "asset": "제목_청록붓선",
+          "rect": [
+            248,
+            581,
+            549,
+            80
+          ],
+          "parent": "left"
+        },
+        {
+          "id": "movement_cost",
+          "kind": "text",
+          "text": "3칸 이동 = 1 AP",
+          "rect": [
+            255,
+            594,
+            531,
+            73
+          ],
+          "font_size": 46,
+          "bold": true,
+          "align": "center",
+          "color": "#20201e",
+          "parent": "left"
+        },
+        {
+          "id": "AP_프레임_38",
+          "kind": "image",
+          "asset": "AP_프레임",
+          "rect": [
+            273,
+            714,
+            59,
+            57
+          ],
+          "parent": "left"
+        },
+        {
+          "id": "AP_채움_39",
+          "kind": "image",
+          "asset": "AP_채움",
+          "rect": [
+            279,
+            720,
+            47,
+            45
+          ],
+          "parent": "left"
+        },
+        {
+          "id": "AP_프레임_40",
+          "kind": "image",
+          "asset": "AP_프레임",
+          "rect": [
+            335,
+            714,
+            59,
+            57
+          ],
+          "parent": "left"
+        },
+        {
+          "id": "AP_채움_41",
+          "kind": "image",
+          "asset": "AP_채움",
+          "rect": [
+            341,
+            720,
+            47,
+            45
+          ],
+          "parent": "left"
+        },
+        {
+          "id": "AP_프레임_42",
+          "kind": "image",
+          "asset": "AP_프레임",
+          "rect": [
+            397,
+            714,
+            59,
+            57
+          ],
+          "parent": "left"
+        },
+        {
+          "id": "AP_채움_43",
+          "kind": "image",
+          "asset": "AP_채움",
+          "rect": [
+            403,
+            720,
+            47,
+            45
+          ],
+          "parent": "left"
+        },
+        {
+          "id": "AP_프레임_44",
+          "kind": "image",
+          "asset": "AP_프레임",
+          "rect": [
+            567,
+            714,
+            59,
+            57
+          ],
+          "parent": "left"
+        },
+        {
+          "id": "AP_채움_45",
+          "kind": "image",
+          "asset": "AP_채움",
+          "rect": [
+            573,
+            720,
+            47,
+            45
+          ],
+          "parent": "left"
+        },
+        {
+          "id": "AP_프레임_46",
+          "kind": "image",
+          "asset": "AP_프레임",
+          "rect": [
+            629,
+            714,
+            59,
+            57
+          ],
+          "parent": "left"
+        },
+        {
+          "id": "AP_채움_47",
+          "kind": "image",
+          "asset": "AP_채움",
+          "rect": [
+            635,
+            720,
+            47,
+            45
+          ],
+          "parent": "left"
+        },
+        {
+          "id": "AP_프레임_48",
+          "kind": "image",
+          "asset": "AP_프레임",
+          "rect": [
+            691,
+            714,
+            59,
+            57
+          ],
+          "parent": "left"
+        },
+        {
+          "id": "AP_빈칸_49",
+          "kind": "image",
+          "asset": "AP_빈칸",
+          "rect": [
+            697,
+            720,
+            47,
+            45
+          ],
+          "parent": "left"
+        },
+        {
+          "id": "선_먹색_50",
+          "kind": "image",
+          "asset": "선_먹색",
+          "rect": [
+            480,
+            737,
+            34,
+            10
+          ],
+          "parent": "left",
+          "angle": 0
+        },
+        {
+          "id": "화살촉_먹색_51",
+          "kind": "image",
+          "asset": "화살촉_먹색",
+          "rect": [
+            510,
+            726,
+            26,
+            32
+          ],
+          "parent": "left",
+          "angle": 0
+        },
+        {
+          "id": "ap_use",
+          "kind": "text",
+          "text": "행동력 사용",
+          "rect": [
+            330,
+            790,
+            397,
+            44
+          ],
+          "font_size": 27,
+          "bold": true,
+          "align": "center",
+          "color": "#20201e",
+          "parent": "left"
+        },
+        {
+          "id": "단계번호_원_53",
+          "kind": "image",
+          "asset": "단계번호_원",
+          "rect": [
+            901,
+            290,
+            58,
+            58
+          ],
+          "parent": "right"
+        },
+        {
+          "id": "step_number_1",
+          "kind": "text",
+          "text": "1",
+          "rect": [
+            901,
+            297,
+            58,
+            45
+          ],
+          "font_size": 33,
+          "bold": true,
+          "align": "center",
+          "color": "#eee9dd",
+          "parent": "right"
+        },
+        {
+          "id": "step_1",
+          "kind": "text",
+          "text": "이동 버튼을 누른다.",
+          "rect": [
+            984,
+            298,
+            443,
+            72
+          ],
+          "font_size": 27,
+          "bold": true,
+          "align": "left",
+          "color": "#20201e",
+          "parent": "right"
+        },
+        {
+          "id": "단계번호_원_56",
+          "kind": "image",
+          "asset": "단계번호_원",
+          "rect": [
+            901,
+            389,
+            58,
+            58
+          ],
+          "parent": "right"
+        },
+        {
+          "id": "step_number_2",
+          "kind": "text",
+          "text": "2",
+          "rect": [
+            901,
+            396,
+            58,
+            45
+          ],
+          "font_size": 33,
+          "bold": true,
+          "align": "center",
+          "color": "#eee9dd",
+          "parent": "right"
+        },
+        {
+          "id": "step_2",
+          "kind": "text",
+          "text": "이동할 칸을 선택한다.",
+          "rect": [
+            984,
+            397,
+            443,
+            72
+          ],
+          "font_size": 27,
+          "bold": true,
+          "align": "left",
+          "color": "#20201e",
+          "parent": "right"
+        },
+        {
+          "id": "단계번호_원_59",
+          "kind": "image",
+          "asset": "단계번호_원",
+          "rect": [
+            901,
+            488,
+            58,
+            58
+          ],
+          "parent": "right"
+        },
+        {
+          "id": "step_number_3",
+          "kind": "text",
+          "text": "3",
+          "rect": [
+            901,
+            495,
+            58,
+            45
+          ],
+          "font_size": 33,
+          "bold": true,
+          "align": "center",
+          "color": "#eee9dd",
+          "parent": "right"
+        },
+        {
+          "id": "step_3",
+          "kind": "text",
+          "text": "이동 경로 3칸마다 1 AP를\n사용한다.",
+          "rect": [
+            984,
+            496,
+            443,
+            72
+          ],
+          "font_size": 27,
+          "bold": true,
+          "align": "left",
+          "color": "#20201e",
+          "parent": "right"
+        },
+        {
+          "id": "메모박스_빈몸통_62",
+          "kind": "image",
+          "asset": "메모박스_빈몸통",
+          "rect": [
+            895,
+            610,
+            545,
+            124
+          ],
+          "parent": "right"
+        },
+        {
+          "id": "안내기호_원_63",
+          "kind": "image",
+          "asset": "안내기호_원",
+          "rect": [
+            917,
+            645.0,
+            54,
+            54
+          ],
+          "parent": "right"
+        },
+        {
+          "id": "right_note_mark_610",
+          "kind": "text",
+          "text": "!",
+          "rect": [
+            917,
+            643.0,
+            54,
+            55
+          ],
+          "font_size": 38,
+          "bold": true,
+          "align": "center",
+          "color": "#eee9dd",
+          "parent": "right"
+        },
+        {
+          "id": "right_note_610",
+          "kind": "text",
+          "text": "AP는 행동력입니다.\n행동력이 부족하면 턴을 종료하세요.",
+          "rect": [
+            992,
+            632,
+            424,
+            97
+          ],
+          "font_size": 25,
+          "bold": true,
+          "align": "left",
+          "color": "#20201e",
+          "parent": "right"
+        }
+      ]
+    },
+    {
+      "id": "02",
+      "title": "시야와 순찰",
+      "canvas": [
+        1672,
+        941
+      ],
+      "active_tab": "시야",
+      "parents": {
+        "fixed": "표지와 색인, 버튼은 종이와 분리",
+        "left": "왼쪽 종이 내용",
+        "right": "오른쪽 종이 내용"
+      },
+      "layers": [
+        {
+          "id": "fixed_cover",
+          "kind": "image",
+          "asset": "표지_종이단면",
+          "rect": [
+            0,
+            0,
+            1672,
+            941
+          ],
+          "parent": "fixed"
+        },
+        {
+          "id": "종이_왼쪽",
+          "kind": "image",
+          "asset": "종이_왼쪽",
+          "rect": [
+            176,
+            52,
+            657,
+            832
+          ],
+          "parent": "left"
+        },
+        {
+          "id": "종이_오른쪽",
+          "kind": "image",
+          "asset": "종이_오른쪽",
+          "rect": [
+            838,
+            52,
+            637,
+            832
+          ],
+          "parent": "right"
+        },
+        {
+          "id": "책등_제본",
+          "kind": "image",
+          "asset": "책등_제본",
+          "rect": [
+            832,
+            52,
+            7,
+            832
+          ],
+          "parent": "fixed"
+        },
+        {
+          "id": "tab_0",
+          "kind": "image",
+          "asset": "색인_빈탭_1",
+          "rect": [
+            1477,
+            124,
+            143,
+            116
+          ],
+          "parent": "fixed"
+        },
+        {
+          "id": "tab_text_0",
+          "kind": "text",
+          "text": "이동",
+          "rect": [
+            1484,
+            151,
+            112,
+            55
+          ],
+          "font_size": 28,
+          "bold": true,
+          "align": "center",
+          "color": "#20201e",
+          "parent": "fixed"
+        },
+        {
+          "id": "tab_1",
+          "kind": "image",
+          "asset": "색인_빈탭_2",
+          "rect": [
+            1477,
+            245,
+            143,
+            109
+          ],
+          "parent": "fixed"
+        },
+        {
+          "id": "active_tab",
+          "kind": "image",
+          "asset": "색인_선택탭",
+          "rect": [
+            1480,
+            251,
+            124,
+            97
+          ],
+          "parent": "fixed"
+        },
+        {
+          "id": "tab_text_1",
+          "kind": "text",
+          "text": "시야",
+          "rect": [
+            1484,
+            272,
+            112,
+            55
+          ],
+          "font_size": 28,
+          "bold": true,
+          "align": "center",
+          "color": "#20201e",
+          "parent": "fixed"
+        },
+        {
+          "id": "tab_2",
+          "kind": "image",
+          "asset": "색인_빈탭_3",
+          "rect": [
+            1477,
+            357,
+            143,
+            111
+          ],
+          "parent": "fixed"
+        },
+        {
+          "id": "tab_text_2",
+          "kind": "text",
+          "text": "전투",
+          "rect": [
+            1484,
+            384,
+            112,
+            55
+          ],
+          "font_size": 28,
+          "bold": true,
+          "align": "center",
+          "color": "#20201e",
+          "parent": "fixed"
+        },
+        {
+          "id": "tab_3",
+          "kind": "image",
+          "asset": "색인_빈탭_4",
+          "rect": [
+            1477,
+            474,
+            143,
+            106
+          ],
+          "parent": "fixed"
+        },
+        {
+          "id": "tab_text_3",
+          "kind": "text",
+          "text": "침입",
+          "rect": [
+            1484,
+            501,
+            112,
+            55
+          ],
+          "font_size": 28,
+          "bold": true,
+          "align": "center",
+          "color": "#20201e",
+          "parent": "fixed"
+        },
+        {
+          "id": "left_title",
+          "kind": "text",
+          "text": "시야와 순찰",
+          "rect": [
+            238,
+            119,
+            550,
+            80
+          ],
+          "font_size": 53,
+          "bold": true,
+          "align": "left",
+          "color": "#20201e",
+          "parent": "left"
+        },
+        {
+          "id": "제목_청록붓선_14",
+          "kind": "image",
+          "asset": "제목_청록붓선",
+          "rect": [
+            236,
+            210,
+            548,
+            17
+          ],
+          "parent": "left"
+        },
+        {
+          "id": "right_title",
+          "kind": "text",
+          "text": "코너 너머를 살피기",
+          "rect": [
+            904,
+            119,
+            550,
+            80
+          ],
+          "font_size": 53,
+          "bold": true,
+          "align": "left",
+          "color": "#20201e",
+          "parent": "right"
+        },
+        {
+          "id": "제목_청록붓선_16",
+          "kind": "image",
+          "asset": "제목_청록붓선",
+          "rect": [
+            902,
+            210,
+            548,
+            17
+          ],
+          "parent": "right"
+        },
+        {
+          "id": "close_button",
+          "kind": "image",
+          "asset": "닫기버튼_빈몸통",
+          "rect": [
+            1217,
+            774,
+            212,
+            80
+          ],
+          "parent": "fixed"
+        },
+        {
+          "id": "close_text",
+          "kind": "text",
+          "text": "수첩 덮기",
+          "rect": [
+            1217,
+            795,
+            212,
+            50
+          ],
+          "font_size": 25,
+          "bold": true,
+          "align": "center",
+          "color": "#e4dfd1",
+          "parent": "fixed"
+        },
+        {
+          "id": "intro",
+          "kind": "text",
+          "text": "보이지 않는다고 사라진 것은 아닙니다.",
+          "rect": [
+            247,
+            252,
+            540,
+            50
+          ],
+          "font_size": 27,
+          "bold": true,
+          "align": "left",
+          "color": "#20201e",
+          "parent": "left"
+        },
+        {
+          "id": "격자_외곽_20",
+          "kind": "image",
+          "asset": "격자_외곽",
+          "rect": [
+            235,
+            321,
+            275,
+            292
+          ],
+          "parent": "left"
+        },
+        {
+          "id": "시야밖_표시_21",
+          "kind": "image",
+          "asset": "시야밖_표시",
+          "rect": [
+            238,
+            324,
+            269,
+            286
+          ],
+          "parent": "left"
+        },
+        {
+          "id": "시야_표시_22",
+          "kind": "image",
+          "asset": "시야_표시",
+          "rect": [
+            241,
+            499,
+            194,
+            104
+          ],
+          "parent": "left"
+        },
+        {
+          "id": "시야_표시_23",
+          "kind": "image",
+          "asset": "시야_표시",
+          "rect": [
+            386,
+            331,
+            49,
+            210
+          ],
+          "parent": "left"
+        },
+        {
+          "id": "벽_한구간_24",
+          "kind": "image",
+          "asset": "벽_한구간",
+          "rect": [
+            243,
+            477,
+            141,
+            22
+          ],
+          "parent": "left"
+        },
+        {
+          "id": "벽_한구간_25",
+          "kind": "image",
+          "asset": "벽_한구간",
+          "rect": [
+            365,
+            331,
+            22,
+            150
+          ],
+          "parent": "left"
+        },
+        {
+          "id": "벽_한구간_26",
+          "kind": "image",
+          "asset": "벽_한구간",
+          "rect": [
+            434,
+            367,
+            68,
+            22
+          ],
+          "parent": "left"
+        },
+        {
+          "id": "유진_표식_27",
+          "kind": "image",
+          "asset": "유진_표식",
+          "rect": [
+            272,
+            550,
+            26,
+            37
+          ],
+          "parent": "left"
+        },
+        {
+          "id": "아군_선택링_28",
+          "kind": "image",
+          "asset": "아군_선택링",
+          "rect": [
+            264,
+            544,
+            41,
+            47
+          ],
+          "parent": "left"
+        },
+        {
+          "id": "상자_29",
+          "kind": "image",
+          "asset": "상자",
+          "rect": [
+            446,
+            559,
+            28,
+            30
+          ],
+          "parent": "left"
+        },
+        {
+          "id": "드럼통_30",
+          "kind": "image",
+          "asset": "드럼통",
+          "rect": [
+            476,
+            574,
+            22,
+            22
+          ],
+          "parent": "left"
+        },
+        {
+          "id": "적_표식_31",
+          "kind": "image",
+          "asset": "적_표식",
+          "rect": [
+            395,
+            392,
+            25,
+            41
+          ],
+          "parent": "left"
+        },
+        {
+          "id": "점선_적색_32",
+          "kind": "image",
+          "asset": "점선_적색",
+          "rect": [
+            423,
+            412,
+            31,
+            10
+          ],
+          "parent": "left",
+          "angle": 0
+        },
+        {
+          "id": "화살촉_적색_33",
+          "kind": "image",
+          "asset": "화살촉_적색",
+          "rect": [
+            450,
+            401,
+            26,
+            32
+          ],
+          "parent": "left",
+          "angle": 0
+        },
+        {
+          "id": "before_label",
+          "kind": "text",
+          "text": "발견",
+          "rect": [
+            235,
+            622,
+            275,
+            46
+          ],
+          "font_size": 30,
+          "bold": true,
+          "align": "center",
+          "color": "#20201e",
+          "parent": "left"
+        },
+        {
+          "id": "격자_외곽_35",
+          "kind": "image",
+          "asset": "격자_외곽",
+          "rect": [
+            529,
+            321,
+            275,
+            292
+          ],
+          "parent": "left"
+        },
+        {
+          "id": "시야밖_표시_36",
+          "kind": "image",
+          "asset": "시야밖_표시",
+          "rect": [
+            532,
+            324,
+            269,
+            286
+          ],
+          "parent": "left"
+        },
+        {
+          "id": "시야_표시_37",
+          "kind": "image",
+          "asset": "시야_표시",
+          "rect": [
+            535,
+            499,
+            194,
+            104
+          ],
+          "parent": "left"
+        },
+        {
+          "id": "시야_표시_38",
+          "kind": "image",
+          "asset": "시야_표시",
+          "rect": [
+            680,
+            331,
+            49,
+            210
+          ],
+          "parent": "left"
+        },
+        {
+          "id": "벽_한구간_39",
+          "kind": "image",
+          "asset": "벽_한구간",
+          "rect": [
+            537,
+            477,
+            141,
+            22
+          ],
+          "parent": "left"
+        },
+        {
+          "id": "벽_한구간_40",
+          "kind": "image",
+          "asset": "벽_한구간",
+          "rect": [
+            659,
+            331,
+            22,
+            150
+          ],
+          "parent": "left"
+        },
+        {
+          "id": "벽_한구간_41",
+          "kind": "image",
+          "asset": "벽_한구간",
+          "rect": [
+            728,
+            367,
+            68,
+            22
+          ],
+          "parent": "left"
+        },
+        {
+          "id": "유진_표식_42",
+          "kind": "image",
+          "asset": "유진_표식",
+          "rect": [
+            566,
+            550,
+            26,
+            37
+          ],
+          "parent": "left"
+        },
+        {
+          "id": "아군_선택링_43",
+          "kind": "image",
+          "asset": "아군_선택링",
+          "rect": [
+            558,
+            544,
+            41,
+            47
+          ],
+          "parent": "left"
+        },
+        {
+          "id": "상자_44",
+          "kind": "image",
+          "asset": "상자",
+          "rect": [
+            740,
+            559,
+            28,
+            30
+          ],
+          "parent": "left"
+        },
+        {
+          "id": "드럼통_45",
+          "kind": "image",
+          "asset": "드럼통",
+          "rect": [
+            770,
+            574,
+            22,
+            22
+          ],
+          "parent": "left"
+        },
+        {
+          "id": "enemy_unknown",
+          "kind": "text",
+          "text": "?",
+          "rect": [
+            753,
+            397,
+            33,
+            50
+          ],
+          "font_size": 42,
+          "bold": true,
+          "align": "left",
+          "color": "#aa302b",
+          "parent": "left"
+        },
+        {
+          "id": "점선_적색_47",
+          "kind": "image",
+          "asset": "점선_적색",
+          "rect": [
+            717,
+            412,
+            31,
+            10
+          ],
+          "parent": "left",
+          "angle": 0
+        },
+        {
+          "id": "화살촉_적색_48",
+          "kind": "image",
+          "asset": "화살촉_적색",
+          "rect": [
+            744,
+            401,
+            26,
+            32
+          ],
+          "parent": "left",
+          "angle": 0
+        },
+        {
+          "id": "after_label",
+          "kind": "text",
+          "text": "시야 밖",
+          "rect": [
+            529,
+            622,
+            275,
+            46
+          ],
+          "font_size": 30,
+          "bold": true,
+          "align": "center",
+          "color": "#20201e",
+          "parent": "left"
+        },
+        {
+          "id": "제목_청록붓선_50",
+          "kind": "image",
+          "asset": "제목_청록붓선",
+          "rect": [
+            241,
+            687,
+            568,
+            78
+          ],
+          "parent": "left"
+        },
+        {
+          "id": "key",
+          "kind": "text",
+          "text": "적은 시야 밖에서도 움직입니다.",
+          "rect": [
+            256,
+            700,
+            540,
+            60
+          ],
+          "font_size": 33,
+          "bold": true,
+          "align": "left",
+          "color": "#20201e",
+          "parent": "left"
+        },
+        {
+          "id": "unknown",
+          "kind": "text",
+          "text": "보이지 않는 공간에는 적이 있을 수 있습니다.",
+          "rect": [
+            254,
+            795,
+            548,
+            48
+          ],
+          "font_size": 26,
+          "bold": true,
+          "align": "left",
+          "color": "#20201e",
+          "parent": "left"
+        },
+        {
+          "id": "단계번호_원_53",
+          "kind": "image",
+          "asset": "단계번호_원",
+          "rect": [
+            901,
+            290,
+            58,
+            58
+          ],
+          "parent": "right"
+        },
+        {
+          "id": "step_number_1",
+          "kind": "text",
+          "text": "1",
+          "rect": [
+            901,
+            297,
+            58,
+            45
+          ],
+          "font_size": 33,
+          "bold": true,
+          "align": "center",
+          "color": "#eee9dd",
+          "parent": "right"
+        },
+        {
+          "id": "step_1",
+          "kind": "text",
+          "text": "코너로 이동해 주변을 확인한다.",
+          "rect": [
+            984,
+            298,
+            443,
+            72
+          ],
+          "font_size": 27,
+          "bold": true,
+          "align": "left",
+          "color": "#20201e",
+          "parent": "right"
+        },
+        {
+          "id": "단계번호_원_56",
+          "kind": "image",
+          "asset": "단계번호_원",
+          "rect": [
+            901,
+            389,
+            58,
+            58
+          ],
+          "parent": "right"
+        },
+        {
+          "id": "step_number_2",
+          "kind": "text",
+          "text": "2",
+          "rect": [
+            901,
+            396,
+            58,
+            45
+          ],
+          "font_size": 33,
+          "bold": true,
+          "align": "center",
+          "color": "#eee9dd",
+          "parent": "right"
+        },
+        {
+          "id": "step_2",
+          "kind": "text",
+          "text": "턴 종료 후 적의 순찰을 살핀다.",
+          "rect": [
+            984,
+            397,
+            443,
+            72
+          ],
+          "font_size": 27,
+          "bold": true,
+          "align": "left",
+          "color": "#20201e",
+          "parent": "right"
+        },
+        {
+          "id": "단계번호_원_59",
+          "kind": "image",
+          "asset": "단계번호_원",
+          "rect": [
+            901,
+            488,
+            58,
+            58
+          ],
+          "parent": "right"
+        },
+        {
+          "id": "step_number_3",
+          "kind": "text",
+          "text": "3",
+          "rect": [
+            901,
+            495,
+            58,
+            45
+          ],
+          "font_size": 33,
+          "bold": true,
+          "align": "center",
+          "color": "#eee9dd",
+          "parent": "right"
+        },
+        {
+          "id": "step_3",
+          "kind": "text",
+          "text": "보이지 않는 길은 검으로 정찰한다.",
+          "rect": [
+            984,
+            496,
+            443,
+            72
+          ],
+          "font_size": 27,
+          "bold": true,
+          "align": "left",
+          "color": "#20201e",
+          "parent": "right"
+        },
+        {
+          "id": "메모박스_빈몸통_62",
+          "kind": "image",
+          "asset": "메모박스_빈몸통",
+          "rect": [
+            895,
+            607,
+            545,
+            124
+          ],
+          "parent": "right"
+        },
+        {
+          "id": "안내기호_원_63",
+          "kind": "image",
+          "asset": "안내기호_원",
+          "rect": [
+            917,
+            642.0,
+            54,
+            54
+          ],
+          "parent": "right"
+        },
+        {
+          "id": "right_note_mark_607",
+          "kind": "text",
+          "text": "!",
+          "rect": [
+            917,
+            640.0,
+            54,
+            55
+          ],
+          "font_size": 38,
+          "bold": true,
+          "align": "center",
+          "color": "#eee9dd",
+          "parent": "right"
+        },
+        {
+          "id": "right_note_607",
+          "kind": "text",
+          "text": "마지막으로 본 위치에 적이\n남아 있다고 단정하지 마세요.",
+          "rect": [
+            992,
+            629,
+            424,
+            97
+          ],
+          "font_size": 25,
+          "bold": true,
+          "align": "left",
+          "color": "#20201e",
+          "parent": "right"
+        }
+      ]
+    },
+    {
+      "id": "03",
+      "title": "엄폐와 전투",
+      "canvas": [
+        1672,
+        941
+      ],
+      "active_tab": "전투",
+      "parents": {
+        "fixed": "표지와 색인, 버튼은 종이와 분리",
+        "left": "왼쪽 종이 내용",
+        "right": "오른쪽 종이 내용"
+      },
+      "layers": [
+        {
+          "id": "fixed_cover",
+          "kind": "image",
+          "asset": "표지_종이단면",
+          "rect": [
+            0,
+            0,
+            1672,
+            941
+          ],
+          "parent": "fixed"
+        },
+        {
+          "id": "종이_왼쪽",
+          "kind": "image",
+          "asset": "종이_왼쪽",
+          "rect": [
+            176,
+            52,
+            657,
+            832
+          ],
+          "parent": "left"
+        },
+        {
+          "id": "종이_오른쪽",
+          "kind": "image",
+          "asset": "종이_오른쪽",
+          "rect": [
+            838,
+            52,
+            637,
+            832
+          ],
+          "parent": "right"
+        },
+        {
+          "id": "책등_제본",
+          "kind": "image",
+          "asset": "책등_제본",
+          "rect": [
+            832,
+            52,
+            7,
+            832
+          ],
+          "parent": "fixed"
+        },
+        {
+          "id": "tab_0",
+          "kind": "image",
+          "asset": "색인_빈탭_1",
+          "rect": [
+            1477,
+            124,
+            143,
+            116
+          ],
+          "parent": "fixed"
+        },
+        {
+          "id": "tab_text_0",
+          "kind": "text",
+          "text": "이동",
+          "rect": [
+            1484,
+            151,
+            112,
+            55
+          ],
+          "font_size": 28,
+          "bold": true,
+          "align": "center",
+          "color": "#20201e",
+          "parent": "fixed"
+        },
+        {
+          "id": "tab_1",
+          "kind": "image",
+          "asset": "색인_빈탭_2",
+          "rect": [
+            1477,
+            245,
+            143,
+            109
+          ],
+          "parent": "fixed"
+        },
+        {
+          "id": "tab_text_1",
+          "kind": "text",
+          "text": "시야",
+          "rect": [
+            1484,
+            272,
+            112,
+            55
+          ],
+          "font_size": 28,
+          "bold": true,
+          "align": "center",
+          "color": "#20201e",
+          "parent": "fixed"
+        },
+        {
+          "id": "tab_2",
+          "kind": "image",
+          "asset": "색인_빈탭_3",
+          "rect": [
+            1477,
+            357,
+            143,
+            111
+          ],
+          "parent": "fixed"
+        },
+        {
+          "id": "active_tab",
+          "kind": "image",
+          "asset": "색인_선택탭",
+          "rect": [
+            1480,
+            363,
+            124,
+            99
+          ],
+          "parent": "fixed"
+        },
+        {
+          "id": "tab_text_2",
+          "kind": "text",
+          "text": "전투",
+          "rect": [
+            1484,
+            384,
+            112,
+            55
+          ],
+          "font_size": 28,
+          "bold": true,
+          "align": "center",
+          "color": "#20201e",
+          "parent": "fixed"
+        },
+        {
+          "id": "tab_3",
+          "kind": "image",
+          "asset": "색인_빈탭_4",
+          "rect": [
+            1477,
+            474,
+            143,
+            106
+          ],
+          "parent": "fixed"
+        },
+        {
+          "id": "tab_text_3",
+          "kind": "text",
+          "text": "침입",
+          "rect": [
+            1484,
+            501,
+            112,
+            55
+          ],
+          "font_size": 28,
+          "bold": true,
+          "align": "center",
+          "color": "#20201e",
+          "parent": "fixed"
+        },
+        {
+          "id": "left_title",
+          "kind": "text",
+          "text": "엄폐와 전투",
+          "rect": [
+            238,
+            119,
+            550,
+            80
+          ],
+          "font_size": 53,
+          "bold": true,
+          "align": "left",
+          "color": "#20201e",
+          "parent": "left"
+        },
+        {
+          "id": "제목_청록붓선_14",
+          "kind": "image",
+          "asset": "제목_청록붓선",
+          "rect": [
+            236,
+            210,
+            548,
+            17
+          ],
+          "parent": "left"
+        },
+        {
+          "id": "right_title",
+          "kind": "text",
+          "text": "공격 수단 고르기",
+          "rect": [
+            904,
+            119,
+            550,
+            80
+          ],
+          "font_size": 53,
+          "bold": true,
+          "align": "left",
+          "color": "#20201e",
+          "parent": "right"
+        },
+        {
+          "id": "제목_청록붓선_16",
+          "kind": "image",
+          "asset": "제목_청록붓선",
+          "rect": [
+            902,
+            210,
+            548,
+            17
+          ],
+          "parent": "right"
+        },
+        {
+          "id": "close_button",
+          "kind": "image",
+          "asset": "닫기버튼_빈몸통",
+          "rect": [
+            1217,
+            774,
+            212,
+            80
+          ],
+          "parent": "fixed"
+        },
+        {
+          "id": "close_text",
+          "kind": "text",
+          "text": "수첩 덮기",
+          "rect": [
+            1217,
+            795,
+            212,
+            50
+          ],
+          "font_size": 25,
+          "bold": true,
+          "align": "center",
+          "color": "#e4dfd1",
+          "parent": "fixed"
+        },
+        {
+          "id": "격자_한칸_19",
+          "kind": "image",
+          "asset": "격자_한칸",
+          "rect": [
+            245,
+            277,
+            78,
+            78
+          ],
+          "parent": "left"
+        },
+        {
+          "id": "격자_한칸_20",
+          "kind": "image",
+          "asset": "격자_한칸",
+          "rect": [
+            323,
+            277,
+            78,
+            78
+          ],
+          "parent": "left"
+        },
+        {
+          "id": "격자_한칸_21",
+          "kind": "image",
+          "asset": "격자_한칸",
+          "rect": [
+            401,
+            277,
+            78,
+            78
+          ],
+          "parent": "left"
+        },
+        {
+          "id": "격자_한칸_22",
+          "kind": "image",
+          "asset": "격자_한칸",
+          "rect": [
+            479,
+            277,
+            78,
+            78
+          ],
+          "parent": "left"
+        },
+        {
+          "id": "격자_한칸_23",
+          "kind": "image",
+          "asset": "격자_한칸",
+          "rect": [
+            557,
+            277,
+            78,
+            78
+          ],
+          "parent": "left"
+        },
+        {
+          "id": "격자_한칸_24",
+          "kind": "image",
+          "asset": "격자_한칸",
+          "rect": [
+            635,
+            277,
+            78,
+            78
+          ],
+          "parent": "left"
+        },
+        {
+          "id": "격자_한칸_25",
+          "kind": "image",
+          "asset": "격자_한칸",
+          "rect": [
+            713,
+            277,
+            78,
+            78
+          ],
+          "parent": "left"
+        },
+        {
+          "id": "격자_한칸_26",
+          "kind": "image",
+          "asset": "격자_한칸",
+          "rect": [
+            245,
+            355,
+            78,
+            78
+          ],
+          "parent": "left"
+        },
+        {
+          "id": "격자_한칸_27",
+          "kind": "image",
+          "asset": "격자_한칸",
+          "rect": [
+            323,
+            355,
+            78,
+            78
+          ],
+          "parent": "left"
+        },
+        {
+          "id": "격자_한칸_28",
+          "kind": "image",
+          "asset": "격자_한칸",
+          "rect": [
+            401,
+            355,
+            78,
+            78
+          ],
+          "parent": "left"
+        },
+        {
+          "id": "격자_한칸_29",
+          "kind": "image",
+          "asset": "격자_한칸",
+          "rect": [
+            479,
+            355,
+            78,
+            78
+          ],
+          "parent": "left"
+        },
+        {
+          "id": "격자_한칸_30",
+          "kind": "image",
+          "asset": "격자_한칸",
+          "rect": [
+            557,
+            355,
+            78,
+            78
+          ],
+          "parent": "left"
+        },
+        {
+          "id": "격자_한칸_31",
+          "kind": "image",
+          "asset": "격자_한칸",
+          "rect": [
+            635,
+            355,
+            78,
+            78
+          ],
+          "parent": "left"
+        },
+        {
+          "id": "격자_한칸_32",
+          "kind": "image",
+          "asset": "격자_한칸",
+          "rect": [
+            713,
+            355,
+            78,
+            78
+          ],
+          "parent": "left"
+        },
+        {
+          "id": "격자_한칸_33",
+          "kind": "image",
+          "asset": "격자_한칸",
+          "rect": [
+            245,
+            433,
+            78,
+            78
+          ],
+          "parent": "left"
+        },
+        {
+          "id": "격자_한칸_34",
+          "kind": "image",
+          "asset": "격자_한칸",
+          "rect": [
+            323,
+            433,
+            78,
+            78
+          ],
+          "parent": "left"
+        },
+        {
+          "id": "격자_한칸_35",
+          "kind": "image",
+          "asset": "격자_한칸",
+          "rect": [
+            401,
+            433,
+            78,
+            78
+          ],
+          "parent": "left"
+        },
+        {
+          "id": "격자_한칸_36",
+          "kind": "image",
+          "asset": "격자_한칸",
+          "rect": [
+            479,
+            433,
+            78,
+            78
+          ],
+          "parent": "left"
+        },
+        {
+          "id": "격자_한칸_37",
+          "kind": "image",
+          "asset": "격자_한칸",
+          "rect": [
+            557,
+            433,
+            78,
+            78
+          ],
+          "parent": "left"
+        },
+        {
+          "id": "격자_한칸_38",
+          "kind": "image",
+          "asset": "격자_한칸",
+          "rect": [
+            635,
+            433,
+            78,
+            78
+          ],
+          "parent": "left"
+        },
+        {
+          "id": "격자_한칸_39",
+          "kind": "image",
+          "asset": "격자_한칸",
+          "rect": [
+            713,
+            433,
+            78,
+            78
+          ],
+          "parent": "left"
+        },
+        {
+          "id": "격자_한칸_40",
+          "kind": "image",
+          "asset": "격자_한칸",
+          "rect": [
+            245,
+            511,
+            78,
+            78
+          ],
+          "parent": "left"
+        },
+        {
+          "id": "격자_한칸_41",
+          "kind": "image",
+          "asset": "격자_한칸",
+          "rect": [
+            323,
+            511,
+            78,
+            78
+          ],
+          "parent": "left"
+        },
+        {
+          "id": "격자_한칸_42",
+          "kind": "image",
+          "asset": "격자_한칸",
+          "rect": [
+            401,
+            511,
+            78,
+            78
+          ],
+          "parent": "left"
+        },
+        {
+          "id": "격자_한칸_43",
+          "kind": "image",
+          "asset": "격자_한칸",
+          "rect": [
+            479,
+            511,
+            78,
+            78
+          ],
+          "parent": "left"
+        },
+        {
+          "id": "격자_한칸_44",
+          "kind": "image",
+          "asset": "격자_한칸",
+          "rect": [
+            557,
+            511,
+            78,
+            78
+          ],
+          "parent": "left"
+        },
+        {
+          "id": "격자_한칸_45",
+          "kind": "image",
+          "asset": "격자_한칸",
+          "rect": [
+            635,
+            511,
+            78,
+            78
+          ],
+          "parent": "left"
+        },
+        {
+          "id": "격자_한칸_46",
+          "kind": "image",
+          "asset": "격자_한칸",
+          "rect": [
+            713,
+            511,
+            78,
+            78
+          ],
+          "parent": "left"
+        },
+        {
+          "id": "격자_외곽_47",
+          "kind": "image",
+          "asset": "격자_외곽",
+          "rect": [
+            245,
+            277,
+            546,
+            312
+          ],
+          "parent": "left"
+        },
+        {
+          "id": "유진_엄폐_48",
+          "kind": "image",
+          "asset": "유진_엄폐",
+          "rect": [
+            307,
+            385,
+            67,
+            82
+          ],
+          "parent": "left"
+        },
+        {
+          "id": "아군_선택링_49",
+          "kind": "image",
+          "asset": "아군_선택링",
+          "rect": [
+            294,
+            371,
+            92,
+            106
+          ],
+          "parent": "left"
+        },
+        {
+          "id": "배관_엄폐물_50",
+          "kind": "image",
+          "asset": "배관_엄폐물",
+          "rect": [
+            392,
+            369,
+            51,
+            108
+          ],
+          "parent": "left"
+        },
+        {
+          "id": "적_총격_51",
+          "kind": "image",
+          "asset": "적_총격",
+          "rect": [
+            673,
+            382,
+            77,
+            104
+          ],
+          "parent": "left"
+        },
+        {
+          "id": "점선_적색_52",
+          "kind": "image",
+          "asset": "점선_적색",
+          "rect": [
+            459,
+            411,
+            211,
+            11
+          ],
+          "parent": "left"
+        },
+        {
+          "id": "화살촉_적색_53",
+          "kind": "image",
+          "asset": "화살촉_적색",
+          "rect": [
+            449,
+            400,
+            29,
+            33
+          ],
+          "parent": "left",
+          "angle": 180
+        },
+        {
+          "id": "attack_dir",
+          "kind": "text",
+          "text": "공격 방향",
+          "rect": [
+            510,
+            365,
+            150,
+            42
+          ],
+          "font_size": 24,
+          "bold": true,
+          "align": "left",
+          "color": "#20201e",
+          "parent": "left"
+        },
+        {
+          "id": "label_유진",
+          "kind": "text",
+          "text": "유진",
+          "rect": [
+            299,
+            499,
+            95,
+            40
+          ],
+          "font_size": 25,
+          "bold": true,
+          "align": "center",
+          "color": "#20201e",
+          "parent": "left"
+        },
+        {
+          "id": "label_엄폐물",
+          "kind": "text",
+          "text": "엄폐물",
+          "rect": [
+            384,
+            499,
+            77,
+            40
+          ],
+          "font_size": 25,
+          "bold": true,
+          "align": "center",
+          "color": "#20201e",
+          "parent": "left"
+        },
+        {
+          "id": "label_적",
+          "kind": "text",
+          "text": "적",
+          "rect": [
+            665,
+            499,
+            90,
+            40
+          ],
+          "font_size": 25,
+          "bold": true,
+          "align": "center",
+          "color": "#20201e",
+          "parent": "left"
+        },
+        {
+          "id": "cover_rule",
+          "kind": "text",
+          "text": "엄폐는 공격 방향에 따라 효과가 달라집니다.\n피격 가능성을 낮추지만 완전히 막지는 않습니다.",
+          "rect": [
+            248,
+            612,
+            555,
+            83
+          ],
+          "font_size": 25,
+          "bold": true,
+          "align": "left",
+          "color": "#20201e",
+          "parent": "left"
+        },
+        {
+          "id": "흐름_상자_59",
+          "kind": "image",
+          "asset": "흐름_상자",
+          "rect": [
+            244,
+            744,
+            150,
+            73
+          ],
+          "parent": "left"
+        },
+        {
+          "id": "flow_아군 턴",
+          "kind": "text",
+          "text": "아군 턴",
+          "rect": [
+            244,
+            762,
+            150,
+            43
+          ],
+          "font_size": 27,
+          "bold": true,
+          "align": "center",
+          "color": "#20201e",
+          "parent": "left"
+        },
+        {
+          "id": "흐름_상자_61",
+          "kind": "image",
+          "asset": "흐름_상자",
+          "rect": [
+            451,
+            744,
+            150,
+            73
+          ],
+          "parent": "left"
+        },
+        {
+          "id": "flow_턴 종료",
+          "kind": "text",
+          "text": "턴 종료",
+          "rect": [
+            451,
+            762,
+            150,
+            43
+          ],
+          "font_size": 27,
+          "bold": true,
+          "align": "center",
+          "color": "#20201e",
+          "parent": "left"
+        },
+        {
+          "id": "흐름_상자_63",
+          "kind": "image",
+          "asset": "흐름_상자",
+          "rect": [
+            651,
+            744,
+            150,
+            73
+          ],
+          "parent": "left"
+        },
+        {
+          "id": "flow_적 턴",
+          "kind": "text",
+          "text": "적 턴",
+          "rect": [
+            651,
+            762,
+            150,
+            43
+          ],
+          "font_size": 27,
+          "bold": true,
+          "align": "center",
+          "color": "#20201e",
+          "parent": "left"
+        },
+        {
+          "id": "선_먹색_65",
+          "kind": "image",
+          "asset": "선_먹색",
+          "rect": [
+            401,
+            777,
+            25,
+            10
+          ],
+          "parent": "left",
+          "angle": 0
+        },
+        {
+          "id": "화살촉_먹색_66",
+          "kind": "image",
+          "asset": "화살촉_먹색",
+          "rect": [
+            422,
+            766,
+            26,
+            32
+          ],
+          "parent": "left",
+          "angle": 0
+        },
+        {
+          "id": "선_먹색_67",
+          "kind": "image",
+          "asset": "선_먹색",
+          "rect": [
+            606,
+            777,
+            24,
+            10
+          ],
+          "parent": "left",
+          "angle": 0
+        },
+        {
+          "id": "화살촉_먹색_68",
+          "kind": "image",
+          "asset": "화살촉_먹색",
+          "rect": [
+            626,
+            766,
+            26,
+            32
+          ],
+          "parent": "left",
+          "angle": 0
+        },
+        {
+          "id": "아이콘_틀_69",
+          "kind": "image",
+          "asset": "아이콘_틀",
+          "rect": [
+            901,
+            270,
+            111,
+            111
+          ],
+          "parent": "right"
+        },
+        {
+          "id": "권총_70",
+          "kind": "image",
+          "asset": "권총",
+          "rect": [
+            917,
+            288,
+            80,
+            75
+          ],
+          "parent": "right",
+          "fit": "contain"
+        },
+        {
+          "id": "권총_title",
+          "kind": "text",
+          "text": "총격 · 1 AP / 탄약 1발",
+          "rect": [
+            1034,
+            279,
+            407,
+            47
+          ],
+          "font_size": 29,
+          "bold": true,
+          "align": "left",
+          "color": "#20201e",
+          "parent": "right"
+        },
+        {
+          "id": "권총_body",
+          "kind": "text",
+          "text": "원거리에서 적을 공격합니다.",
+          "rect": [
+            1034,
+            335,
+            401,
+            44
+          ],
+          "font_size": 24,
+          "bold": false,
+          "align": "left",
+          "color": "#20201e",
+          "parent": "right"
+        },
+        {
+          "id": "아이콘_틀_73",
+          "kind": "image",
+          "asset": "아이콘_틀",
+          "rect": [
+            901,
+            411,
+            111,
+            111
+          ],
+          "parent": "right"
+        },
+        {
+          "id": "검_근접아이콘_74",
+          "kind": "image",
+          "asset": "검_근접아이콘",
+          "rect": [
+            917,
+            429,
+            80,
+            75
+          ],
+          "parent": "right",
+          "fit": "contain"
+        },
+        {
+          "id": "검_근접아이콘_title",
+          "kind": "text",
+          "text": "검 근접 · 1 AP",
+          "rect": [
+            1034,
+            420,
+            407,
+            47
+          ],
+          "font_size": 29,
+          "bold": true,
+          "align": "left",
+          "color": "#20201e",
+          "parent": "right"
+        },
+        {
+          "id": "검_근접아이콘_body",
+          "kind": "text",
+          "text": "주변 8칸의 적을 공격합니다.",
+          "rect": [
+            1034,
+            476,
+            401,
+            44
+          ],
+          "font_size": 24,
+          "bold": false,
+          "align": "left",
+          "color": "#20201e",
+          "parent": "right"
+        },
+        {
+          "id": "아이콘_틀_77",
+          "kind": "image",
+          "asset": "아이콘_틀",
+          "rect": [
+            901,
+            551,
+            111,
+            111
+          ],
+          "parent": "right"
+        },
+        {
+          "id": "주먹_78",
+          "kind": "image",
+          "asset": "주먹",
+          "rect": [
+            917,
+            569,
+            80,
+            75
+          ],
+          "parent": "right",
+          "fit": "contain"
+        },
+        {
+          "id": "주먹_title",
+          "kind": "text",
+          "text": "맨손 근접 · 1 AP",
+          "rect": [
+            1034,
+            560,
+            407,
+            47
+          ],
+          "font_size": 29,
+          "bold": true,
+          "align": "left",
+          "color": "#20201e",
+          "parent": "right"
+        },
+        {
+          "id": "주먹_body",
+          "kind": "text",
+          "text": "검이 떨어져 있으면 맨손입니다.",
+          "rect": [
+            1034,
+            616,
+            401,
+            44
+          ],
+          "font_size": 24,
+          "bold": false,
+          "align": "left",
+          "color": "#20201e",
+          "parent": "right"
+        },
+        {
+          "id": "메모박스_빈몸통_81",
+          "kind": "image",
+          "asset": "메모박스_빈몸통",
+          "rect": [
+            895,
+            667,
+            545,
+            99
+          ],
+          "parent": "right"
+        },
+        {
+          "id": "안내기호_원_82",
+          "kind": "image",
+          "asset": "안내기호_원",
+          "rect": [
+            917,
+            689.5,
+            54,
+            54
+          ],
+          "parent": "right"
+        },
+        {
+          "id": "right_note_mark_667",
+          "kind": "text",
+          "text": "!",
+          "rect": [
+            917,
+            687.5,
+            54,
+            55
+          ],
+          "font_size": 38,
+          "bold": true,
+          "align": "center",
+          "color": "#eee9dd",
+          "parent": "right"
+        },
+        {
+          "id": "right_note_667",
+          "kind": "text",
+          "text": "엄폐와 상황에 따라\n명중 여부가 달라집니다.",
+          "rect": [
+            992,
+            689,
+            424,
+            72
+          ],
+          "font_size": 25,
+          "bold": true,
+          "align": "left",
+          "color": "#20201e",
+          "parent": "right"
+        },
+        {
+          "id": "fixed_results",
+          "kind": "text",
+          "text": "튜토리얼 일부 공격은 학습용으로 결과가 고정됩니다.",
+          "rect": [
+            902,
+            849,
+            525,
+            24
+          ],
+          "font_size": 18,
+          "bold": false,
+          "align": "left",
+          "color": "#20201e",
+          "parent": "right"
+        }
+      ]
+    },
+    {
+      "id": "04",
+      "title": "도깨비검 정찰",
+      "canvas": [
+        1672,
+        941
+      ],
+      "active_tab": "시야",
+      "parents": {
+        "fixed": "표지와 색인, 버튼은 종이와 분리",
+        "left": "왼쪽 종이 내용",
+        "right": "오른쪽 종이 내용"
+      },
+      "layers": [
+        {
+          "id": "fixed_cover",
+          "kind": "image",
+          "asset": "표지_종이단면",
+          "rect": [
+            0,
+            0,
+            1672,
+            941
+          ],
+          "parent": "fixed"
+        },
+        {
+          "id": "종이_왼쪽",
+          "kind": "image",
+          "asset": "종이_왼쪽",
+          "rect": [
+            176,
+            52,
+            657,
+            832
+          ],
+          "parent": "left"
+        },
+        {
+          "id": "종이_오른쪽",
+          "kind": "image",
+          "asset": "종이_오른쪽",
+          "rect": [
+            838,
+            52,
+            637,
+            832
+          ],
+          "parent": "right"
+        },
+        {
+          "id": "책등_제본",
+          "kind": "image",
+          "asset": "책등_제본",
+          "rect": [
+            832,
+            52,
+            7,
+            832
+          ],
+          "parent": "fixed"
+        },
+        {
+          "id": "tab_0",
+          "kind": "image",
+          "asset": "색인_빈탭_1",
+          "rect": [
+            1477,
+            124,
+            143,
+            116
+          ],
+          "parent": "fixed"
+        },
+        {
+          "id": "tab_text_0",
+          "kind": "text",
+          "text": "이동",
+          "rect": [
+            1484,
+            151,
+            112,
+            55
+          ],
+          "font_size": 28,
+          "bold": true,
+          "align": "center",
+          "color": "#20201e",
+          "parent": "fixed"
+        },
+        {
+          "id": "tab_1",
+          "kind": "image",
+          "asset": "색인_빈탭_2",
+          "rect": [
+            1477,
+            245,
+            143,
+            109
+          ],
+          "parent": "fixed"
+        },
+        {
+          "id": "active_tab",
+          "kind": "image",
+          "asset": "색인_선택탭",
+          "rect": [
+            1480,
+            251,
+            124,
+            97
+          ],
+          "parent": "fixed"
+        },
+        {
+          "id": "tab_text_1",
+          "kind": "text",
+          "text": "시야",
+          "rect": [
+            1484,
+            272,
+            112,
+            55
+          ],
+          "font_size": 28,
+          "bold": true,
+          "align": "center",
+          "color": "#20201e",
+          "parent": "fixed"
+        },
+        {
+          "id": "tab_2",
+          "kind": "image",
+          "asset": "색인_빈탭_3",
+          "rect": [
+            1477,
+            357,
+            143,
+            111
+          ],
+          "parent": "fixed"
+        },
+        {
+          "id": "tab_text_2",
+          "kind": "text",
+          "text": "전투",
+          "rect": [
+            1484,
+            384,
+            112,
+            55
+          ],
+          "font_size": 28,
+          "bold": true,
+          "align": "center",
+          "color": "#20201e",
+          "parent": "fixed"
+        },
+        {
+          "id": "tab_3",
+          "kind": "image",
+          "asset": "색인_빈탭_4",
+          "rect": [
+            1477,
+            474,
+            143,
+            106
+          ],
+          "parent": "fixed"
+        },
+        {
+          "id": "tab_text_3",
+          "kind": "text",
+          "text": "침입",
+          "rect": [
+            1484,
+            501,
+            112,
+            55
+          ],
+          "font_size": 28,
+          "bold": true,
+          "align": "center",
+          "color": "#20201e",
+          "parent": "fixed"
+        },
+        {
+          "id": "left_title",
+          "kind": "text",
+          "text": "도깨비검 정찰",
+          "rect": [
+            238,
+            119,
+            550,
+            80
+          ],
+          "font_size": 53,
+          "bold": true,
+          "align": "left",
+          "color": "#20201e",
+          "parent": "left"
+        },
+        {
+          "id": "제목_청록붓선_14",
+          "kind": "image",
+          "asset": "제목_청록붓선",
+          "rect": [
+            236,
+            210,
+            548,
+            17
+          ],
+          "parent": "left"
+        },
+        {
+          "id": "right_title",
+          "kind": "text",
+          "text": "검 보내기와 회수",
+          "rect": [
+            904,
+            119,
+            550,
+            80
+          ],
+          "font_size": 53,
+          "bold": true,
+          "align": "left",
+          "color": "#20201e",
+          "parent": "right"
+        },
+        {
+          "id": "제목_청록붓선_16",
+          "kind": "image",
+          "asset": "제목_청록붓선",
+          "rect": [
+            902,
+            210,
+            548,
+            17
+          ],
+          "parent": "right"
+        },
+        {
+          "id": "close_button",
+          "kind": "image",
+          "asset": "닫기버튼_빈몸통",
+          "rect": [
+            1217,
+            774,
+            212,
+            80
+          ],
+          "parent": "fixed"
+        },
+        {
+          "id": "close_text",
+          "kind": "text",
+          "text": "수첩 덮기",
+          "rect": [
+            1217,
+            795,
+            212,
+            50
+          ],
+          "font_size": 25,
+          "bold": true,
+          "align": "center",
+          "color": "#e4dfd1",
+          "parent": "fixed"
+        },
+        {
+          "id": "intro",
+          "kind": "text",
+          "text": "검도 아군 시야를 제공합니다.",
+          "rect": [
+            248,
+            251,
+            535,
+            50
+          ],
+          "font_size": 27,
+          "bold": true,
+          "align": "left",
+          "color": "#20201e",
+          "parent": "left"
+        },
+        {
+          "id": "격자_한칸_20",
+          "kind": "image",
+          "asset": "격자_한칸",
+          "rect": [
+            252,
+            318,
+            76,
+            76
+          ],
+          "parent": "left"
+        },
+        {
+          "id": "격자_한칸_21",
+          "kind": "image",
+          "asset": "격자_한칸",
+          "rect": [
+            328,
+            318,
+            76,
+            76
+          ],
+          "parent": "left"
+        },
+        {
+          "id": "격자_한칸_22",
+          "kind": "image",
+          "asset": "격자_한칸",
+          "rect": [
+            404,
+            318,
+            76,
+            76
+          ],
+          "parent": "left"
+        },
+        {
+          "id": "격자_한칸_23",
+          "kind": "image",
+          "asset": "격자_한칸",
+          "rect": [
+            480,
+            318,
+            76,
+            76
+          ],
+          "parent": "left"
+        },
+        {
+          "id": "격자_한칸_24",
+          "kind": "image",
+          "asset": "격자_한칸",
+          "rect": [
+            556,
+            318,
+            76,
+            76
+          ],
+          "parent": "left"
+        },
+        {
+          "id": "격자_한칸_25",
+          "kind": "image",
+          "asset": "격자_한칸",
+          "rect": [
+            632,
+            318,
+            76,
+            76
+          ],
+          "parent": "left"
+        },
+        {
+          "id": "격자_한칸_26",
+          "kind": "image",
+          "asset": "격자_한칸",
+          "rect": [
+            708,
+            318,
+            76,
+            76
+          ],
+          "parent": "left"
+        },
+        {
+          "id": "격자_한칸_27",
+          "kind": "image",
+          "asset": "격자_한칸",
+          "rect": [
+            252,
+            394,
+            76,
+            76
+          ],
+          "parent": "left"
+        },
+        {
+          "id": "격자_한칸_28",
+          "kind": "image",
+          "asset": "격자_한칸",
+          "rect": [
+            328,
+            394,
+            76,
+            76
+          ],
+          "parent": "left"
+        },
+        {
+          "id": "격자_한칸_29",
+          "kind": "image",
+          "asset": "격자_한칸",
+          "rect": [
+            404,
+            394,
+            76,
+            76
+          ],
+          "parent": "left"
+        },
+        {
+          "id": "격자_한칸_30",
+          "kind": "image",
+          "asset": "격자_한칸",
+          "rect": [
+            480,
+            394,
+            76,
+            76
+          ],
+          "parent": "left"
+        },
+        {
+          "id": "격자_한칸_31",
+          "kind": "image",
+          "asset": "격자_한칸",
+          "rect": [
+            556,
+            394,
+            76,
+            76
+          ],
+          "parent": "left"
+        },
+        {
+          "id": "격자_한칸_32",
+          "kind": "image",
+          "asset": "격자_한칸",
+          "rect": [
+            632,
+            394,
+            76,
+            76
+          ],
+          "parent": "left"
+        },
+        {
+          "id": "격자_한칸_33",
+          "kind": "image",
+          "asset": "격자_한칸",
+          "rect": [
+            708,
+            394,
+            76,
+            76
+          ],
+          "parent": "left"
+        },
+        {
+          "id": "격자_한칸_34",
+          "kind": "image",
+          "asset": "격자_한칸",
+          "rect": [
+            252,
+            470,
+            76,
+            76
+          ],
+          "parent": "left"
+        },
+        {
+          "id": "격자_한칸_35",
+          "kind": "image",
+          "asset": "격자_한칸",
+          "rect": [
+            328,
+            470,
+            76,
+            76
+          ],
+          "parent": "left"
+        },
+        {
+          "id": "격자_한칸_36",
+          "kind": "image",
+          "asset": "격자_한칸",
+          "rect": [
+            404,
+            470,
+            76,
+            76
+          ],
+          "parent": "left"
+        },
+        {
+          "id": "격자_한칸_37",
+          "kind": "image",
+          "asset": "격자_한칸",
+          "rect": [
+            480,
+            470,
+            76,
+            76
+          ],
+          "parent": "left"
+        },
+        {
+          "id": "격자_한칸_38",
+          "kind": "image",
+          "asset": "격자_한칸",
+          "rect": [
+            556,
+            470,
+            76,
+            76
+          ],
+          "parent": "left"
+        },
+        {
+          "id": "격자_한칸_39",
+          "kind": "image",
+          "asset": "격자_한칸",
+          "rect": [
+            632,
+            470,
+            76,
+            76
+          ],
+          "parent": "left"
+        },
+        {
+          "id": "격자_한칸_40",
+          "kind": "image",
+          "asset": "격자_한칸",
+          "rect": [
+            708,
+            470,
+            76,
+            76
+          ],
+          "parent": "left"
+        },
+        {
+          "id": "격자_한칸_41",
+          "kind": "image",
+          "asset": "격자_한칸",
+          "rect": [
+            252,
+            546,
+            76,
+            76
+          ],
+          "parent": "left"
+        },
+        {
+          "id": "격자_한칸_42",
+          "kind": "image",
+          "asset": "격자_한칸",
+          "rect": [
+            328,
+            546,
+            76,
+            76
+          ],
+          "parent": "left"
+        },
+        {
+          "id": "격자_한칸_43",
+          "kind": "image",
+          "asset": "격자_한칸",
+          "rect": [
+            404,
+            546,
+            76,
+            76
+          ],
+          "parent": "left"
+        },
+        {
+          "id": "격자_한칸_44",
+          "kind": "image",
+          "asset": "격자_한칸",
+          "rect": [
+            480,
+            546,
+            76,
+            76
+          ],
+          "parent": "left"
+        },
+        {
+          "id": "격자_한칸_45",
+          "kind": "image",
+          "asset": "격자_한칸",
+          "rect": [
+            556,
+            546,
+            76,
+            76
+          ],
+          "parent": "left"
+        },
+        {
+          "id": "격자_한칸_46",
+          "kind": "image",
+          "asset": "격자_한칸",
+          "rect": [
+            632,
+            546,
+            76,
+            76
+          ],
+          "parent": "left"
+        },
+        {
+          "id": "격자_한칸_47",
+          "kind": "image",
+          "asset": "격자_한칸",
+          "rect": [
+            708,
+            546,
+            76,
+            76
+          ],
+          "parent": "left"
+        },
+        {
+          "id": "격자_외곽_48",
+          "kind": "image",
+          "asset": "격자_외곽",
+          "rect": [
+            252,
+            318,
+            532,
+            304
+          ],
+          "parent": "left"
+        },
+        {
+          "id": "검_시야_영역_49",
+          "kind": "image",
+          "asset": "검_시야_영역",
+          "rect": [
+            540,
+            330,
+            241,
+            225
+          ],
+          "parent": "left"
+        },
+        {
+          "id": "벽_한구간_50",
+          "kind": "image",
+          "asset": "벽_한구간",
+          "rect": [
+            253,
+            398,
+            219,
+            48
+          ],
+          "parent": "left"
+        },
+        {
+          "id": "벽_한구간_51",
+          "kind": "image",
+          "asset": "벽_한구간",
+          "rect": [
+            487,
+            319,
+            48,
+            98
+          ],
+          "parent": "left"
+        },
+        {
+          "id": "유진_표식_52",
+          "kind": "image",
+          "asset": "유진_표식",
+          "rect": [
+            285,
+            526,
+            36,
+            48
+          ],
+          "parent": "left"
+        },
+        {
+          "id": "아군_선택링_53",
+          "kind": "image",
+          "asset": "아군_선택링",
+          "rect": [
+            278,
+            520,
+            50,
+            57
+          ],
+          "parent": "left"
+        },
+        {
+          "id": "점선_코너_청록_54",
+          "kind": "image",
+          "asset": "점선_코너_청록",
+          "rect": [
+            337,
+            468,
+            159,
+            85
+          ],
+          "parent": "left"
+        },
+        {
+          "id": "화살촉_청록_55",
+          "kind": "image",
+          "asset": "화살촉_청록",
+          "rect": [
+            481,
+            461,
+            22,
+            25
+          ],
+          "parent": "left",
+          "angle": -90
+        },
+        {
+          "id": "도깨비검_56",
+          "kind": "image",
+          "asset": "도깨비검",
+          "rect": [
+            526,
+            424,
+            22,
+            60
+          ],
+          "parent": "left"
+        },
+        {
+          "id": "적_표식_57",
+          "kind": "image",
+          "asset": "적_표식",
+          "rect": [
+            695,
+            409,
+            39,
+            53
+          ],
+          "parent": "left"
+        },
+        {
+          "id": "label_유진",
+          "kind": "text",
+          "text": "유진",
+          "rect": [
+            268,
+            586,
+            82,
+            40
+          ],
+          "font_size": 23,
+          "bold": true,
+          "align": "center",
+          "color": "#20201e",
+          "parent": "left"
+        },
+        {
+          "id": "label_도깨비검",
+          "kind": "text",
+          "text": "도깨비검",
+          "rect": [
+            492,
+            490,
+            100,
+            40
+          ],
+          "font_size": 23,
+          "bold": true,
+          "align": "center",
+          "color": "#20201e",
+          "parent": "left"
+        },
+        {
+          "id": "label_발견한 적",
+          "kind": "text",
+          "text": "발견한 적",
+          "rect": [
+            671,
+            474,
+            108,
+            40
+          ],
+          "font_size": 23,
+          "bold": true,
+          "align": "center",
+          "color": "#20201e",
+          "parent": "left"
+        },
+        {
+          "id": "key",
+          "kind": "text",
+          "text": "검을 보내 먼저 확인합니다.",
+          "rect": [
+            253,
+            659,
+            550,
+            59
+          ],
+          "font_size": 36,
+          "bold": true,
+          "align": "left",
+          "color": "#20201e",
+          "parent": "left"
+        },
+        {
+          "id": "메모박스_빈몸통_62",
+          "kind": "image",
+          "asset": "메모박스_빈몸통",
+          "rect": [
+            243,
+            736,
+            545,
+            104
+          ],
+          "parent": "left"
+        },
+        {
+          "id": "안내기호_원_63",
+          "kind": "image",
+          "asset": "안내기호_원",
+          "rect": [
+            265,
+            761.0,
+            54,
+            54
+          ],
+          "parent": "left"
+        },
+        {
+          "id": "left_note_mark_736",
+          "kind": "text",
+          "text": "!",
+          "rect": [
+            265,
+            759.0,
+            54,
+            55
+          ],
+          "font_size": 38,
+          "bold": true,
+          "align": "center",
+          "color": "#eee9dd",
+          "parent": "left"
+        },
+        {
+          "id": "left_note_736",
+          "kind": "text",
+          "text": "적에게 너무 가까이 보내면\n기척을 들킬 수 있습니다.",
+          "rect": [
+            340,
+            758,
+            424,
+            77
+          ],
+          "font_size": 25,
+          "bold": true,
+          "align": "left",
+          "color": "#20201e",
+          "parent": "left"
+        },
+        {
+          "id": "단계번호_원_66",
+          "kind": "image",
+          "asset": "단계번호_원",
+          "rect": [
+            901,
+            267,
+            58,
+            58
+          ],
+          "parent": "right"
+        },
+        {
+          "id": "step_number_1",
+          "kind": "text",
+          "text": "1",
+          "rect": [
+            901,
+            274,
+            58,
+            45
+          ],
+          "font_size": 33,
+          "bold": true,
+          "align": "center",
+          "color": "#eee9dd",
+          "parent": "right"
+        },
+        {
+          "id": "step_1",
+          "kind": "text",
+          "text": "검 투척 버튼을 누른다.",
+          "rect": [
+            984,
+            275,
+            443,
+            72
+          ],
+          "font_size": 27,
+          "bold": true,
+          "align": "left",
+          "color": "#20201e",
+          "parent": "right"
+        },
+        {
+          "id": "단계번호_원_69",
+          "kind": "image",
+          "asset": "단계번호_원",
+          "rect": [
+            901,
+            353,
+            58,
+            58
+          ],
+          "parent": "right"
+        },
+        {
+          "id": "step_number_2",
+          "kind": "text",
+          "text": "2",
+          "rect": [
+            901,
+            360,
+            58,
+            45
+          ],
+          "font_size": 33,
+          "bold": true,
+          "align": "center",
+          "color": "#eee9dd",
+          "parent": "right"
+        },
+        {
+          "id": "step_2",
+          "kind": "text",
+          "text": "정찰할 칸을 선택한다.",
+          "rect": [
+            984,
+            361,
+            443,
+            72
+          ],
+          "font_size": 27,
+          "bold": true,
+          "align": "left",
+          "color": "#20201e",
+          "parent": "right"
+        },
+        {
+          "id": "단계번호_원_72",
+          "kind": "image",
+          "asset": "단계번호_원",
+          "rect": [
+            901,
+            439,
+            58,
+            58
+          ],
+          "parent": "right"
+        },
+        {
+          "id": "step_number_3",
+          "kind": "text",
+          "text": "3",
+          "rect": [
+            901,
+            446,
+            58,
+            45
+          ],
+          "font_size": 33,
+          "bold": true,
+          "align": "center",
+          "color": "#eee9dd",
+          "parent": "right"
+        },
+        {
+          "id": "step_3",
+          "kind": "text",
+          "text": "검 회수 버튼으로 돌려받는다.",
+          "rect": [
+            984,
+            447,
+            443,
+            72
+          ],
+          "font_size": 27,
+          "bold": true,
+          "align": "left",
+          "color": "#20201e",
+          "parent": "right"
+        },
+        {
+          "id": "유진_표식_75",
+          "kind": "image",
+          "asset": "유진_표식",
+          "rect": [
+            909,
+            552,
+            34,
+            49
+          ],
+          "parent": "right"
+        },
+        {
+          "id": "아군_선택링_76",
+          "kind": "image",
+          "asset": "아군_선택링",
+          "rect": [
+            898,
+            544,
+            57,
+            63
+          ],
+          "parent": "right"
+        },
+        {
+          "id": "도깨비검_77",
+          "kind": "image",
+          "asset": "도깨비검",
+          "rect": [
+            1178,
+            543,
+            22,
+            63
+          ],
+          "parent": "right"
+        },
+        {
+          "id": "선_청록_78",
+          "kind": "image",
+          "asset": "선_청록",
+          "rect": [
+            973,
+            556,
+            170,
+            10
+          ],
+          "parent": "right",
+          "angle": 0
+        },
+        {
+          "id": "화살촉_청록_79",
+          "kind": "image",
+          "asset": "화살촉_청록",
+          "rect": [
+            1139,
+            545,
+            26,
+            32
+          ],
+          "parent": "right",
+          "angle": 0
+        },
+        {
+          "id": "선_청록_80",
+          "kind": "image",
+          "asset": "선_청록",
+          "rect": [
+            973,
+            593,
+            170,
+            9
+          ],
+          "parent": "right"
+        },
+        {
+          "id": "화살촉_청록_81",
+          "kind": "image",
+          "asset": "화살촉_청록",
+          "rect": [
+            962,
+            582,
+            27,
+            30
+          ],
+          "parent": "right",
+          "angle": 180
+        },
+        {
+          "id": "sword_cost",
+          "kind": "text",
+          "text": "검 이동 · 1 AP\n검 회수 · 1 AP",
+          "rect": [
+            1232,
+            539,
+            200,
+            85
+          ],
+          "font_size": 26,
+          "bold": true,
+          "align": "left",
+          "color": "#20201e",
+          "parent": "right"
+        },
+        {
+          "id": "메모박스_빈몸통_83",
+          "kind": "image",
+          "asset": "메모박스_빈몸통",
+          "rect": [
+            895,
+            655,
+            545,
+            109
+          ],
+          "parent": "right"
+        },
+        {
+          "id": "안내기호_원_84",
+          "kind": "image",
+          "asset": "안내기호_원",
+          "rect": [
+            917,
+            682.5,
+            54,
+            54
+          ],
+          "parent": "right"
+        },
+        {
+          "id": "right_note_mark_655",
+          "kind": "text",
+          "text": "!",
+          "rect": [
+            917,
+            680.5,
+            54,
+            55
+          ],
+          "font_size": 38,
+          "bold": true,
+          "align": "center",
+          "color": "#eee9dd",
+          "parent": "right"
+        },
+        {
+          "id": "right_note_655",
+          "kind": "text",
+          "text": "배치된 검에서 다시 이동할 수 있습니다.\n검이 떨어져 있으면 근접 공격은 맨손입니다.",
+          "rect": [
+            992,
+            677,
+            424,
+            82
+          ],
+          "font_size": 21,
+          "bold": true,
+          "align": "left",
+          "color": "#20201e",
+          "parent": "right"
+        }
+      ]
+    },
+    {
+      "id": "05",
+      "title": "전산 침입",
+      "canvas": [
+        1672,
+        941
+      ],
+      "active_tab": "침입",
+      "parents": {
+        "fixed": "표지와 색인, 버튼은 종이와 분리",
+        "left": "왼쪽 종이 내용",
+        "right": "오른쪽 종이 내용"
+      },
+      "layers": [
+        {
+          "id": "fixed_cover",
+          "kind": "image",
+          "asset": "표지_종이단면",
+          "rect": [
+            0,
+            0,
+            1672,
+            941
+          ],
+          "parent": "fixed"
+        },
+        {
+          "id": "종이_왼쪽",
+          "kind": "image",
+          "asset": "종이_왼쪽",
+          "rect": [
+            176,
+            52,
+            657,
+            832
+          ],
+          "parent": "left"
+        },
+        {
+          "id": "종이_오른쪽",
+          "kind": "image",
+          "asset": "종이_오른쪽",
+          "rect": [
+            838,
+            52,
+            637,
+            832
+          ],
+          "parent": "right"
+        },
+        {
+          "id": "책등_제본",
+          "kind": "image",
+          "asset": "책등_제본",
+          "rect": [
+            832,
+            52,
+            7,
+            832
+          ],
+          "parent": "fixed"
+        },
+        {
+          "id": "tab_0",
+          "kind": "image",
+          "asset": "색인_빈탭_1",
+          "rect": [
+            1477,
+            124,
+            143,
+            116
+          ],
+          "parent": "fixed"
+        },
+        {
+          "id": "tab_text_0",
+          "kind": "text",
+          "text": "이동",
+          "rect": [
+            1484,
+            151,
+            112,
+            55
+          ],
+          "font_size": 28,
+          "bold": true,
+          "align": "center",
+          "color": "#20201e",
+          "parent": "fixed"
+        },
+        {
+          "id": "tab_1",
+          "kind": "image",
+          "asset": "색인_빈탭_2",
+          "rect": [
+            1477,
+            245,
+            143,
+            109
+          ],
+          "parent": "fixed"
+        },
+        {
+          "id": "tab_text_1",
+          "kind": "text",
+          "text": "시야",
+          "rect": [
+            1484,
+            272,
+            112,
+            55
+          ],
+          "font_size": 28,
+          "bold": true,
+          "align": "center",
+          "color": "#20201e",
+          "parent": "fixed"
+        },
+        {
+          "id": "tab_2",
+          "kind": "image",
+          "asset": "색인_빈탭_3",
+          "rect": [
+            1477,
+            357,
+            143,
+            111
+          ],
+          "parent": "fixed"
+        },
+        {
+          "id": "tab_text_2",
+          "kind": "text",
+          "text": "전투",
+          "rect": [
+            1484,
+            384,
+            112,
+            55
+          ],
+          "font_size": 28,
+          "bold": true,
+          "align": "center",
+          "color": "#20201e",
+          "parent": "fixed"
+        },
+        {
+          "id": "tab_3",
+          "kind": "image",
+          "asset": "색인_빈탭_4",
+          "rect": [
+            1477,
+            474,
+            143,
+            106
+          ],
+          "parent": "fixed"
+        },
+        {
+          "id": "active_tab",
+          "kind": "image",
+          "asset": "색인_선택탭",
+          "rect": [
+            1480,
+            480,
+            124,
+            94
+          ],
+          "parent": "fixed"
+        },
+        {
+          "id": "tab_text_3",
+          "kind": "text",
+          "text": "침입",
+          "rect": [
+            1484,
+            501,
+            112,
+            55
+          ],
+          "font_size": 28,
+          "bold": true,
+          "align": "center",
+          "color": "#20201e",
+          "parent": "fixed"
+        },
+        {
+          "id": "left_title",
+          "kind": "text",
+          "text": "전산 침입",
+          "rect": [
+            238,
+            119,
+            550,
+            80
+          ],
+          "font_size": 53,
+          "bold": true,
+          "align": "left",
+          "color": "#20201e",
+          "parent": "left"
+        },
+        {
+          "id": "제목_청록붓선_14",
+          "kind": "image",
+          "asset": "제목_청록붓선",
+          "rect": [
+            236,
+            210,
+            548,
+            17
+          ],
+          "parent": "left"
+        },
+        {
+          "id": "right_title",
+          "kind": "text",
+          "text": "보안문 여는 법",
+          "rect": [
+            904,
+            119,
+            550,
+            80
+          ],
+          "font_size": 53,
+          "bold": true,
+          "align": "left",
+          "color": "#20201e",
+          "parent": "right"
+        },
+        {
+          "id": "제목_청록붓선_16",
+          "kind": "image",
+          "asset": "제목_청록붓선",
+          "rect": [
+            902,
+            210,
+            548,
+            17
+          ],
+          "parent": "right"
+        },
+        {
+          "id": "close_button",
+          "kind": "image",
+          "asset": "닫기버튼_빈몸통",
+          "rect": [
+            1217,
+            774,
+            212,
+            80
+          ],
+          "parent": "fixed"
+        },
+        {
+          "id": "close_text",
+          "kind": "text",
+          "text": "수첩 덮기",
+          "rect": [
+            1217,
+            795,
+            212,
+            50
+          ],
+          "font_size": 25,
+          "bold": true,
+          "align": "center",
+          "color": "#e4dfd1",
+          "parent": "fixed"
+        },
+        {
+          "id": "intro",
+          "kind": "text",
+          "text": "금두꺼비로 설비의 잠금을 해제합니다.",
+          "rect": [
+            248,
+            252,
+            548,
+            46
+          ],
+          "font_size": 27,
+          "bold": true,
+          "align": "left",
+          "color": "#20201e",
+          "parent": "left"
+        },
+        {
+          "id": "터미널_20",
+          "kind": "image",
+          "asset": "터미널",
+          "rect": [
+            275,
+            326,
+            172,
+            163
+          ],
+          "parent": "left",
+          "fit": "contain"
+        },
+        {
+          "id": "보안문_닫힘_21",
+          "kind": "image",
+          "asset": "보안문_닫힘",
+          "rect": [
+            607,
+            319,
+            151,
+            169
+          ],
+          "parent": "left",
+          "fit": "contain"
+        },
+        {
+          "id": "설비_연결선_22",
+          "kind": "image",
+          "asset": "설비_연결선",
+          "rect": [
+            457,
+            397,
+            127,
+            14
+          ],
+          "parent": "left"
+        },
+        {
+          "id": "terminal_label",
+          "kind": "text",
+          "text": "터미널",
+          "rect": [
+            275,
+            497,
+            172,
+            43
+          ],
+          "font_size": 29,
+          "bold": true,
+          "align": "center",
+          "color": "#20201e",
+          "parent": "left"
+        },
+        {
+          "id": "door_label",
+          "kind": "text",
+          "text": "보안문",
+          "rect": [
+            607,
+            497,
+            151,
+            43
+          ],
+          "font_size": 29,
+          "bold": true,
+          "align": "center",
+          "color": "#20201e",
+          "parent": "left"
+        },
+        {
+          "id": "보안문_닫힘_25",
+          "kind": "image",
+          "asset": "보안문_닫힘",
+          "rect": [
+            277,
+            555,
+            152,
+            161
+          ],
+          "parent": "left",
+          "fit": "contain"
+        },
+        {
+          "id": "자물쇠_26",
+          "kind": "image",
+          "asset": "자물쇠",
+          "rect": [
+            333,
+            612,
+            44,
+            55
+          ],
+          "parent": "left",
+          "fit": "contain"
+        },
+        {
+          "id": "선_청록_27",
+          "kind": "image",
+          "asset": "선_청록",
+          "rect": [
+            466,
+            622,
+            88,
+            10
+          ],
+          "parent": "left",
+          "angle": 0
+        },
+        {
+          "id": "화살촉_청록_28",
+          "kind": "image",
+          "asset": "화살촉_청록",
+          "rect": [
+            550,
+            611,
+            26,
+            32
+          ],
+          "parent": "left",
+          "angle": 0
+        },
+        {
+          "id": "connect_label",
+          "kind": "text",
+          "text": "접속",
+          "rect": [
+            461,
+            577,
+            110,
+            40
+          ],
+          "font_size": 27,
+          "bold": true,
+          "align": "center",
+          "color": "#20201e",
+          "parent": "left"
+        },
+        {
+          "id": "보안문_열림_30",
+          "kind": "image",
+          "asset": "보안문_열림",
+          "rect": [
+            610,
+            555,
+            154,
+            161
+          ],
+          "parent": "left",
+          "fit": "contain"
+        },
+        {
+          "id": "locked",
+          "kind": "text",
+          "text": "잠김",
+          "rect": [
+            277,
+            724,
+            152,
+            44
+          ],
+          "font_size": 28,
+          "bold": true,
+          "align": "center",
+          "color": "#20201e",
+          "parent": "left"
+        },
+        {
+          "id": "opened",
+          "kind": "text",
+          "text": "개방",
+          "rect": [
+            610,
+            724,
+            154,
+            44
+          ],
+          "font_size": 28,
+          "bold": true,
+          "align": "center",
+          "color": "#20201e",
+          "parent": "left"
+        },
+        {
+          "id": "key",
+          "kind": "text",
+          "text": "터미널 접속 = 보안문 개방",
+          "rect": [
+            250,
+            785,
+            560,
+            53
+          ],
+          "font_size": 34,
+          "bold": true,
+          "align": "left",
+          "color": "#20201e",
+          "parent": "left"
+        },
+        {
+          "id": "stage_note",
+          "kind": "text",
+          "text": "1-1에서는 보안문을 열어 승강기로 이동합니다.",
+          "rect": [
+            248,
+            833,
+            565,
+            31
+          ],
+          "font_size": 22,
+          "bold": false,
+          "align": "left",
+          "color": "#20201e",
+          "parent": "left"
+        },
+        {
+          "id": "단계번호_원_35",
+          "kind": "image",
+          "asset": "단계번호_원",
+          "rect": [
+            901,
+            272,
+            58,
+            58
+          ],
+          "parent": "right"
+        },
+        {
+          "id": "step_number_1",
+          "kind": "text",
+          "text": "1",
+          "rect": [
+            901,
+            279,
+            58,
+            45
+          ],
+          "font_size": 33,
+          "bold": true,
+          "align": "center",
+          "color": "#eee9dd",
+          "parent": "right"
+        },
+        {
+          "id": "step_1",
+          "kind": "text",
+          "text": "해킹 버튼을 누른다.",
+          "rect": [
+            984,
+            280,
+            443,
+            72
+          ],
+          "font_size": 27,
+          "bold": true,
+          "align": "left",
+          "color": "#20201e",
+          "parent": "right"
+        },
+        {
+          "id": "단계번호_원_38",
+          "kind": "image",
+          "asset": "단계번호_원",
+          "rect": [
+            901,
+            361,
+            58,
+            58
+          ],
+          "parent": "right"
+        },
+        {
+          "id": "step_number_2",
+          "kind": "text",
+          "text": "2",
+          "rect": [
+            901,
+            368,
+            58,
+            45
+          ],
+          "font_size": 33,
+          "bold": true,
+          "align": "center",
+          "color": "#eee9dd",
+          "parent": "right"
+        },
+        {
+          "id": "step_2",
+          "kind": "text",
+          "text": "강조된 터미널을 선택한다.",
+          "rect": [
+            984,
+            369,
+            443,
+            72
+          ],
+          "font_size": 27,
+          "bold": true,
+          "align": "left",
+          "color": "#20201e",
+          "parent": "right"
+        },
+        {
+          "id": "단계번호_원_41",
+          "kind": "image",
+          "asset": "단계번호_원",
+          "rect": [
+            901,
+            450,
+            58,
+            58
+          ],
+          "parent": "right"
+        },
+        {
+          "id": "step_number_3",
+          "kind": "text",
+          "text": "3",
+          "rect": [
+            901,
+            457,
+            58,
+            45
+          ],
+          "font_size": 33,
+          "bold": true,
+          "align": "center",
+          "color": "#eee9dd",
+          "parent": "right"
+        },
+        {
+          "id": "step_3",
+          "kind": "text",
+          "text": "열린 보안문을 지나간다.",
+          "rect": [
+            984,
+            458,
+            443,
+            72
+          ],
+          "font_size": 27,
+          "bold": true,
+          "align": "left",
+          "color": "#20201e",
+          "parent": "right"
+        },
+        {
+          "id": "제목_청록붓선_44",
+          "kind": "image",
+          "asset": "제목_청록붓선",
+          "rect": [
+            900,
+            553,
+            537,
+            65
+          ],
+          "parent": "right"
+        },
+        {
+          "id": "hack_cost",
+          "kind": "text",
+          "text": "접속 비용 · 1 AP",
+          "rect": [
+            921,
+            560,
+            497,
+            54
+          ],
+          "font_size": 39,
+          "bold": true,
+          "align": "center",
+          "color": "#20201e",
+          "parent": "right"
+        },
+        {
+          "id": "메모박스_빈몸통_46",
+          "kind": "image",
+          "asset": "메모박스_빈몸통",
+          "rect": [
+            895,
+            636,
+            545,
+            112
+          ],
+          "parent": "right"
+        },
+        {
+          "id": "안내기호_원_47",
+          "kind": "image",
+          "asset": "안내기호_원",
+          "rect": [
+            917,
+            665.0,
+            54,
+            54
+          ],
+          "parent": "right"
+        },
+        {
+          "id": "right_note_mark_636",
+          "kind": "text",
+          "text": "!",
+          "rect": [
+            917,
+            663.0,
+            54,
+            55
+          ],
+          "font_size": 38,
+          "bold": true,
+          "align": "center",
+          "color": "#eee9dd",
+          "parent": "right"
+        },
+        {
+          "id": "right_note_636",
+          "kind": "text",
+          "text": "터미널은 아군 시야와 접속 사거리\n안에 있어야 합니다.",
+          "rect": [
+            992,
+            658,
+            424,
+            85
+          ],
+          "font_size": 25,
+          "bold": true,
+          "align": "left",
+          "color": "#20201e",
+          "parent": "right"
+        },
+        {
+          "id": "blocked",
+          "kind": "text",
+          "text": "접속할 수 없으면 위치와 남은 AP를 확인하세요.",
+          "rect": [
+            903,
+            841,
+            526,
+            28
+          ],
+          "font_size": 20,
+          "bold": false,
+          "align": "left",
+          "color": "#20201e",
+          "parent": "right"
+        }
+      ]
+    },
+    {
+      "01": {
+        "tab_text_0": "이동",
+        "tab_text_1": "시야",
+        "tab_text_2": "전투",
+        "tab_text_3": "침입",
+        "left_title": "이동과 행동력",
+        "right_title": "골목을 이동하는 법",
+        "close_text": "수첩 덮기",
+        "intro": "이동 거리 3칸마다 행동력(AP) 1을 사용합니다.\n시작 칸은 이동 거리에 포함하지 않습니다.",
+        "distance_0": "시작",
+        "distance_1": "1칸",
+        "distance_2": "2칸",
+        "distance_3": "3칸",
+        "movement_cost": "3칸 이동 = 1 AP",
+        "ap_use": "행동력 사용",
+        "step_number_1": "1",
+        "step_1": "이동 버튼을 누른다.",
+        "step_number_2": "2",
+        "step_2": "이동할 칸을 선택한다.",
+        "step_number_3": "3",
+        "step_3": "이동 경로 3칸마다 1 AP를\n사용한다.",
+        "right_note_mark_610": "!",
+        "right_note_610": "AP는 행동력입니다.\n행동력이 부족하면 턴을 종료하세요."
+      },
+      "02": {
+        "tab_text_0": "이동",
+        "tab_text_1": "시야",
+        "tab_text_2": "전투",
+        "tab_text_3": "침입",
+        "left_title": "시야와 순찰",
+        "right_title": "코너 너머를 살피기",
+        "close_text": "수첩 덮기",
+        "intro": "보이지 않는다고 사라진 것은 아닙니다.",
+        "before_label": "발견",
+        "enemy_unknown": "?",
+        "after_label": "시야 밖",
+        "key": "적은 시야 밖에서도 움직입니다.",
+        "unknown": "보이지 않는 공간에는 적이 있을 수 있습니다.",
+        "step_number_1": "1",
+        "step_1": "코너로 이동해 주변을 확인한다.",
+        "step_number_2": "2",
+        "step_2": "턴 종료 후 적의 순찰을 살핀다.",
+        "step_number_3": "3",
+        "step_3": "보이지 않는 길은 검으로 정찰한다.",
+        "right_note_mark_607": "!",
+        "right_note_607": "마지막으로 본 위치에 적이\n남아 있다고 단정하지 마세요."
+      },
+      "03": {
+        "tab_text_0": "이동",
+        "tab_text_1": "시야",
+        "tab_text_2": "전투",
+        "tab_text_3": "침입",
+        "left_title": "엄폐와 전투",
+        "right_title": "공격 수단 고르기",
+        "close_text": "수첩 덮기",
+        "attack_dir": "공격 방향",
+        "label_유진": "유진",
+        "label_엄폐물": "엄폐물",
+        "label_적": "적",
+        "cover_rule": "엄폐는 공격 방향에 따라 효과가 달라집니다.\n피격 가능성을 낮추지만 완전히 막지는 않습니다.",
+        "flow_아군 턴": "아군 턴",
+        "flow_턴 종료": "턴 종료",
+        "flow_적 턴": "적 턴",
+        "권총_title": "총격 · 1 AP / 탄약 1발",
+        "권총_body": "원거리에서 적을 공격합니다.",
+        "검_근접아이콘_title": "검 근접 · 1 AP",
+        "검_근접아이콘_body": "주변 8칸의 적을 공격합니다.",
+        "주먹_title": "맨손 근접 · 1 AP",
+        "주먹_body": "검이 떨어져 있으면 맨손입니다.",
+        "right_note_mark_667": "!",
+        "right_note_667": "엄폐와 상황에 따라\n명중 여부가 달라집니다.",
+        "fixed_results": "튜토리얼 일부 공격은 학습용으로 결과가 고정됩니다."
+      },
+      "04": {
+        "tab_text_0": "이동",
+        "tab_text_1": "시야",
+        "tab_text_2": "전투",
+        "tab_text_3": "침입",
+        "left_title": "도깨비검 정찰",
+        "right_title": "검 보내기와 회수",
+        "close_text": "수첩 덮기",
+        "intro": "검도 아군 시야를 제공합니다.",
+        "label_유진": "유진",
+        "label_도깨비검": "도깨비검",
+        "label_발견한 적": "발견한 적",
+        "key": "검을 보내 먼저 확인합니다.",
+        "left_note_mark_736": "!",
+        "left_note_736": "적에게 너무 가까이 보내면\n기척을 들킬 수 있습니다.",
+        "step_number_1": "1",
+        "step_1": "검 투척 버튼을 누른다.",
+        "step_number_2": "2",
+        "step_2": "정찰할 칸을 선택한다.",
+        "step_number_3": "3",
+        "step_3": "검 회수 버튼으로 돌려받는다.",
+        "sword_cost": "검 이동 · 1 AP\n검 회수 · 1 AP",
+        "right_note_mark_655": "!",
+        "right_note_655": "배치된 검에서 다시 이동할 수 있습니다.\n검이 떨어져 있으면 근접 공격은 맨손입니다."
+      },
+      "05": {
+        "tab_text_0": "이동",
+        "tab_text_1": "시야",
+        "tab_text_2": "전투",
+        "tab_text_3": "침입",
+        "left_title": "전산 침입",
+        "right_title": "보안문 여는 법",
+        "close_text": "수첩 덮기",
+        "intro": "금두꺼비로 설비의 잠금을 해제합니다.",
+        "terminal_label": "터미널",
+        "door_label": "보안문",
+        "connect_label": "접속",
+        "locked": "잠김",
+        "opened": "개방",
+        "key": "터미널 접속 = 보안문 개방",
+        "stage_note": "1-1에서는 보안문을 열어 승강기로 이동합니다.",
+        "step_number_1": "1",
+        "step_1": "해킹 버튼을 누른다.",
+        "step_number_2": "2",
+        "step_2": "강조된 터미널을 선택한다.",
+        "step_number_3": "3",
+        "step_3": "열린 보안문을 지나간다.",
+        "hack_cost": "접속 비용 · 1 AP",
+        "right_note_mark_636": "!",
+        "right_note_636": "터미널은 아군 시야와 접속 사거리\n안에 있어야 합니다.",
+        "blocked": "접속할 수 없으면 위치와 남은 AP를 확인하세요."
+      }
+    }
+  ],
+  "assets": [
+    {
+      "key": "종이_왼쪽",
+      "file": "Assets/Art/UI/BattleManual/종이_왼쪽.png"
+    },
+    {
+      "key": "종이_오른쪽",
+      "file": "Assets/Art/UI/BattleManual/종이_오른쪽.png"
+    },
+    {
+      "key": "책등_제본",
+      "file": "Assets/Art/UI/BattleManual/책등_제본.png"
+    },
+    {
+      "key": "색인_빈탭_1",
+      "file": "Assets/Art/UI/BattleManual/색인_빈탭_1.png"
+    },
+    {
+      "key": "색인_빈탭_2",
+      "file": "Assets/Art/UI/BattleManual/색인_빈탭_2.png"
+    },
+    {
+      "key": "색인_빈탭_3",
+      "file": "Assets/Art/UI/BattleManual/색인_빈탭_3.png"
+    },
+    {
+      "key": "색인_빈탭_4",
+      "file": "Assets/Art/UI/BattleManual/색인_빈탭_4.png"
+    },
+    {
+      "key": "표지_종이단면",
+      "file": "Assets/Art/UI/BattleManual/표지_종이단면.png"
+    },
+    {
+      "key": "닫힌표지",
+      "file": "Assets/Art/UI/BattleManual/닫힌표지.png"
+    },
+    {
+      "key": "넘김용_빈종이",
+      "file": "Assets/Art/UI/BattleManual/넘김용_빈종이.png"
+    },
+    {
+      "key": "터미널",
+      "file": "Assets/Art/UI/BattleManual/터미널.png"
+    },
+    {
+      "key": "보안문_닫힘",
+      "file": "Assets/Art/UI/BattleManual/보안문_닫힘.png"
+    },
+    {
+      "key": "보안문_열림",
+      "file": "Assets/Art/UI/BattleManual/보안문_열림.png"
+    },
+    {
+      "key": "상자",
+      "file": "Assets/Art/UI/BattleManual/상자.png"
+    },
+    {
+      "key": "드럼통",
+      "file": "Assets/Art/UI/BattleManual/드럼통.png"
+    },
+    {
+      "key": "자물쇠",
+      "file": "Assets/Art/UI/BattleManual/자물쇠.png"
+    },
+    {
+      "key": "닫기버튼_빈몸통",
+      "file": "Assets/Art/UI/BattleManual/닫기버튼_빈몸통.png"
+    },
+    {
+      "key": "메모박스_빈몸통",
+      "file": "Assets/Art/UI/BattleManual/메모박스_빈몸통.png"
+    },
+    {
+      "key": "제목_청록붓선",
+      "file": "Assets/Art/UI/BattleManual/제목_청록붓선.png"
+    },
+    {
+      "key": "색인_선택탭",
+      "file": "Assets/Art/UI/BattleManual/색인_선택탭.png"
+    },
+    {
+      "key": "단계번호_원",
+      "file": "Assets/Art/UI/BattleManual/단계번호_원.png"
+    },
+    {
+      "key": "안내기호_원",
+      "file": "Assets/Art/UI/BattleManual/안내기호_원.png"
+    },
+    {
+      "key": "유진_이동",
+      "file": "Assets/Art/UI/BattleManual/유진_이동.png"
+    },
+    {
+      "key": "유진_엄폐",
+      "file": "Assets/Art/UI/BattleManual/유진_엄폐.png"
+    },
+    {
+      "key": "적_총격",
+      "file": "Assets/Art/UI/BattleManual/적_총격.png"
+    },
+    {
+      "key": "권총",
+      "file": "Assets/Art/UI/BattleManual/권총.png"
+    },
+    {
+      "key": "도깨비검",
+      "file": "Assets/Art/UI/BattleManual/도깨비검.png"
+    },
+    {
+      "key": "검_근접아이콘",
+      "file": "Assets/Art/UI/BattleManual/검_근접아이콘.png"
+    },
+    {
+      "key": "주먹",
+      "file": "Assets/Art/UI/BattleManual/주먹.png"
+    },
+    {
+      "key": "유진_표식",
+      "file": "Assets/Art/UI/BattleManual/유진_표식.png"
+    },
+    {
+      "key": "적_표식",
+      "file": "Assets/Art/UI/BattleManual/적_표식.png"
+    },
+    {
+      "key": "적_순찰",
+      "file": "Assets/Art/UI/BattleManual/적_순찰.png"
+    },
+    {
+      "key": "격자_한칸",
+      "file": "Assets/Art/UI/BattleManual/격자_한칸.png"
+    },
+    {
+      "key": "격자_외곽",
+      "file": "Assets/Art/UI/BattleManual/격자_외곽.png"
+    },
+    {
+      "key": "이동_칸프레임",
+      "file": "Assets/Art/UI/BattleManual/이동_칸프레임.png"
+    },
+    {
+      "key": "AP_프레임",
+      "file": "Assets/Art/UI/BattleManual/AP_프레임.png"
+    },
+    {
+      "key": "AP_채움",
+      "file": "Assets/Art/UI/BattleManual/AP_채움.png"
+    },
+    {
+      "key": "AP_빈칸",
+      "file": "Assets/Art/UI/BattleManual/AP_빈칸.png"
+    },
+    {
+      "key": "아군_선택링",
+      "file": "Assets/Art/UI/BattleManual/아군_선택링.png"
+    },
+    {
+      "key": "목표_모서리",
+      "file": "Assets/Art/UI/BattleManual/목표_모서리.png"
+    },
+    {
+      "key": "선_청록",
+      "file": "Assets/Art/UI/BattleManual/선_청록.png"
+    },
+    {
+      "key": "점선_청록",
+      "file": "Assets/Art/UI/BattleManual/점선_청록.png"
+    },
+    {
+      "key": "화살촉_청록",
+      "file": "Assets/Art/UI/BattleManual/화살촉_청록.png"
+    },
+    {
+      "key": "선_적색",
+      "file": "Assets/Art/UI/BattleManual/선_적색.png"
+    },
+    {
+      "key": "점선_적색",
+      "file": "Assets/Art/UI/BattleManual/점선_적색.png"
+    },
+    {
+      "key": "화살촉_적색",
+      "file": "Assets/Art/UI/BattleManual/화살촉_적색.png"
+    },
+    {
+      "key": "선_먹색",
+      "file": "Assets/Art/UI/BattleManual/선_먹색.png"
+    },
+    {
+      "key": "점선_먹색",
+      "file": "Assets/Art/UI/BattleManual/점선_먹색.png"
+    },
+    {
+      "key": "화살촉_먹색",
+      "file": "Assets/Art/UI/BattleManual/화살촉_먹색.png"
+    },
+    {
+      "key": "점선_코너_청록",
+      "file": "Assets/Art/UI/BattleManual/점선_코너_청록.png"
+    },
+    {
+      "key": "설비_연결선",
+      "file": "Assets/Art/UI/BattleManual/설비_연결선.png"
+    },
+    {
+      "key": "시야_표시",
+      "file": "Assets/Art/UI/BattleManual/시야_표시.png"
+    },
+    {
+      "key": "시야밖_표시",
+      "file": "Assets/Art/UI/BattleManual/시야밖_표시.png"
+    },
+    {
+      "key": "검_시야_영역",
+      "file": "Assets/Art/UI/BattleManual/검_시야_영역.png"
+    },
+    {
+      "key": "벽_한구간",
+      "file": "Assets/Art/UI/BattleManual/벽_한구간.png"
+    },
+    {
+      "key": "배관_엄폐물",
+      "file": "Assets/Art/UI/BattleManual/배관_엄폐물.png"
+    },
+    {
+      "key": "아이콘_틀",
+      "file": "Assets/Art/UI/BattleManual/아이콘_틀.png"
+    },
+    {
+      "key": "흐름_상자",
+      "file": "Assets/Art/UI/BattleManual/흐름_상자.png"
+    },
+    {
+      "key": "접힘_그림자",
+      "file": "Assets/Art/UI/BattleManual/접힘_그림자.png"
+    }
+  ]
+}

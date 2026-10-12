@@ -9,6 +9,10 @@ public class DialogueBubblePresenter : MonoBehaviour
     [Header("Root")]
     [SerializeField] private RectTransform bubbleRoot;
 
+    // 말풍선이 사용할 카메라와 Canvas를 명시적으로 전달한다.
+    [SerializeField] private Camera worldCamera;
+    [SerializeField] private Canvas rootCanvas;
+
     private readonly List<SpeechBubbleView> activeBubbles = new();
     private readonly Stack<SpeechBubbleView> pooledBubbles = new();
 
@@ -31,10 +35,8 @@ public class DialogueBubblePresenter : MonoBehaviour
 
     private void Awake()
     {
-        if (bubbleRoot == null)
-        {
-            bubbleRoot = transform as RectTransform;
-        }
+        if (bubbleRoot == null || worldCamera == null || rootCanvas == null || speechBubblePrefab == null)
+        { Debug.LogError("말풍선 Presenter에 루트·Canvas·카메라·말풍선 참조가 필요합니다.", this); enabled = false; }
     }
 
     public bool ShowStep(DialogueStepData step, DialogueSpeaker[] speakers, string sequenceName)
@@ -72,6 +74,7 @@ public class DialogueBubblePresenter : MonoBehaviour
                 return false;
             }
 
+            bubble.Initialize(worldCamera, rootCanvas);
             bubble.Show(speaker.SpeechBubbleAnchor, line);
             activeBubbles.Add(bubble);
         }

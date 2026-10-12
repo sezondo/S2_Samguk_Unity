@@ -1,4 +1,4 @@
-﻿using System.Collections.Generic;
+using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.EventSystems;
 using UnityEngine.InputSystem;
@@ -33,6 +33,8 @@ public class CameraMouseZoom : MonoBehaviour
     /// <summary>휠 입력을 읽고 전투 연출 및 UI 조작과 겹치지 않을 때 줌을 변경한다.</summary>
     private void Update()
     {
+        if (BattleMenuController.BlocksInput) return;
+        if (BattleTutorialController.Instance != null && !BattleTutorialController.Instance.IsFreePlay) return;
         Mouse mouse = Mouse.current;
         if (mouse == null || !Application.isFocused ||
             !targetCamera.pixelRect.Contains(mouse.position.ReadValue()) ||

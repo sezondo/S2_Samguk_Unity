@@ -1,4 +1,4 @@
-﻿using UnityEngine;
+using UnityEngine;
 using UnityEngine.UI;
 
 /// <summary>
@@ -152,7 +152,9 @@ public sealed class BattleHudController : MonoBehaviour
     /// </summary>
     private static bool CanUseAction(TacticalUnitContext unit, BattleHudActionType actionType)
     {
-        if (unit == null || unit.UnitData == null || unit.ActionPoint == null)
+        if (BattleMenuController.BlocksInput) return false;
+        if ((BattleTutorialController.Instance != null && !BattleTutorialController.Instance.AllowsAction(actionType, unit)) ||
+            unit == null || unit.UnitData == null || unit.ActionPoint == null)
         {
             return false;
         }

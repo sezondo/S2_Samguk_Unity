@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections;
 using UnityEngine;
 using UnityEngine.InputSystem;
@@ -101,6 +101,7 @@ public class TurnManager : MonoBehaviour
     /// </summary>
     private void Update()
     {
+        if (BattleMenuController.BlocksInput) return;
         if (!stageStateManager.IsPlaying ||
             !allowKeyboardDebugEndTurn ||
             debugEndTurnKey == Key.None ||
@@ -121,6 +122,7 @@ public class TurnManager : MonoBehaviour
     /// </summary>
     public void EndCurrentTurn()
     {
+        if (CurrentSide == TurnSide.Player && BattleTutorialController.Instance != null && !BattleTutorialController.Instance.AllowsEndTurn) return;
         if (!CanProgressTurn("현재 턴을 종료"))
         {
             return;
@@ -178,6 +180,7 @@ public class TurnManager : MonoBehaviour
     /// </summary>
     private bool CanProgressTurn(string requestDescription)
     {
+        if (BattleMenuController.IsOpen) return false;
         if (!HasValidReference())
         {
             return false;

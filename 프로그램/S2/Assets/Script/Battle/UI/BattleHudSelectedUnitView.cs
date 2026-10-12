@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using TMPro;
 using UnityEngine;
@@ -109,6 +109,9 @@ public sealed class BattleHudSelectedUnitView : MonoBehaviour
             bool available = commonActionAvailable && canUseAction(boundUnit, button.ActionType);
             bool selected = isActionSelected(boundUnit, button.ActionType);
             button.SetState(available, selected, false);
+            // 상단 지시문 없이도 현재 단계에서 눌러야 할 버튼을 확인할 수 있게 한다.
+            var tutorial = BattleTutorialController.Instance;
+            button.SetTutorialHint(available && tutorial != null && !tutorial.IsFreePlay && tutorial.AllowsAction(button.ActionType, boundUnit));
         }
     }
 

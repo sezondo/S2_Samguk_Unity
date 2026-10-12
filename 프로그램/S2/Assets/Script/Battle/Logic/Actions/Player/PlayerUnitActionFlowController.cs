@@ -1,4 +1,4 @@
-﻿using UnityEngine;
+using UnityEngine;
 
 /// <summary>
 /// 플레이어 행동 하나의 논리 처리와 연출 큐 실행 시점을 조정한다.
@@ -69,7 +69,7 @@ public class PlayerUnitActionFlowController : MonoBehaviour
     /// </summary>
     public bool TryExecuteMove(GridPosition targetPosition)
     {
-        if (!CanStartAction())
+        if (!CanStartAction() || (BattleTutorialController.Instance != null && !BattleTutorialController.Instance.AllowsTarget(BattleHudActionType.Move, ActiveUnit, targetPosition)))
         {
             return false;
         }
@@ -82,6 +82,7 @@ public class PlayerUnitActionFlowController : MonoBehaviour
 
         resolutionContext.Resolve();
         presentationQueue.PlayQueuedEvents();
+        BattleTutorialController.Instance?.NotifyActionExecuted(BattleHudActionType.Move, targetPosition);
         return true;
     }
 
@@ -90,7 +91,7 @@ public class PlayerUnitActionFlowController : MonoBehaviour
     /// </summary>
     public bool TryExecuteHack(HackableObject target)
     {
-        if (!CanStartAction())
+        if (!CanStartAction() || (BattleTutorialController.Instance != null && !BattleTutorialController.Instance.AllowsTarget(BattleHudActionType.Hack, ActiveUnit, target != null ? target.GridPosition : GridPosition.Zero)))
         {
             return false;
         }
@@ -109,6 +110,7 @@ public class PlayerUnitActionFlowController : MonoBehaviour
 
         resolutionContext.Resolve();
         presentationQueue.PlayQueuedEvents();
+        BattleTutorialController.Instance?.NotifyActionExecuted(BattleHudActionType.Hack, target != null ? target.GridPosition : GridPosition.Zero);
         return true;
     }
 
@@ -117,7 +119,7 @@ public class PlayerUnitActionFlowController : MonoBehaviour
     /// </summary>
     public bool TryExecuteSwordThrow(GridPosition targetPosition)
     {
-        if (!CanStartAction())
+        if (!CanStartAction() || (BattleTutorialController.Instance != null && !BattleTutorialController.Instance.AllowsTarget(BattleHudActionType.SwordThrow, ActiveUnit, targetPosition)))
         {
             return false;
         }
@@ -136,6 +138,7 @@ public class PlayerUnitActionFlowController : MonoBehaviour
 
         resolutionContext.Resolve();
         presentationQueue.PlayQueuedEvents();
+        BattleTutorialController.Instance?.NotifyActionExecuted(BattleHudActionType.SwordThrow, targetPosition);
         return true;
     }
 
@@ -144,7 +147,7 @@ public class PlayerUnitActionFlowController : MonoBehaviour
     /// </summary>
     public bool TryExecuteSwordRecall()
     {
-        if (!CanStartAction())
+        if (!CanStartAction() || (BattleTutorialController.Instance != null && !BattleTutorialController.Instance.AllowsTarget(BattleHudActionType.SwordRecall, ActiveUnit, GridPosition.Zero)))
         {
             return false;
         }
@@ -163,6 +166,7 @@ public class PlayerUnitActionFlowController : MonoBehaviour
 
         resolutionContext.Resolve();
         presentationQueue.PlayQueuedEvents();
+        BattleTutorialController.Instance?.NotifyActionExecuted(BattleHudActionType.SwordRecall, GridPosition.Zero);
         return true;
     }
 
@@ -171,7 +175,7 @@ public class PlayerUnitActionFlowController : MonoBehaviour
     /// </summary>
     public bool TryExecuteMeleeAttack(GridPosition targetPosition)
     {
-        if (!CanStartAction())
+        if (!CanStartAction() || (BattleTutorialController.Instance != null && !BattleTutorialController.Instance.AllowsTarget(BattleHudActionType.Melee, ActiveUnit, targetPosition)))
         {
             return false;
         }
@@ -190,6 +194,7 @@ public class PlayerUnitActionFlowController : MonoBehaviour
 
         resolutionContext.Resolve();
         presentationQueue.PlayQueuedEvents();
+        BattleTutorialController.Instance?.NotifyActionExecuted(BattleHudActionType.Melee, targetPosition);
         return true;
     }
 
@@ -198,7 +203,7 @@ public class PlayerUnitActionFlowController : MonoBehaviour
     /// </summary>
     public bool TryExecuteGunAttack(GridPosition targetPosition)
     {
-        if (!CanStartAction())
+        if (!CanStartAction() || (BattleTutorialController.Instance != null && !BattleTutorialController.Instance.AllowsTarget(BattleHudActionType.Gun, ActiveUnit, targetPosition)))
         {
             return false;
         }
@@ -217,6 +222,7 @@ public class PlayerUnitActionFlowController : MonoBehaviour
 
         resolutionContext.Resolve();
         presentationQueue.PlayQueuedEvents();
+        BattleTutorialController.Instance?.NotifyActionExecuted(BattleHudActionType.Gun, targetPosition);
         return true;
     }
 
@@ -225,6 +231,7 @@ public class PlayerUnitActionFlowController : MonoBehaviour
     /// </summary>
     private bool CanStartAction()
     {
+        if (BattleMenuController.BlocksInput) return false;
         if (!HasValidSceneReference())
         {
             return false;

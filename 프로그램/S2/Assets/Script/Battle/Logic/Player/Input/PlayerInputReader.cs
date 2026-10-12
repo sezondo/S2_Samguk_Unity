@@ -79,6 +79,14 @@ public class PlayerInputReader : MonoBehaviour
     /// </summary>
     private void Update()
     {
+        // 창을 닫는 입력이 게임 행동이나 선택 취소로 다시 사용되지 않게 초기화한다.
+        if (BattleMenuController.BlocksInput)
+        {
+            SelectMovePressedThisFrame = SelectHackPressedThisFrame = SelectSwordThrowPressedThisFrame = false;
+            RecallSwordPressedThisFrame = SelectMeleeAttackPressedThisFrame = SelectGunAttackPressedThisFrame = false;
+            ConfirmPressedThisFrame = CancelPressedThisFrame = false;
+            return;
+        }
         SelectMovePressedThisFrame = allowDebugKeyboardSelect &&
             debugSelectMoveKey != Key.None &&
             Keyboard.current != null &&

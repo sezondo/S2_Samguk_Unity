@@ -93,6 +93,7 @@ public class StageResultPresenter : MonoBehaviour, IPresentationEventHandler
     /// </summary>
     private void Update()
     {
+        if (BattleMenuController.BlocksInput) return;
         Keyboard keyboard = Keyboard.current;
         if (pendingHandle != null && keyboard != null &&
             (keyboard.enterKey.wasPressedThisFrame ||

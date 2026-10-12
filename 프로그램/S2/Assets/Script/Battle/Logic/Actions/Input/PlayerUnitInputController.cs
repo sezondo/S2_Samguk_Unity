@@ -1,4 +1,4 @@
-﻿using UnityEngine;
+using UnityEngine;
 
 /// <summary>
 /// 씬의 단일 입력 Reader를 현재 선택된 전술 유닛의 행동 요청으로 변환한다.
@@ -50,12 +50,13 @@ public class PlayerUnitInputController : MonoBehaviour
     /// </summary>
     private void Update()
     {
+        if (BattleMenuController.BlocksInput) return;
         if (!HasValidReference())
         {
             return;
         }
 
-        if (!stageStateManager.IsPlaying)
+        if (!stageStateManager.IsPlaying || (BattleTutorialController.Instance != null && !BattleTutorialController.Instance.AllowsGameplayInput))
         {
             return;
         }
@@ -86,7 +87,7 @@ public class PlayerUnitInputController : MonoBehaviour
         RefreshMovePreview(input, unit);
         RefreshSwordThrowPreview(input, unit);
 
-        if (input.RecallSwordPressedThisFrame)
+        if (input.RecallSwordPressedThisFrame && (BattleTutorialController.Instance == null || BattleTutorialController.Instance.AllowsAction(BattleHudActionType.SwordRecall, unit)))
         {
             ExecuteSwordRecall(unit);
             return;
@@ -105,23 +106,23 @@ public class PlayerUnitInputController : MonoBehaviour
     /// </summary>
     private void HandleActionSelection(PlayerInputReader input, TacticalUnitContext unit)
     {
-        if (input.SelectMovePressedThisFrame)
+        if (input.SelectMovePressedThisFrame && (BattleTutorialController.Instance == null || BattleTutorialController.Instance.AllowsAction(BattleHudActionType.Move, unit)))
         {
             SelectAction(unit, UnitAbilityType.Move, unit.GridMoveAction, action => action.SelectMoveAction());
         }
-        else if (input.SelectHackPressedThisFrame)
+        else if (input.SelectHackPressedThisFrame && (BattleTutorialController.Instance == null || BattleTutorialController.Instance.AllowsAction(BattleHudActionType.Hack, unit)))
         {
             SelectAction(unit, UnitAbilityType.Hack, unit.HackAction, action => action.SelectHackAction());
         }
-        else if (input.SelectSwordThrowPressedThisFrame)
+        else if (input.SelectSwordThrowPressedThisFrame && (BattleTutorialController.Instance == null || BattleTutorialController.Instance.AllowsAction(BattleHudActionType.SwordThrow, unit)))
         {
             SelectAction(unit, UnitAbilityType.Sword, unit.SwordThrowAction, action => action.SelectSwordThrowAction());
         }
-        else if (input.SelectMeleeAttackPressedThisFrame)
+        else if (input.SelectMeleeAttackPressedThisFrame && (BattleTutorialController.Instance == null || BattleTutorialController.Instance.AllowsAction(BattleHudActionType.Melee, unit)))
         {
             SelectAction(unit, UnitAbilityType.Melee, unit.MeleeAttackAction, action => action.SelectMeleeAttackAction());
         }
-        else if (input.SelectGunAttackPressedThisFrame)
+        else if (input.SelectGunAttackPressedThisFrame && (BattleTutorialController.Instance == null || BattleTutorialController.Instance.AllowsAction(BattleHudActionType.Gun, unit)))
         {
             SelectAction(unit, UnitAbilityType.Gun, unit.GunAttackAction, action => action.SelectGunAttackAction());
         }

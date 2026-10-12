@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
@@ -76,7 +76,8 @@ public sealed class BattleHudBaseController : MonoBehaviour
     {
         turnText.text = isPlayerTurn ? "아군 턴" : "적군 턴";
         turnGlowImage.sprite = isPlayerTurn ? assetSet.TurnGlowPlayer : assetSet.TurnGlowEnemy;
-        endTurnButton.interactable = isPlayerTurn && stageStateManager.IsPlaying && !presentationQueue.IsBusy;
+        endTurnButton.interactable = !BattleMenuController.BlocksInput && isPlayerTurn && stageStateManager.IsPlaying && !presentationQueue.IsBusy &&
+            (BattleTutorialController.Instance == null || BattleTutorialController.Instance.AllowsEndTurn);
         RefreshActionInfo(activeUnit);
     }
 
@@ -202,6 +203,7 @@ public sealed class BattleHudBaseController : MonoBehaviour
     /// </summary>
     private void RequestEndTurn()
     {
+        if (BattleMenuController.BlocksInput) return;
         if (turnManager.IsPlayerTurn && stageStateManager.IsPlaying && !presentationQueue.IsBusy)
         {
             unitControlManager.ActiveUnit?.CancelAllActionSelections();

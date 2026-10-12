@@ -1,4 +1,4 @@
-﻿using UnityEngine;
+using UnityEngine;
 using UnityEngine.InputSystem;
 
 /// <summary>
@@ -37,7 +37,8 @@ public class CameraKeyboardMover : MonoBehaviour
     /// </summary>
     private void Update()
     {
-        if (!CanReceiveMoveInput() || !TryReadMoveInput(out Vector2 inputDirection))
+        if (BattleMenuController.BlocksInput) return;
+        if ((BattleTutorialController.Instance != null && !BattleTutorialController.Instance.IsFreePlay) || !CanReceiveMoveInput() || !TryReadMoveInput(out Vector2 inputDirection))
         {
             return;
         }

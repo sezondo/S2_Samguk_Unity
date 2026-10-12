@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using TMPro;
 using UnityEngine;
 using UnityEngine.EventSystems;
@@ -40,7 +40,14 @@ public sealed class BattleHudActionButtonView : MonoBehaviour,
     // 포인터 진입·이탈을 행동 정보 패널에 전달한다.
     private Action<BattleHudActionType, bool> hoverChanged;
 
+    // 지정된 튜토리얼 행동을 선택 전에 청록색으로 강조할 상태다.
+    private bool tutorialHint;
+    public bool HasTutorialHint => tutorialHint;
     public BattleHudActionType ActionType => actionType;
+
+    /// <summary>현재 단계에서 눌러야 할 행동 버튼을 선택 상태와 구분해 안내한다.</summary>
+    public void SetTutorialHint(bool value) { tutorialHint = value; RefreshOverlay(); }
+
 
     /// <summary>
     /// 프리팹에 직렬화된 행동 종류와 UI 참조에 런타임 요청 함수를 연결한다.
@@ -173,11 +180,17 @@ public sealed class BattleHudActionButtonView : MonoBehaviour,
         {
             nextSprite = hoverSprite;
         }
+        else if (tutorialHint)
+        {
+            nextSprite = selectedSprite;
+        }
         else if (warning)
         {
             nextSprite = warningSprite;
         }
 
+        stateOverlay.color = new Color(1, 1, 1, tutorialHint && button.interactable && !selected && !pressed && !hovered
+            ? .7f + Mathf.Sin(Time.unscaledTime * 4f) * .2f : 1f);
         stateOverlay.sprite = nextSprite;
         stateOverlay.enabled = nextSprite != null;
     }

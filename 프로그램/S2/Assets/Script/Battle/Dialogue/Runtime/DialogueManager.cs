@@ -29,10 +29,15 @@ public class DialogueManager : MonoBehaviour
 
         Instance = this;
 
-        if (bubblePresenter == null)
-        {
-            bubblePresenter = GetComponentInChildren<DialogueBubblePresenter>(true);
-        }
+        if (!HasValidReference()) enabled = false;
+    }
+
+    /// <summary>필수 말풍선 Presenter를 명시적으로 검사한다.</summary>
+    public bool HasValidReference()
+    {
+        if (bubblePresenter != null) return true;
+        Debug.LogError("대사 매니저에 말풍선 Presenter 참조가 필요합니다.", this);
+        return false;
     }
 
     private void OnDestroy()
@@ -45,6 +50,7 @@ public class DialogueManager : MonoBehaviour
 
     private void Update()
     {
+        if (BattleMenuController.IsOpen) return;
         if (!IsPlaying)
         {
             return;
@@ -93,6 +99,7 @@ public class DialogueManager : MonoBehaviour
 
     public void Advance()
     {
+        if (BattleMenuController.IsOpen) return;
         if (!IsPlaying)
         {
             return;
