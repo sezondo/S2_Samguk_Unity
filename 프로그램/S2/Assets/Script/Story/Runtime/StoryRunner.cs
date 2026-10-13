@@ -66,6 +66,9 @@ public class StoryRunner : MonoBehaviour
             return false;
         }
 
+        if (!context.BackgroundPresenter.ConfigureComicViewport(sequence.OverrideComicViewport, sequence.ComicViewport))
+            return false;
+
         activeSequence = sequence;
         currentCommandIndex = -1;
         playbackState = StoryPlaybackState.Executing;
@@ -194,6 +197,10 @@ public class StoryRunner : MonoBehaviour
 
             case StoryCommandType.ChangeBackground:
                 return context.BackgroundPresenter.ShowBackground(command.VisualSprite);
+
+            case StoryCommandType.ReplaceComicPage:
+                playbackState = StoryPlaybackState.WaitingForTimedCommand;
+                return context.BackgroundPresenter.ReplaceComicPage(command.VisualSprite, HandleTimedCommandCompleted);
 
             case StoryCommandType.ShowStanding:
                 return context.StandingPresenter.ShowStanding(command.StandingPosition, command.VisualSprite);
@@ -361,6 +368,12 @@ public class StoryRunner : MonoBehaviour
             return false;
         }
 
+        if (sequence.OverrideComicViewport && !StoryBackgroundPresenter.HasValidViewport(sequence.ComicViewport))
+        {
+            Debug.LogError($"{sequence.name}의 명시적 컷 표시 영역이 유효하지 않습니다.", sequence);
+            return false;
+        }
+
         StoryCommandData[] commands = sequence.Commands;
         if (commands == null || commands.Length == 0)
         {
@@ -403,6 +416,9 @@ public class StoryRunner : MonoBehaviour
 
             StoryCommandType.ChangeBackground =>
                 command.VisualSprite != null,
+
+            StoryCommandType.ReplaceComicPage =>
+                command.VisualSprite != null && !command.VisualSprite.packed,
 
             StoryCommandType.ShowStanding or StoryCommandType.ChangeStandingExpression =>
                 command.StandingPosition != StoryStandingPosition.None &&

@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
@@ -14,6 +14,9 @@ public class StoryBackgroundPresenter : MonoBehaviour
     [Header("Comic Cut")]
     // 하단 대화창을 제외한 컷 표시 영역이다. 좌하단 기준 0~1 앵커 좌표로 설정한다.
     [SerializeField] private Rect comicViewport = new Rect(.04f, .11f, .92f, .89f);
+
+    // 현재 시퀀스가 선택한 표시 영역이다. 기본 영역과 시퀀스별 명시 영역을 분리한다.
+    private Rect activeComicViewport;
 
 
     // 페이지 전체 크기로 고정하며 원본 텍스처를 공유하는 누적 공개 Sprite다.
@@ -40,6 +43,41 @@ public class StoryBackgroundPresenter : MonoBehaviour
     public bool IsShowingComicCut => runtimeCutSprite != null;
     public bool IsCutTransitioning => cutTransition != null;
 
+    /// <summary>공개된 컷의 메시와 화면 배치를 유지하며 동일 규격의 페이지 그림을 교체한다.</summary>
+    public bool ReplaceComicPage(Sprite page, Action completed)
+    {
+        if (!isActiveAndEnabled || runtimeCutSprite == null || activeComicPage == null ||
+            cutTransition != null || page == null || page.packed ||
+            page.rect != activeComicPage.rect || page.pixelsPerUnit != activeComicPage.pixelsPerUnit ||
+            page.texture.width != activeComicPage.texture.width || page.texture.height != activeComicPage.texture.height)
+        {
+            Debug.LogError("만화 페이지 교체에는 전환이 끝난 공개 페이지와 동일한 크기·픽셀 단위의 원화가 필요합니다.", this);
+            return false;
+        }
+
+        cutTransition = StartCoroutine(ReplaceComicPageRoutine(page, completed));
+        return true;
+    }
+
+    /// <summary>UI 재구축을 피하고 다음 재생 프레임에서 공개 메시를 새 페이지로 옮긴다.</summary>
+    private IEnumerator ReplaceComicPageRoutine(Sprite page, Action completed)
+    {
+        // UI 입력 처리·화면 재구축과 같은 프레임에서는 Sprite 경계를 변경하지 않는다.
+        yield return null;
+        var replacement = Sprite.Create(page.texture, page.rect, Vector2.one * .5f,
+            page.pixelsPerUnit, 0, SpriteMeshType.Tight);
+        replacement.name = page.name + "_Revealed";
+        replacement.OverrideGeometry(revealedVertices.ToArray(), revealedTriangles.ToArray());
+        var previous = runtimeCutSprite;
+        runtimeCutSprite = replacement;
+        activeComicPage = page;
+        backgroundImage.sprite = replacement;
+        backgroundImage.SetVerticesDirty();
+        Destroy(previous);
+        cutTransition = null;
+        completed?.Invoke();
+    }
+
     /// <summary>필수 Image를 검사하고 기존 배경의 UI 상태를 보관한다.</summary>
     private void Awake()
     {
@@ -48,7 +86,28 @@ public class StoryBackgroundPresenter : MonoBehaviour
         originalAnchorMin = rect.anchorMin; originalAnchorMax = rect.anchorMax;
         originalPosition = rect.anchoredPosition; originalSize = rect.sizeDelta; originalPivot = rect.pivot;
         originalColor = backgroundImage.color; originalMaterial = backgroundImage.material; originalUseSpriteMesh = backgroundImage.useSpriteMesh;
+        activeComicViewport = comicViewport;
     }
+
+    /// <summary>시퀀스가 명시한 표시 영역 또는 기존 기본 영역을 선택한다.</summary>
+    public bool ConfigureComicViewport(bool useOverride, Rect viewport)
+    {
+        Rect selected = useOverride ? viewport : comicViewport;
+        if (!HasValidViewport(selected))
+        {
+            Debug.LogError("스토리 컷 표시 영역은 화면 안의 유효한 사각형이어야 합니다.", this);
+            return false;
+        }
+        activeComicViewport = selected;
+        return true;
+    }
+
+    /// <summary>표시 앵커가 유한하며 화면 안에서 양의 면적을 가지는지 검사한다.</summary>
+    public static bool HasValidViewport(Rect viewport) =>
+        !float.IsNaN(viewport.x) && !float.IsNaN(viewport.y) &&
+        !float.IsNaN(viewport.width) && !float.IsNaN(viewport.height) &&
+        viewport.xMin >= 0f && viewport.yMin >= 0f && viewport.xMax <= 1f && viewport.yMax <= 1f &&
+        viewport.width > 0f && viewport.height > 0f;
 
     /// <summary>현재 컷 자원을 정리하고 전체 배경 Sprite를 원래 위치에 표시한다.</summary>
     public bool ShowBackground(Sprite backgroundSprite)
@@ -136,7 +195,7 @@ public class StoryBackgroundPresenter : MonoBehaviour
             revealedVertices.Add(page.rect.size);
             revealedVertices.Add(new Vector2(0f, page.rect.height));
             var rect = backgroundImage.rectTransform;
-            rect.anchorMin = comicViewport.min; rect.anchorMax = comicViewport.max;
+            rect.anchorMin = activeComicViewport.min; rect.anchorMax = activeComicViewport.max;
             rect.pivot = Vector2.one * .5f; rect.sizeDelta = Vector2.zero;
             rect.anchoredPosition = Vector2.zero;
             backgroundImage.sprite = runtimeCutSprite;

@@ -24,7 +24,7 @@ public class StoryCommandData
     [SerializeField] private float charactersPerSecond = 30f;
 
     [Header("Visual")]
-    // 배경, 스탠딩 또는 표정 변경 명령에서 사용할 Sprite다.
+    // 배경·스탠딩·컷 공개 또는 공개 페이지 그림 교체에 사용할 Sprite다.
     [SerializeField] private Sprite visualSprite;
     // 스탠딩 관련 명령이 대상으로 삼을 고정 화면 위치다.
     [SerializeField] private StoryStandingPosition standingPosition;

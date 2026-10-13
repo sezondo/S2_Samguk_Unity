@@ -17,4 +17,6 @@ public enum StoryCommandType
     HideDialogue,
     // 고정 만화 페이지에 지정 컷을 추가 공개한 뒤 대사를 진행한다.
     ShowComicCut,
+    // 공개한 컷의 경계는 유지하고 같은 크기의 페이지 그림만 교체한다.
+    ReplaceComicPage,
 }
