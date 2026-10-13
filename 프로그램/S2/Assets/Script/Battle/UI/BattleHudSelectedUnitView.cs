@@ -115,6 +115,16 @@ public sealed class BattleHudSelectedUnitView : MonoBehaviour
         }
     }
 
+    /// <summary>초기화 때 연결한 실제 행동 버튼에서 가림막 노출 영역을 얻는다.</summary>
+    public bool TryGetActionButtonRect(BattleHudActionType action, out RectTransform rect)
+    {
+        rect = null;
+        if (actionButtons == null) return false;
+        foreach (var view in actionButtons)
+            if (view.ActionType == action) { rect = view.ButtonRect; return true; }
+        return false;
+    }
+
     /// <summary>
     /// Prefab에 필요한 공통 UI 참조가 모두 연결되어 있는지 검사한다.
     /// </summary>

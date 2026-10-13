@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.UI;
@@ -80,6 +80,13 @@ public sealed class BattleHudSelectedUnitPanelController : MonoBehaviour
     public void Refresh(bool commonActionAvailable)
     {
         activeView?.Refresh(commonActionAvailable);
+    }
+
+    /// <summary>현재 표시 중인 유닛 HUD의 명시적으로 연결된 행동 버튼 영역을 전달한다.</summary>
+    public bool TryGetActionButtonRect(BattleHudActionType action, out RectTransform rect)
+    {
+        rect = null;
+        return activeView != null && activeView.TryGetActionButtonRect(action, out rect);
     }
 
     /// <summary>

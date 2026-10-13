@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.IO;
@@ -84,7 +84,11 @@ public static class BattleMenuVerification
             else if (tutorial.IsWaitingForAction)
             {
                 if (tutorial.CurrentStep.action != BattleHudActionType.Move) throw new InvalidOperationException("첫 안내 전 예상하지 않은 행동");
+                yield return null;
+                ScreenCapture.CaptureScreenshot(Folder + "/spotlight-button-translucent.png"); yield return Pause(.2);
                 tutorial.Context.player.GridMoveAction.SelectMoveAction();
+                yield return null;
+                ScreenCapture.CaptureScreenshot(Folder + "/spotlight-target-translucent.png"); yield return Pause(.2);
                 if (!tutorial.Context.actions.TryExecuteMove(tutorial.CurrentStep.target)) throw new InvalidOperationException("첫 안내 전 이동 실패");
                 while (tutorial.Context.queue.IsBusy) yield return null;
             }
@@ -99,7 +103,9 @@ public static class BattleMenuVerification
         var cardRoot = (RectTransform)new SerializedObject(cards).FindProperty("unitCardRoot").objectReferenceValue;
         Check(cardRoot.anchoredPosition.y == -160, "유진 상태창 아래 배치");
         var menuCanvas = c.canvasRect.GetComponent<Canvas>();
-        Check(UnityEngine.Object.FindObjectsByType<Canvas>(FindObjectsSortMode.None).Where(x => x != menuCanvas).All(x => x.sortingOrder < menuCanvas.sortingOrder), "메뉴가 기존 HUD·말풍선보다 앞에 표시됨");
+        var spotlightCanvas=tutorial.Context.spotlight.transform.parent.GetComponent<Canvas>();
+        Check(UnityEngine.Object.FindObjectsByType<Canvas>(FindObjectsSortMode.None).Where(x => x != menuCanvas && x != spotlightCanvas).All(x => x.sortingOrder < menuCanvas.sortingOrder), "메뉴가 기존 HUD·말풍선보다 앞에 표시됨");
+        Check(spotlightCanvas.sortingOrder > menuCanvas.sortingOrder && !tutorial.Context.spotlight.gameObject.activeSelf,"가림막은 최상단이며 수첩 중에는 숨김");
         Check(Time.timeScale == 0 && BattleMenuController.BlocksInput, "튜토리얼 안내 정지·입력 잠금");
         int step = tutorial.StepIndex; var position = tutorial.Context.player.GridActor.GridPosition;
         tutorial.Context.turns.EndCurrentTurn();

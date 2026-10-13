@@ -44,6 +44,7 @@ public sealed class BattleHudActionButtonView : MonoBehaviour,
     private bool tutorialHint;
     public bool HasTutorialHint => tutorialHint;
     public BattleHudActionType ActionType => actionType;
+    public RectTransform ButtonRect => (RectTransform)button.transform;
 
     /// <summary>현재 단계에서 눌러야 할 행동 버튼을 선택 상태와 구분해 안내한다.</summary>
     public void SetTutorialHint(bool value) { tutorialHint = value; RefreshOverlay(); }

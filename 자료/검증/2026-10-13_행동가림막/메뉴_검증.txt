@@ -1,0 +1,179 @@
+PASS 177
+시작 자동 수첩 제거
+순찰 이후에 첫 자동 수첩 안내
+모든 메뉴·수첩 참조
+수첩·메뉴 우상단 배치
+이름 제거·톱니바퀴 메뉴
+유진 상태창 아래 배치
+메뉴가 기존 HUD·말풍선보다 앞에 표시됨
+가림막은 최상단이며 수첩 중에는 숨김
+튜토리얼 안내 정지·입력 잠금
+수첩 뒤 이동 요청 차단
+팝업 중 진행·위치 유지
+넘김 중 덮기 버튼 숨김
+다음 펼침 미리 표시
+목적 페이지 아래 배치
+넘김 중 색인 잠금
+넘김 중 닫기·확인 방지
+넘김 후 덮기 복원
+덮기 버튼 활성 색 복원
+수첩 페이지 1
+문구 영역 1: left_title
+문구 영역 1: intro
+문구 영역 1: distance_0
+문구 영역 1: distance_1
+문구 영역 1: distance_2
+문구 영역 1: distance_3
+문구 영역 1: movement_cost
+문구 영역 1: ap_use
+문구 영역 1: right_title
+문구 영역 1: step_number_1
+문구 영역 1: step_1
+문구 영역 1: step_number_2
+문구 영역 1: step_2
+문구 영역 1: step_number_3
+문구 영역 1: step_3
+문구 영역 1: right_note_mark_610
+문구 영역 1: right_note_610
+넘김 중 덮기 버튼 숨김
+다음 펼침 미리 표시
+목적 페이지 아래 배치
+넘김 중 색인 잠금
+넘김 중 닫기·확인 방지
+넘김 후 덮기 복원
+덮기 버튼 활성 색 복원
+수첩 페이지 2
+문구 영역 2: left_title
+문구 영역 2: intro
+문구 영역 2: before_label
+문구 영역 2: enemy_unknown
+문구 영역 2: after_label
+문구 영역 2: key
+문구 영역 2: unknown
+문구 영역 2: right_title
+문구 영역 2: step_number_1
+문구 영역 2: step_1
+문구 영역 2: step_number_2
+문구 영역 2: step_2
+문구 영역 2: step_number_3
+문구 영역 2: step_3
+문구 영역 2: right_note_mark_607
+문구 영역 2: right_note_607
+넘김 중 덮기 버튼 숨김
+다음 펼침 미리 표시
+목적 페이지 아래 배치
+넘김 중 색인 잠금
+넘김 중 닫기·확인 방지
+넘김 후 덮기 복원
+덮기 버튼 활성 색 복원
+수첩 페이지 3
+문구 영역 3: left_title
+문구 영역 3: attack_dir
+문구 영역 3: label_유진
+문구 영역 3: label_엄폐물
+문구 영역 3: label_적
+문구 영역 3: cover_rule
+문구 영역 3: flow_아군 턴
+문구 영역 3: flow_턴 종료
+문구 영역 3: flow_적 턴
+문구 영역 3: right_title
+문구 영역 3: 권총_title
+문구 영역 3: 권총_body
+문구 영역 3: 검_근접아이콘_title
+문구 영역 3: 검_근접아이콘_body
+문구 영역 3: 주먹_title
+문구 영역 3: 주먹_body
+문구 영역 3: right_note_mark_667
+문구 영역 3: right_note_667
+문구 영역 3: fixed_results
+넘김 중 덮기 버튼 숨김
+다음 펼침 미리 표시
+목적 페이지 아래 배치
+넘김 중 색인 잠금
+넘김 중 닫기·확인 방지
+넘김 후 덮기 복원
+덮기 버튼 활성 색 복원
+수첩 페이지 4
+문구 영역 4: left_title
+문구 영역 4: intro
+문구 영역 4: label_유진
+문구 영역 4: label_도깨비검
+문구 영역 4: label_발견한 적
+문구 영역 4: key
+문구 영역 4: left_note_mark_736
+문구 영역 4: left_note_736
+문구 영역 4: right_title
+문구 영역 4: step_number_1
+문구 영역 4: step_1
+문구 영역 4: step_number_2
+문구 영역 4: step_2
+문구 영역 4: step_number_3
+문구 영역 4: step_3
+문구 영역 4: sword_cost
+문구 영역 4: right_note_mark_655
+문구 영역 4: right_note_655
+넘김 중 덮기 버튼 숨김
+다음 펼침 미리 표시
+목적 페이지 아래 배치
+넘김 중 색인 잠금
+넘김 중 닫기·확인 방지
+넘김 후 덮기 복원
+덮기 버튼 활성 색 복원
+수첩 페이지 5
+문구 영역 5: left_title
+문구 영역 5: intro
+문구 영역 5: terminal_label
+문구 영역 5: door_label
+문구 영역 5: connect_label
+문구 영역 5: locked
+문구 영역 5: opened
+문구 영역 5: key
+문구 영역 5: stage_note
+문구 영역 5: right_title
+문구 영역 5: step_number_1
+문구 영역 5: step_1
+문구 영역 5: step_number_2
+문구 영역 5: step_2
+문구 영역 5: step_number_3
+문구 영역 5: step_3
+문구 영역 5: hack_cost
+문구 영역 5: right_note_mark_636
+문구 영역 5: right_note_636
+문구 영역 5: blocked
+이전 페이지 아래 배치
+역방향 다음 펼침 준비
+역방향 펼침 단계 관찰
+이전 종이 펼칠 때 위 배치
+역방향 넘김 완료
+넘김 중 재열기 복원
+재열기 문구 left_title
+재열기 문구 attack_dir
+재열기 문구 label_유진
+재열기 문구 label_엄폐물
+재열기 문구 label_적
+재열기 문구 cover_rule
+재열기 문구 flow_아군 턴
+재열기 문구 flow_턴 종료
+재열기 문구 flow_적 턴
+재열기 문구 right_title
+재열기 문구 권총_title
+재열기 문구 권총_body
+재열기 문구 검_근접아이콘_title
+재열기 문구 검_근접아이콘_body
+재열기 문구 주먹_title
+재열기 문구 주먹_body
+재열기 문구 right_note_mark_667
+재열기 문구 right_note_667
+재열기 문구 fixed_results
+안내 덮기 후 튜토리얼 재개
+메뉴 열기·설정 준비 중
+일반 메뉴에서 대사 진행 차단
+메뉴에서 매뉴얼 열기
+수첩에서 메뉴로 복귀
+종료 확인 기본 선택 취소
+종료 취소 후 메뉴 복귀
+HUD 수첩 버튼
+HUD 수첩 덮기 후 게임 복귀
+버튼 누름 상태
+버튼 뗌·포인터 이탈 복원
+PASS 실제 종료 버튼으로 재생 중단·편집 모드 복귀

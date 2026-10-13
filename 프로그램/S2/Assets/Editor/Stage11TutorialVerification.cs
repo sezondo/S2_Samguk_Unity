@@ -76,10 +76,12 @@ public static class Stage11TutorialVerification
         Check(c.presenter.transform.Find("Instruction")==null,"상단 검은 지시창 제거");
         int firstAction=Array.FindIndex(t.Data.steps,x=>x.kind==BattleTutorialStepKind.Action);
         Check(!t.Data.steps.Take(firstAction).Any(x=>x.kind==BattleTutorialStepKind.Guide),"첫 이동 전 자동 수첩 없음");
+        var maskCanvas=c.spotlight.transform.parent.GetComponent<Canvas>();
+        Check(UnityEngine.Object.FindObjectsByType<Canvas>(FindObjectsSortMode.None).Where(x=>x!=maskCanvas).All(x=>x.sortingOrder<maskCanvas.sortingOrder),"가림막이 메뉴 아이콘까지 덮는 최상단");
         Check(c.presenter.transform.Find("Continue")==null,"기존 하단 대화 진행 버튼 제거");
         Check(c.player.GridActor.GridPosition==new GridPosition(23,14),"원래 플레이어 시작점 유지");
         Check(!c.door.IsOpen,"시작 시 보안문 닫힘");
-        var visited=new HashSet<int>(); int actions=0;
+        var visited=new HashSet<int>(); var manualPages=new HashSet<int>(); int actions=0;
         while(!t.IsFreePlay)
         {
             if(t.HasFailed)throw new InvalidOperationException("튜토리얼 진행 실패 "+t.StepIndex);
@@ -90,6 +92,9 @@ public static class Stage11TutorialVerification
                 c.turns.EndCurrentTurn();
                 Check(c.turns.IsPlayerTurn && t.PlayerTurnNumber==turn,"대사·안내 중 턴 종료 차단 "+step.id);
                 Check(!c.actions.TryExecuteMove(new GridPosition(24,14))&&c.player.ActionPoint.Current==ap&&c.player.Health.CurrentHitPoint==hp,"안내 중 행동 차단 "+step.id);
+                Check(!c.spotlight.gameObject.activeSelf,"대사·수첩 중 가림막 해제 "+step.id);
+                if(step.kind==BattleTutorialStepKind.Guide)
+                    Check(manualPages.Add(step.manualPage),"수첩 페이지 자동 안내는 최초 1회 "+step.manualPage);
                 if(step.kind==BattleTutorialStepKind.Dialogue && visited.Add(t.StepIndex))
                 {
                     t.Continue(); yield return null;
@@ -126,6 +131,9 @@ public static class Stage11TutorialVerification
                     expectedCost=unit.GridMoveAction.CalculateMoveActionPointCost(path.Count);
                 }
                 Check(before>=expectedCost,"필수 행동 AP 충분 "+step.id);
+                yield return null;
+                Check(c.spotlight.gameObject.activeSelf && c.presenter.CurrentFocus==BattleTutorialPresenter.FocusKind.ActionButton,"행동 선택 전 버튼만 노출 "+step.id);
+                CheckSpotlightInput(c,"버튼 "+step.id);
                 if(actions==0)
                 {
                     yield return null;
@@ -134,7 +142,29 @@ public static class Stage11TutorialVerification
                     Check(!BattleMenuController.IsOpen,"첫 행동을 수첩이 가리지 않음");
                     ScreenCapture.CaptureScreenshot(Folder+"/opening-first-move.png"); yield return Pause(.2);
                 }
+                if(actions==0)
+                {
+                    var menu=UnityEngine.Object.FindFirstObjectByType<BattleMenuController>();
+                    menu.OpenMenu(); yield return null;
+                    Check(!c.spotlight.gameObject.activeSelf,"메뉴 중 가림막 해제");
+                    menu.Close(); yield return null;
+                    Check(c.spotlight.gameObject.activeSelf,"메뉴 닫은 뒤 가림막 복원");
+                }
+                SelectAction(c,step.action); yield return null;
+                if(step.action!=BattleHudActionType.SwordRecall)
+                {
+                    Check(c.presenter.CurrentFocus==BattleTutorialPresenter.FocusKind.TargetCell,"행동 선택 후 목표만 노출 "+step.id);
+                    CheckSpotlightInput(c,"목표 "+step.id);
+                    if(actions==0)
+                    {
+                        ScreenCapture.CaptureScreenshot(Folder+"/opening-target-spotlight.png"); yield return Pause(.2);
+                        c.player.CancelAllActionSelections(); yield return null;
+                        Check(c.presenter.CurrentFocus==BattleTutorialPresenter.FocusKind.ActionButton,"선택 취소 후 버튼 노출 복원");
+                        SelectAction(c,step.action); yield return null;
+                    }
+                }
                 Check(Execute(c,step),"기존 행동 실행 성공 "+step.id);
+                Check(!c.spotlight.gameObject.activeSelf,"행동 실행 즉시 가림막 해제 "+step.id);
                 Check(unit.ActionPoint.Current==before-expectedCost,"실제 AP 소모 "+step.id);
                 Check(!Execute(c,step),"같은 단계 중복 실행 차단 "+step.id);
                 actions++;
@@ -152,6 +182,10 @@ public static class Stage11TutorialVerification
             }
             if(step.kind==BattleTutorialStepKind.EndTurn && t.AllowsEndTurn && c.turns.IsPlayerTurn)
             {
+                yield return null;
+                Check(c.presenter.CurrentFocus==BattleTutorialPresenter.FocusKind.EndTurnButton,"수동 턴 종료 버튼만 노출 "+step.id);
+                CheckSpotlightInput(c,"턴 종료 "+step.id);
+                if(t.PlayerTurnNumber==1) { ScreenCapture.CaptureScreenshot(Folder+"/opening-endturn-spotlight.png"); yield return Pause(.2); }
                 int turn=t.PlayerTurnNumber;
                 if(turn==1)Check(PlayerVisionManager.Instance.IsVisible(c.patrol.GridActor.GridPosition)&&!c.patrol.AlertState.IsAlerted,"코너에서 순찰 적 발견·미발각");
                 c.turns.EndCurrentTurn();
@@ -162,6 +196,8 @@ public static class Stage11TutorialVerification
             }
             yield return null;
         }
+        Check(manualPages.Count==4&&t.IntroducedManualPageCount==4,"시야·전투·검·침입 자동 수첩 각 1회");
+        Check(!c.spotlight.gameObject.activeSelf,"자유 조작 가림막 해제");
         Check(t.PlayerTurnNumber==10,"10턴부터 자유 조작");
         Check(actions==17,"지정 행동 17개 완료");
         Check(recorder.results.Count==3&&recorder.results.Count(x=>x.IsHit)==2,"튜토리얼 전용 총격 명중 2회·회피 1회");
@@ -200,6 +236,32 @@ public static class Stage11TutorialVerification
             case BattleHudActionType.SwordRecall:return c.actions.TryExecuteSwordRecall();
             case BattleHudActionType.Hack:c.player.HackAction.SelectHackAction();return c.actions.TryExecuteHack(c.terminal);
             default:return false;
+        }
+    }
+
+    /// <summary>가려진 영역의 실제 UI 레이캐스트 차단과 구멍의 통과를 검사한다.</summary>
+    private static void CheckSpotlightInput(BattleTutorialContext c,string stage)
+    {
+        Vector2 exposed=c.spotlight.rectTransform.TransformPoint(c.spotlight.Aperture.center);
+        var pointer=new UnityEngine.EventSystems.PointerEventData(UnityEngine.EventSystems.EventSystem.current);
+        var hits=new List<UnityEngine.EventSystems.RaycastResult>();
+        pointer.position=exposed; UnityEngine.EventSystems.EventSystem.current.RaycastAll(pointer,hits);
+        Check(hits.All(x=>x.gameObject!=c.spotlight.gameObject),"노출 영역 포인터 통과 "+stage);
+        hits.Clear(); pointer.position=new Vector2(12,12); UnityEngine.EventSystems.EventSystem.current.RaycastAll(pointer,hits);
+        Check(hits.Any(x=>x.gameObject==c.spotlight.gameObject),"검은 영역 포인터 차단 "+stage);
+        Check(c.spotlight.color==new Color(0,0,0,.7f),"가림막 검정 불투명도 70% "+stage);
+    }
+
+    /// <summary>플레이어가 누르는 행동 선택 단계를 실행 판정과 분리해 검사한다.</summary>
+    private static void SelectAction(BattleTutorialContext c,BattleHudActionType action)
+    {
+        switch(action)
+        {
+            case BattleHudActionType.Move:c.player.GridMoveAction.SelectMoveAction();break;
+            case BattleHudActionType.Gun:c.player.GunAttackAction.SelectGunAttackAction();break;
+            case BattleHudActionType.Melee:c.player.MeleeAttackAction.SelectMeleeAttackAction();break;
+            case BattleHudActionType.SwordThrow:c.player.SwordThrowAction.SelectSwordThrowAction();break;
+            case BattleHudActionType.Hack:c.player.HackAction.SelectHackAction();break;
         }
     }
 

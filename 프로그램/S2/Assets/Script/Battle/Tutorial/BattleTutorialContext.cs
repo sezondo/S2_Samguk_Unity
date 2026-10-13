@@ -1,4 +1,5 @@
-using UnityEngine;
+﻿using UnityEngine;
+using UnityEngine.UI;
 
 /// <summary>튜토리얼 기능들이 공유하는 명시적 씬 참조 주머니다.</summary>
 public sealed class BattleTutorialContext : MonoBehaviour
@@ -25,4 +26,8 @@ public sealed class BattleTutorialContext : MonoBehaviour
     public DialogueManager dialogue;
     public DialogueSpeaker[] speakers;
     public BattleTutorialPresenter presenter;
+    // 가림막과 현재 유닛 HUD·턴 종료 버튼의 명시적 화면 참조다.
+    public BattleTutorialSpotlightGraphic spotlight;
+    public BattleHudSelectedUnitPanelController selectedHud;
+    public Button endTurnButton;
 }

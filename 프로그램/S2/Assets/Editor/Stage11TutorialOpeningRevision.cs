@@ -26,16 +26,11 @@ public static class Stage11TutorialOpeningRevision
         EditorSceneManager.MarkSceneDirty(scene); EditorSceneManager.SaveScene(scene);
         Debug.Log("첫 이동 전 수첩과 상단 지시창을 제거했습니다. 순찰 이후의 수첩 안내는 유지합니다.");
     }
-    /// <summary>기존 고유 ID를 유지한 채 시작 수첩 두 개를 제거하고 이동 안내를 대사로 바꾼다.</summary>
+    /// <summary>기존 고유 ID를 유지한 채 시작 수첩과 가림막으로 대체할 조작 안내를 제거한다.</summary>
     public static BattleTutorialStep[] ReviseSteps(BattleTutorialStep[] steps)
     {
-        var movement = steps.FirstOrDefault(s => s.id == "09 이동");
-        if (movement == null) throw new InvalidOperationException("첫 이동 안내 단계가 필요합니다.");
-        movement.kind = BattleTutorialStepKind.Dialogue;
-        movement.speaker = "금두꺼비";
-        movement.text = "이동 버튼을 누르고, 표시된 코너로 이동하십시오.";
         return steps.Where(s => !(s.kind == BattleTutorialStepKind.Guide &&
-            (s.id == "01 목표" || s.id == "06 목적지 확인"))).ToArray();
+            (s.id == "01 목표" || s.id == "06 목적지 확인" || s.id.EndsWith(" 탈출"))) && s.id != "09 이동").ToArray();
     }
 
 }

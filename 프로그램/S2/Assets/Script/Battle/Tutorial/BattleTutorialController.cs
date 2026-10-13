@@ -19,6 +19,9 @@ public sealed class BattleTutorialController : MonoBehaviour
     private bool failed;
     // 망치·큰못의 지정 공격에만 일회 적용할 판정이다.
     private bool enemyMissPending;
+    // 스테이지에서 자동 소개한 수첩 페이지다. 직접 열람과 별개로 중복 소개를 막는다.
+    private readonly HashSet<int> introducedManualPages = new();
+    public int IntroducedManualPageCount => introducedManualPages.Count;
     // 실행 코루틴과 임시 대사 데이터다.
     private Coroutine routine, enemyRoutine;
     private DialogueSequenceData runtimeDialogue;
@@ -84,7 +87,7 @@ public sealed class BattleTutorialController : MonoBehaviour
         if (!IsFreePlay && IsWaitingForAction && CurrentStep.action == action)
         {
             actionAccepted = true;
-            context.presenter.HideMarker();
+            context.presenter.HideGuidance();
         }
     }
 
@@ -120,6 +123,7 @@ public sealed class BattleTutorialController : MonoBehaviour
         for (stepIndex = 0; stepIndex < data.steps.Length && !failed && context.stage.IsPlaying; stepIndex++)
         {
             while (BattleMenuController.IsOpen) yield return null;
+            context.presenter.HideGuidance();
             var step = CurrentStep;
             context.player.CancelAllActionSelections();
             switch (step.kind)
@@ -137,6 +141,7 @@ public sealed class BattleTutorialController : MonoBehaviour
                     context.presenter.DisableDialogueInput();
                     break;
                 case BattleTutorialStepKind.Guide:
+                    if (!introducedManualPages.Add(step.manualPage)) break;
                     waitingContinue = true;
                     context.presenter.ShowGuide(step.manualPage, step.text);
                     while (waitingContinue && !failed) yield return null;
@@ -151,7 +156,7 @@ public sealed class BattleTutorialController : MonoBehaviour
                     yield return MoveCamera(focus);
                     actionAccepted = false; waitingAction = true;
                     context.control.TrySelectUnit(context.player);
-                    if (step.action != BattleHudActionType.SwordRecall) context.presenter.ShowMarker(step.target);
+                    context.presenter.ShowActionGuidance(step.action, step.target);
                     while (!actionAccepted && !failed) yield return null;
                     waitingAction = false;
                     yield return WaitForQueue();
@@ -165,7 +170,9 @@ public sealed class BattleTutorialController : MonoBehaviour
                         context.turns.EndCurrentTurn();
                         internalTurnRequest = false;
                     }
+                    if (waitingTurn && !internalTurnRequest && context.turns.IsPlayerTurn) context.presenter.ShowEndTurnGuidance();
                     while (waitingTurn && !failed) yield return null;
+                    context.presenter.HideGuidance();
                     break;
                 case BattleTutorialStepKind.FreePlay:
                     IsFreePlay = true;
@@ -193,6 +200,7 @@ public sealed class BattleTutorialController : MonoBehaviour
     /// <summary>턴 번호를 갱신하고 일반 AI 대신 지정된 튜토리얼 적 턴을 실행한다.</summary>
     private void HandleTurnStarted(TurnSide side)
     {
+        context.presenter.HideGuidance();
         if (side == TurnSide.Player) { PlayerTurnNumber++; waitingTurn = false; }
         else if (enemyRoutine == null) enemyRoutine = StartCoroutine(RunEnemyTurn());
     }
@@ -282,6 +290,7 @@ public sealed class BattleTutorialController : MonoBehaviour
     private void Fail(string reason)
     {
         failed = true;
+        context?.presenter?.HideGuidance();
         Debug.LogError($"1-1 튜토리얼: {reason}", this);
     }
 
@@ -291,7 +300,7 @@ public sealed class BattleTutorialController : MonoBehaviour
         bool valid = data != null && context != null && context.grid != null && context.player != null &&
             context.patrol != null && context.bigNail != null && context.hammer != null && context.terminal != null &&
             context.door != null && context.goal != null && context.turns != null && context.stage != null &&
-            context.queue != null && context.control != null && context.actions != null && context.worldCamera != null &&
+            context.queue != null && context.control != null && context.actions != null && context.worldCamera != null && context.spotlight != null && context.selectedHud != null && context.endTurnButton != null &&
             context.dialogue != null && context.speakers != null && context.speakers.Length == 3 && context.presenter != null;
         if (!valid) Debug.LogError("1-1 튜토리얼 Context에 필수 참조가 없습니다.", this);
         return valid;
