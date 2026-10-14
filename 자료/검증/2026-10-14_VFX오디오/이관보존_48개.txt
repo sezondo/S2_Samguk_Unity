@@ -1,0 +1,49 @@
+PASS
+PASS 원래 프리팹·시간 보존 ID 6
+PASS 원래 프리팹·시간 보존 ID 7
+PASS 원래 프리팹·시간 보존 ID 11
+PASS 원래 프리팹·시간 보존 ID 12
+PASS 원래 프리팹·시간 보존 ID 13
+PASS 원래 프리팹·시간 보존 ID 14
+PASS 원래 프리팹·시간 보존 ID 15
+PASS 원래 프리팹·시간 보존 ID 16
+PASS 원래 프리팹·시간 보존 ID 17
+PASS 원래 프리팹·시간 보존 ID 18
+PASS 원래 프리팹·시간 보존 ID 19
+PASS 원래 프리팹·시간 보존 ID 20
+PASS 원래 프리팹·시간 보존 ID 21
+PASS Assets\Scenes\Tset.unity 미리 생성 개수·부모 보존
+PASS Assets\Scenes\Tset.unity 기존 Transform·UI 배치 전체 보존 (29)
+PASS Assets\Scenes\Test\BattleTest01.unity 미리 생성 개수·부모 보존
+PASS Assets\Scenes\Test\BattleTest01.unity 기존 Transform·UI 배치 전체 보존 (443)
+PASS Assets\Scenes\Test\BattleTest02.unity 미리 생성 개수·부모 보존
+PASS Assets\Scenes\Test\BattleTest02.unity 기존 Transform·UI 배치 전체 보존 (65)
+PASS Assets\Art\Vfx\Cheonha\천하회_망치_Combat.asset 공격자 데이터 매핑 보존
+PASS Assets\Art\Vfx\Cheonha\천하회_망치_Combat.asset presentationDuration 보존
+PASS Assets\Art\Vfx\Cheonha\천하회_망치_Combat.asset vfxDelay 보존
+PASS Assets\Art\Vfx\Cheonha\천하회_망치_Combat.asset vfxDuration 보존
+PASS Assets\Art\Vfx\Cheonha\천하회_망치_Combat.asset vfxHeightRatio 보존
+PASS Assets\Art\Vfx\Cheonha\천하회_망치_Combat.asset vfxOffset 보존
+PASS Assets\Art\Vfx\Cheonha\천하회_망치_Combat.asset spanToTarget 보존
+PASS Assets\Art\Vfx\Cheonha\천하회_작은못_Combat.asset 공격자 데이터 매핑 보존
+PASS Assets\Art\Vfx\Cheonha\천하회_작은못_Combat.asset presentationDuration 보존
+PASS Assets\Art\Vfx\Cheonha\천하회_작은못_Combat.asset vfxDelay 보존
+PASS Assets\Art\Vfx\Cheonha\천하회_작은못_Combat.asset vfxDuration 보존
+PASS Assets\Art\Vfx\Cheonha\천하회_작은못_Combat.asset vfxHeightRatio 보존
+PASS Assets\Art\Vfx\Cheonha\천하회_작은못_Combat.asset vfxOffset 보존
+PASS Assets\Art\Vfx\Cheonha\천하회_작은못_Combat.asset spanToTarget 보존
+PASS Assets\Art\Vfx\Cheonha\천하회_큰못_Combat.asset 공격자 데이터 매핑 보존
+PASS Assets\Art\Vfx\Cheonha\천하회_큰못_Combat.asset presentationDuration 보존
+PASS Assets\Art\Vfx\Cheonha\천하회_큰못_Combat.asset vfxDelay 보존
+PASS Assets\Art\Vfx\Cheonha\천하회_큰못_Combat.asset vfxDuration 보존
+PASS Assets\Art\Vfx\Cheonha\천하회_큰못_Combat.asset vfxHeightRatio 보존
+PASS Assets\Art\Vfx\Cheonha\천하회_큰못_Combat.asset vfxOffset 보존
+PASS Assets\Art\Vfx\Cheonha\천하회_큰못_Combat.asset spanToTarget 보존
+PASS Assets\Data\TestStage\Player\CombatPresentationDataTest.asset 공격자 데이터 매핑 보존
+PASS Assets\Data\TestStage\Player\CombatPresentationDataTest.asset presentationDuration 보존
+PASS Assets\Data\TestStage\Player\CombatPresentationDataTest.asset vfxDelay 보존
+PASS Assets\Data\TestStage\Player\CombatPresentationDataTest.asset vfxDuration 보존
+PASS Assets\Data\TestStage\Player\CombatPresentationDataTest.asset vfxHeightRatio 보존
+PASS Assets\Data\TestStage\Player\CombatPresentationDataTest.asset vfxOffset 보존
+PASS Assets\Data\TestStage\Player\CombatPresentationDataTest.asset spanToTarget 보존
+PASS 실행 코드의 VFX ID·정적 조회 제거

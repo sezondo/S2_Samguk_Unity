@@ -7,6 +7,9 @@ using UnityEngine;
 /// </summary>
 public class HackPresenter : MonoBehaviour, IPresentationEventHandler
 {
+    // 현재 씬의 VFX·오디오 재생 담당을 명시적으로 제공한다.
+    [SerializeField] private BattlePresentationContext presentationContext;
+
     [Header("Target")]
     // 이 Presenter가 해킹 연출을 처리할 해킹 대상이다.
     [SerializeField] private HackableObject targetHackable;
@@ -27,6 +30,8 @@ public class HackPresenter : MonoBehaviour, IPresentationEventHandler
     // 현재 처리 중인 큐 이벤트 완료 핸들이다.
     private PresentationEventHandle activeHandle;
     [Header("Hack VFX")]
+    // 해킹 회로·중앙·섬광·꼭지점 원화를 담은 공유 이펙트다.
+    [SerializeField] private VfxData hackVfx;
     // 해킹 문양의 월드 캔버스 크기와 중심 오프셋이다.
     [SerializeField] private float effectSize = 2f;
     [SerializeField] private Vector3 effectOffset = new(0f, 0.7f, 0f);
@@ -123,7 +128,7 @@ public class HackPresenter : MonoBehaviour, IPresentationEventHandler
         }
 
         if (!HasValidReference() || !HasValidData() || GridManager.Instance == null || ActorPresentationRegistry.Instance == null ||
-            VfxManager.Instance == null || !VfxManager.Instance.isActiveAndEnabled)
+            presentationContext == null || presentationContext.Vfx == null || !presentationContext.Vfx.isActiveAndEnabled)
         {
             Debug.LogError("해킹 연출에 필요한 참조 또는 그리드가 없습니다.", this);
             handle.Complete();
@@ -137,7 +142,7 @@ public class HackPresenter : MonoBehaviour, IPresentationEventHandler
     private IEnumerator PlayHack(PresentationEvent evt, PresentationEventHandle handle)
     {
         activeHandle = handle;
-        hackEffect = VfxManager.TryAcquire(VfxId.HackCircuit);
+        hackEffect = presentationContext.Vfx.Acquire(hackVfx);
         if (hackEffect != null && hackEffect.PartCount != 4)
         {
             Debug.LogError("해킹 프리팹에는 회로·중앙·섬광·꼭지점 4개 Sprite가 필요합니다.", this);
@@ -210,6 +215,8 @@ public class HackPresenter : MonoBehaviour, IPresentationEventHandler
     /// </summary>
     public bool HasValidReference()
     {
+        if (presentationContext == null || presentationContext.Vfx == null)
+        { Debug.LogError("해킹 연출 Context에 VFX 담당이 필요합니다.",this); return false; }
         if (cameraPresenter == null)
         {
             Debug.LogError("해킹 연출 카메라 참조가 없습니다.", this);
@@ -232,7 +239,8 @@ public class HackPresenter : MonoBehaviour, IPresentationEventHandler
     /// <summary>해킹 이펙트의 크기와 최소 표시 시간을 검사한다.</summary>
     public bool HasValidData()
     {
-        if (effectSize > 0f && minimumEffectDuration > 0f) return true;
+        if (!HasValidReference()) return false;
+        if (presentationContext.Vfx.HasValidData(hackVfx) && effectSize > 0f && minimumEffectDuration > 0f) return true;
         Debug.LogError("해킹 VFX 크기와 최소 시간은 0보다 커야 합니다.", this);
         return false;
     }

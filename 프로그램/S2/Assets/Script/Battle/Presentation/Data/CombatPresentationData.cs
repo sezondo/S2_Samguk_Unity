@@ -16,7 +16,7 @@ public struct CombatPresentationEntry
     [SerializeField] private float presentationDuration;
 
     // 해당 공격의 공격자에게 표시할 VFX다. 투척은 SwordActionPresenter가 맡으므로 None이다.
-    [SerializeField] private VfxId attackerVfx;
+    [SerializeField] private VfxData attackerVfx;
     // 공통 카메라 준비 이후 타격 전 추가 대기다. 자세·결과·이펙트는 함께 시작하며 현재 튜닝은 0이다.
     [SerializeField] private float vfxDelay;
     // 단발 이펙트의 표시 시간이다. 전투 자세 유지 시간 안에 끝나야 한다.
@@ -30,7 +30,19 @@ public struct CombatPresentationEntry
     [SerializeField] private bool spanToTarget;
     public bool SpanToTarget => spanToTarget;
 
-    public VfxId AttackerVfx => attackerVfx;
+    // 이번 공격의 명중·회피 때 대상에게 표시할 공유 이펙트다.
+    [SerializeField] private VfxData hitVfx, missVfx;
+    // 효과음을 연결한 연출만 켠다. 켜진 경우 발사·명중·회피 참조가 모두 필수다.
+    [SerializeField] private bool playAudio;
+    // 공격자 발사음과 판정 결과에 맞는 대상 소리를 직접 연결한다.
+    [SerializeField] private SoundData fireSound, hitSound, missSound;
+    public VfxData HitVfx => hitVfx;
+    public VfxData MissVfx => missVfx;
+    public bool PlayAudio => playAudio;
+    public SoundData FireSound => fireSound;
+    public SoundData HitSound => hitSound;
+    public SoundData MissSound => missSound;
+    public VfxData AttackerVfx => attackerVfx;
     public float VfxDelay => vfxDelay;
     public float VfxDuration => vfxDuration;
     public float VfxHeightRatio => vfxHeightRatio;

@@ -7,6 +7,9 @@ using UnityEngine;
 /// </summary>
 public class SwordActionPresenter : MonoBehaviour, IPresentationEventHandler
 {
+    // 현재 씬의 VFX·오디오 재생 담당을 명시적으로 제공한다.
+    [SerializeField] private BattlePresentationContext presentationContext;
+
     [Header("Target")]
     // 이 Presenter가 처리할 플레이어 논리 Actor다.
     [SerializeField] private GridActor ownerActor;
@@ -34,8 +37,8 @@ public class SwordActionPresenter : MonoBehaviour, IPresentationEventHandler
     [SerializeField] private Vector3 deployedPositionOffset;
 
     [Header("Sword Trail")]
-    // 투척·회수·해킹 접근에 함께 쓰는 확정 궤적 프리팹 ID다.
-    [SerializeField] private VfxId pathVfxId = VfxId.YujinSwordTrail;
+    // 투척·회수·해킹 접근에 함께 쓰는 공유 궤적 이펙트 데이터다.
+    [SerializeField] private VfxData pathVfx;
     // 궤적 캔버스의 월드 높이다. 이동 거리와 독립적으로 유지한다.
     [SerializeField] private float pathVfxWidth = 0.5f;
     // 일반 투척·회수·해킹 접근의 비행 속도와 최소 이동 시간이다.
@@ -168,7 +171,7 @@ public class SwordActionPresenter : MonoBehaviour, IPresentationEventHandler
     public void Handle(PresentationEvent presentationEvent, PresentationEventHandle handle)
     {
         if (!HasValidReference() || !HasValidData() || GridManager.Instance == null ||
-            VfxManager.Instance == null || !VfxManager.Instance.isActiveAndEnabled || swordMoveCoroutine != null)
+            presentationContext == null || presentationContext.Vfx == null || !presentationContext.Vfx.isActiveAndEnabled || swordMoveCoroutine != null)
         {
             Debug.LogError("검 이동 연출의 참조 또는 재생 상태가 올바르지 않습니다.", this);
             handle.Complete();
@@ -201,7 +204,7 @@ public class SwordActionPresenter : MonoBehaviour, IPresentationEventHandler
         // 전투 투척만 비행 대기를 없애 타격과 연결하고, 정찰 투척은 실제 이동을 보여준다.
         float duration = combatThrow
             ? 0f : Mathf.Max(minimumTravelDuration, distance / swordTravelSpeed);
-        trailEffect = VfxManager.TryAcquire(pathVfxId);
+        trailEffect = presentationContext.Vfx.Acquire(pathVfx);
         if (trailEffect != null && trailEffect.PartCount != 3)
         {
             Debug.LogError("검 궤적 프리팹에는 꼬리·몸통·앞부분 3개 Sprite가 필요합니다.", this);
@@ -399,6 +402,8 @@ public class SwordActionPresenter : MonoBehaviour, IPresentationEventHandler
     /// </summary>
     public bool HasValidReference()
     {
+        if (presentationContext == null || presentationContext.Vfx == null)
+        { Debug.LogError("검 연출 Context에 VFX 담당이 필요합니다.",this); return false; }
         if (ownerActor == null)
         {
             Debug.LogError($"{nameof(SwordActionPresenter)} on {name}에는 검 연출 기준 {nameof(GridActor)} 참조가 필요합니다.", this);
@@ -437,13 +442,14 @@ public class SwordActionPresenter : MonoBehaviour, IPresentationEventHandler
     /// </summary>
     public bool HasValidData()
     {
+        if (!HasValidReference()) return false;
         if (meleeTiltAngle < 0f || meleeTiltAngle > 180f)
         {
             Debug.LogError($"{nameof(SwordActionPresenter)} on {name}의 근접 검 기울기 각도는 0 이상 180 이하여야 합니다.", this);
             return false;
         }
 
-        if (pathVfxId == VfxId.None || pathVfxWidth <= 0f || swordTravelSpeed <= 0f || minimumTravelDuration <= 0f || trailFadeDuration <= 0f || trailTailLength <= 0f || trailHeadLength <= 0f)
+        if (!presentationContext.Vfx.HasValidData(pathVfx) || pathVfxWidth <= 0f || swordTravelSpeed <= 0f || minimumTravelDuration <= 0f || trailFadeDuration <= 0f || trailTailLength <= 0f || trailHeadLength <= 0f)
         {
             Debug.LogError($"{nameof(SwordActionPresenter)} on {name}의 검 경로 VFX 두께와 길이 배율은 0보다 커야 합니다.", this);
             return false;

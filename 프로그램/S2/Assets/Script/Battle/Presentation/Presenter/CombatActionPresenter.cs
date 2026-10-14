@@ -9,6 +9,9 @@ using UnityEngine;
 /// </summary>
 public class CombatActionPresenter : MonoBehaviour, IPresentationEventHandler
 {
+    // 현재 씬의 VFX·오디오 재생 담당을 명시적으로 제공한다.
+    [SerializeField] private BattlePresentationContext presentationContext;
+
     [Header("Reference")]
     // 논리 Actor를 화면 표시용 ActorVisualController로 변환할 씬 단위 등록소다.
     [SerializeField] private ActorPresentationRegistry presentationRegistry;
@@ -58,6 +61,8 @@ public class CombatActionPresenter : MonoBehaviour, IPresentationEventHandler
     // 현재 전투에 대여한 공격자/대상 단발 VFX다.
     private VfxHandle attackerEffect;
     private VfxHandle targetEffect;
+    // 정상 완료 후 잔향은 유지하고, 담당 비활성화 때만 직접 시작한 소리를 중단한다.
+    private readonly List<SoundHandle> ownedSounds = new();
 
     // 전투 자세가 시작된 직후 검 같은 부가 Visual에 현재 이벤트를 알린다.
     public event Action<PresentationEvent> CombatPresentationStarted;
@@ -103,6 +108,8 @@ public class CombatActionPresenter : MonoBehaviour, IPresentationEventHandler
         }
 
         ReleaseCombatEffects();
+        foreach (var sound in ownedSounds) sound.Stop();
+        ownedSounds.Clear();
         NotifyCombatPresentationCompleted();
         RestoreActiveVisuals();
 
@@ -170,7 +177,7 @@ public class CombatActionPresenter : MonoBehaviour, IPresentationEventHandler
     {
         entry = default;
 
-        if (VfxManager.Instance == null || !VfxManager.Instance.isActiveAndEnabled)
+        if (presentationContext == null || presentationContext.Vfx == null || !presentationContext.Vfx.isActiveAndEnabled)
         {
             Debug.LogError("전투 연출에 필요한 활성 VfxManager가 없습니다.", this);
             return false;
@@ -313,9 +320,18 @@ public class CombatActionPresenter : MonoBehaviour, IPresentationEventHandler
     private void BeginCombatEffects(CombatPresentationEntry entry)
     {
         // 맨손 충격은 접촉한 대상에만 표시하며 빗나간 경우에는 공용 회피만 표시한다.
-        if (entry.AttackerVfx != VfxId.None && !(activeAttackMissed && entry.AttackKind == AttackPresentationKind.MeleeUnarmed))
-            attackerEffect = VfxManager.TryAcquire(entry.AttackerVfx);
-        targetEffect = VfxManager.TryAcquire(activeAttackMissed ? VfxId.SharedDodge : VfxId.SharedBloodHit);
+        if (entry.AttackerVfx != null && !(activeAttackMissed && entry.AttackKind == AttackPresentationKind.MeleeUnarmed))
+            attackerEffect = presentationContext.Vfx.Acquire(entry.AttackerVfx);
+        targetEffect = presentationContext.Vfx.Acquire(activeAttackMissed ? entry.MissVfx : entry.HitVfx);
+        if(entry.PlayAudio)
+        {
+            // 현재 전투는 발사·피격 자세가 같은 타격 프레임에 시작하므로 소리도 같은 박자에 요청한다.
+            ownedSounds.RemoveAll(sound => !sound.IsValid);
+            var fire = presentationContext.Audio.Play(entry.FireSound,activeAttackerVisual.TargetRenderer.bounds.center);
+            var result = presentationContext.Audio.Play(activeAttackMissed?entry.MissSound:entry.HitSound,activeTargetVisual.TargetRenderer.bounds.center);
+            if (fire != null) ownedSounds.Add(fire);
+            if (result != null) ownedSounds.Add(result);
+        }
         UpdateCombatEffects(entry, 1f);
     }
 
@@ -442,6 +458,8 @@ public class CombatActionPresenter : MonoBehaviour, IPresentationEventHandler
     /// </summary>
     public bool HasValidReference()
     {
+        if (presentationContext == null || presentationContext.Vfx == null || presentationContext.Audio == null)
+        { Debug.LogError("전투 연출 Context에 VFX·오디오 담당이 필요합니다.",this); return false; }
         if (cameraPresenter == null)
         {
             Debug.LogError("전투 연출 카메라 참조가 없습니다.", this);
@@ -470,6 +488,7 @@ public class CombatActionPresenter : MonoBehaviour, IPresentationEventHandler
     /// <summary>공통 데이터와 배우별 공격 데이터에 동일한 검증 규칙을 적용한다.</summary>
     private bool HasValidData(CombatPresentationData presentationData)
     {
+        if (!HasValidReference()) return false;
         if (presentationData == null)
         {
             Debug.LogError($"{nameof(CombatActionPresenter)} on {name}에는 검사할 {nameof(CombatPresentationData)}가 필요합니다.", this);
@@ -514,6 +533,10 @@ public class CombatActionPresenter : MonoBehaviour, IPresentationEventHandler
                 return false;
             }
 
+            if ((entry.AttackerVfx != null && !presentationContext.Vfx.HasValidData(entry.AttackerVfx)) ||
+                !presentationContext.Vfx.HasValidData(entry.HitVfx) || !presentationContext.Vfx.HasValidData(entry.MissVfx)) return false;
+            if (entry.PlayAudio && (!presentationContext.Audio.HasValidData(entry.FireSound) ||
+                !presentationContext.Audio.HasValidData(entry.HitSound) || !presentationContext.Audio.HasValidData(entry.MissSound))) return false;
             if (entry.VfxDelay < 0f || entry.VfxDuration <= 0f || entry.VfxHeightRatio <= 0f ||
                 entry.VfxDelay + entry.VfxDuration > entry.PresentationDuration)
             {

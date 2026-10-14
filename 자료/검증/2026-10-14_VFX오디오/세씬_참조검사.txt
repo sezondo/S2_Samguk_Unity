@@ -1,0 +1,4 @@
+PASS
+Assets/Scenes/Test/BattleTest01.unity: 전투·검·해킹·배우 데이터·유진 총격 참조 정상
+Assets/Scenes/Test/BattleTest02.unity: 전투·검·해킹·배우 데이터·유진 총격 참조 정상
+Assets/Scenes/Tset.unity: 전투·검·해킹·배우 데이터·유진 총격 참조 정상

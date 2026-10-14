@@ -1,0 +1,31 @@
+PASS
+PASS 입장 큐 완료
+PASS 오디오 명시 참조와 활성 상태
+PASS YujinGunFire 후보 3개
+PASS YujinGunHit 후보 3개
+PASS YujinGunMiss 후보 3개
+PASS 동일 VFX 동시 대여 분리
+PASS 기존 VFX 예열 풀 재사용
+PASS VFX 이전 핸들 재사용 간섭 차단
+PASS 미리 생성 목록 밖 데이터 직접 재생
+PASS VFX 비활성화 시 전체 반납
+PASS 효과음 후보·음높이 선택이 전투 난수에 영향 없음
+PASS 예열 오디오 4개 동시 사용
+PASS 음원 후보·음높이·음량·2D 설정
+PASS 오디오 장치에서 실제 샘플 재생 진행
+PASS 오디오 이전 핸들 차단·풀 재사용
+PASS 재생 중 전체 음량 조정
+PASS 시간 정지 동안 오디오 대여 유지
+PASS 재개 후 종료 소스 자동 회수
+PASS 동시 16개 한도에서 기존 소리 유지
+PASS 비활성화 시 소리 정지·핸들 무효화
+PASS 총격 명중 발사·결과음 각각 1회
+PASS 총격 소리와 타격 VFX 같은 프레임
+PASS 연출 완료가 발사음 잔향을 기다리지 않음
+PASS 소리 재생으로 HP·AP 변경 없음
+PASS 총격 회피 발사·결과음 각각 1회
+PASS 총격 소리와 타격 VFX 같은 프레임
+PASS 연출 완료가 발사음 잔향을 기다리지 않음
+PASS 소리 재생으로 HP·AP 변경 없음
+PASS 전투 담당 중단 시 자체 효과음·이벤트 정리
+PASS 새 런타임 오류 없음: 

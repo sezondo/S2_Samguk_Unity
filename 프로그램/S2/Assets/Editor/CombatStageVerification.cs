@@ -155,7 +155,8 @@ public static class CombatStageVerification
         var camera = Find<CombatCameraPresenter>();
         var combat = Find<CombatActionPresenter>();
         var registry = ActorPresentationRegistry.Instance;
-        var player = PlayerUnitControlManager.Instance.ActiveUnit;
+        // 시작 대사가 제어권을 잠근 1-1에서도 실제 유진의 표시 연출을 독립 검증한다.
+        var player = GameObject.Find("Player Actor Root").GetComponentInChildren<TacticalUnitContext>();
         var enemies = EnemyRegistry.Instance.Enemies.Where(e => e.IsAlive).ToArray();
         Check(enemies.Length >= 2, "검증용 대상과 주변 배우 존재");
         var target = enemies[0].GridActor;
@@ -355,10 +356,10 @@ public static class CombatStageVerification
 
         // 천하회 네 공격은 실제 큐에서 원화 선택·회피·거리 대응·풀 반납을 검증한다.
         foreach (var spec in new[] {
-            ("천하회_망치", AttackPresentationKind.EnemyMelee, VfxId.CheonhaHammer),
-            ("천하회_작은못", AttackPresentationKind.EnemyMelee, VfxId.CheonhaClub),
-            ("천하회_작은못", AttackPresentationKind.EnemyRanged, VfxId.CheonhaCrossbow),
-            ("천하회_큰못", AttackPresentationKind.EnemyRanged, VfxId.CheonhaBow) })
+            ("천하회_망치", AttackPresentationKind.EnemyMelee, AssetDatabase.LoadAssetAtPath<VfxData>("Assets/Data/Battle/Presentation/Vfx/CheonhaHammer.asset")),
+            ("천하회_작은못", AttackPresentationKind.EnemyMelee, AssetDatabase.LoadAssetAtPath<VfxData>("Assets/Data/Battle/Presentation/Vfx/CheonhaClub.asset")),
+            ("천하회_작은못", AttackPresentationKind.EnemyRanged, AssetDatabase.LoadAssetAtPath<VfxData>("Assets/Data/Battle/Presentation/Vfx/CheonhaCrossbow.asset")),
+            ("천하회_큰못", AttackPresentationKind.EnemyRanged, AssetDatabase.LoadAssetAtPath<VfxData>("Assets/Data/Battle/Presentation/Vfx/CheonhaBow.asset")) })
         {
             var source = enemies.First(e => e.EnemyData.name == spec.Item1);
             registry.TryGetVisual(source.GridActor, out var visual);
@@ -383,9 +384,9 @@ public static class CombatStageVerification
                     if(effect!=null && !checkedEffect)
                     {
                         checkedEffect=true; borrowed=effect;
-                        Check((VfxId)Get(effect,"id")==spec.Item3, spec.Item3+" 실제 대여 "+hit);
+                        Check(effect.Data==spec.Item3, spec.Item3+" 실제 대여 "+hit);
                         var targetFx=(VfxHandle)Get(combat,"targetEffect");
-                        Check((VfxId)Get(targetFx,"id")== (hit?VfxId.SharedBloodHit:VfxId.SharedDodge),spec.Item3+" 피격/회피 분기 "+hit);
+                        Check(targetFx.Data== (hit?settings.HitVfx:settings.MissVfx),spec.Item3+" 피격/회피 분기 "+hit);
                         Check(actorVisual.CurrentAnimationStateName==(hit?"Hit":"Dodge"), spec.Item3+" 대상 자세 동시 표시 "+hit);
                         if(settings.SpanToTarget)
                         {
