@@ -21,6 +21,9 @@ public static class Stage11TutorialVerification
     private static readonly List<string> results = new();
     private static double deadline;
     private static AttackRecorder recorder;
+    // 실제 한 판에서 요청된 효과음과 횟수를 기록한다.
+    private static AudioManager audio;
+    private static readonly Dictionary<string,int> soundCounts = new();
 
     /// <summary>플레이 진입과 중단 이벤트를 연결한다.</summary>
     static Stage11TutorialVerification() => EditorApplication.playModeStateChanged += OnMode;
@@ -56,9 +59,11 @@ public static class Stage11TutorialVerification
     /// <summary>결과와 실패 시점 화면을 남기고 편집 모드로 복귀한다.</summary>
     private static void Finish(Exception error)
     {
+        if(audio!=null)audio.SoundStarted-=RecordSound;
         EditorApplication.update-=Tick; (routine as IDisposable)?.Dispose(); routine=null;
         if(recorder!=null)ActionLogicEventBus.Unregister(recorder); recorder=null;
         File.WriteAllText(Folder+"/verification.txt",(error==null?"PASS":"FAIL "+error)+"\n"+string.Join("\n",results));
+        File.AppendAllText(Folder+"/verification.txt","\n실제 효과음: "+string.Join(", ",soundCounts.Select(pair=>pair.Key+"="+pair.Value)));
         if(error==null)Debug.Log($"1-1 튜토리얼 전체 진행 검사 {results.Count}개 통과"); else Debug.LogError("1-1 튜토리얼 검증 실패: "+error);
         EditorApplication.isPlaying=false;
     }
@@ -67,6 +72,8 @@ public static class Stage11TutorialVerification
     private static IEnumerator Run()
     {
         Application.runInBackground=true;
+        audio=UnityEngine.Object.FindFirstObjectByType<BattlePresentationContext>().Audio;
+        soundCounts.Clear(); audio.SoundStarted+=RecordSound;
         var t=UnityEngine.Object.FindFirstObjectByType<BattleTutorialController>();
         Check(t!=null,"튜토리얼 씬 연결");
         while(t.PlayerTurnNumber==0)yield return null;
@@ -220,8 +227,19 @@ public static class Stage11TutorialVerification
         var resultRoot=(GameObject)new SerializedObject(resultPresenter).FindProperty("resultRoot").objectReferenceValue;
         while(!resultRoot.activeInHierarchy)yield return null;
         Check(resultRoot.activeInHierarchy,"이동 연출 완료 후 클리어 결과 창 표시");
+        var expectedSounds=new[]{"YujinGunFire","YujinGunHit","SwordScout","SwordRecall","SwordAttack","SwordMelee","Unarmed",
+            "Bow","Hammer","ImpactHit","Dodge","Death","Alert","HackStart","HackComplete","DoorOpen","ElevatorDepart","ManualOpen","ManualClose"};
+        foreach(var sound in expectedSounds)Check(soundCounts.ContainsKey(sound),"실제 튜토리얼 효과음 재생 "+sound);
+        Check(soundCounts["YujinGunFire"]==2&&soundCounts["SwordAttack"]==1,"지정 총격 2회·공격 투척 1회 소리 중복 없음");
         yield return Pause(.2);
         ScreenCapture.CaptureScreenshot(Folder+"/cleared.png"); yield return Pause(.4);
+    }
+
+    /// <summary>실제 재생 담당에 요청된 효과음 데이터를 센다.</summary>
+    private static void RecordSound(SoundHandle sound)
+    {
+        soundCounts.TryGetValue(sound.Data.name,out int count);
+        soundCounts[sound.Data.name]=count+1;
     }
 
     /// <summary>실제 조작과 같은 선택 함수·행동 흐름을 사용한다.</summary>

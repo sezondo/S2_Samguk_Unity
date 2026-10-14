@@ -32,10 +32,13 @@ public struct CombatPresentationEntry
 
     // 이번 공격의 명중·회피 때 대상에게 표시할 공유 이펙트다.
     [SerializeField] private VfxData hitVfx, missVfx;
-    // 효과음을 연결한 연출만 켠다. 켜진 경우 발사·명중·회피 참조가 모두 필수다.
+    // 효과음을 연결한 연출만 켠다. 켜진 경우 공격·명중·회피·사망 참조가 모두 필수다.
     [SerializeField] private bool playAudio;
     // 공격자 발사음과 판정 결과에 맞는 대상 소리를 직접 연결한다.
     [SerializeField] private SoundData fireSound, hitSound, missSound;
+    // 치명 피해 때 결과음에 더하는 짧은 쓰러짐 소리다. 오디오 사용 시 필수다.
+    [SerializeField] private SoundData deathSound;
+    public SoundData DeathSound => deathSound;
     public VfxData HitVfx => hitVfx;
     public VfxData MissVfx => missVfx;
     public bool PlayAudio => playAudio;

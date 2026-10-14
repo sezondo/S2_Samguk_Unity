@@ -9,6 +9,10 @@ public class SwordActionPresenter : MonoBehaviour, IPresentationEventHandler
 {
     // 현재 씬의 VFX·오디오 재생 담당을 명시적으로 제공한다.
     [SerializeField] private BattlePresentationContext presentationContext;
+    // 정찰용 투척과 회수는 전투 타격음과 별도로 재생한다.
+    [SerializeField] private SoundData scoutSound, recallSound;
+    // 이 검 이동 담당이 시작한 잔향의 중단 권한이다.
+    private readonly PresentationAudioScope sounds = new();
 
     [Header("Target")]
     // 이 Presenter가 처리할 플레이어 논리 Actor다.
@@ -125,6 +129,7 @@ public class SwordActionPresenter : MonoBehaviour, IPresentationEventHandler
         swordMoveCoroutine = null;
         trailEffect?.Release(); trailEffect = null;
         moveHandle?.Complete(); moveHandle = null;
+        sounds.StopAll();
     }
 
     /// <summary>
@@ -193,6 +198,9 @@ public class SwordActionPresenter : MonoBehaviour, IPresentationEventHandler
             yield break;
         }
         if (isRecalledVisual) ApplyRecalledPosition();
+        // 적을 겨냥한 전투 투척은 CombatActionPresenter가 타격음까지 한 번 재생한다.
+        if (!(combatThrow && combatActionPresenter.CameraPresenter.HasActorTarget))
+            sounds.Play(presentationContext, evt.SwordMoveKind == SwordMoveKind.Recall ? recallSound : scoutSound, swordVisual.position);
         Vector3 from = swordVisual.position;
         Vector3 to = evt.SwordMoveKind == SwordMoveKind.Recall
             ? GetRecalledWorldPosition()
@@ -402,8 +410,8 @@ public class SwordActionPresenter : MonoBehaviour, IPresentationEventHandler
     /// </summary>
     public bool HasValidReference()
     {
-        if (presentationContext == null || presentationContext.Vfx == null)
-        { Debug.LogError("검 연출 Context에 VFX 담당이 필요합니다.",this); return false; }
+        if (presentationContext == null || presentationContext.Vfx == null || presentationContext.Audio == null)
+        { Debug.LogError("검 연출 Context에 VFX·오디오 담당이 필요합니다.",this); return false; }
         if (ownerActor == null)
         {
             Debug.LogError($"{nameof(SwordActionPresenter)} on {name}에는 검 연출 기준 {nameof(GridActor)} 참조가 필요합니다.", this);
@@ -443,6 +451,8 @@ public class SwordActionPresenter : MonoBehaviour, IPresentationEventHandler
     public bool HasValidData()
     {
         if (!HasValidReference()) return false;
+        if (presentationContext.Audio == null || !presentationContext.Audio.HasValidData(scoutSound) ||
+            !presentationContext.Audio.HasValidData(recallSound)) return false;
         if (meleeTiltAngle < 0f || meleeTiltAngle > 180f)
         {
             Debug.LogError($"{nameof(SwordActionPresenter)} on {name}의 근접 검 기울기 각도는 0 이상 180 이하여야 합니다.", this);

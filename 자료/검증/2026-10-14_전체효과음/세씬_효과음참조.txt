@@ -1,0 +1,4 @@
+PASS
+Assets/Scenes/Test/BattleTest01.unity: 25종 후보·정지 정책·전투·검·발각·해킹·문·결과·메뉴·수첩·버튼 연결 정상
+Assets/Scenes/Test/BattleTest02.unity: 25종 후보·정지 정책·전투·검·발각·해킹·문·결과·메뉴·수첩·버튼 연결 정상
+Assets/Scenes/Tset.unity: 25종 후보·정지 정책·전투·검·발각·해킹·문·결과·메뉴·수첩·버튼 연결 정상

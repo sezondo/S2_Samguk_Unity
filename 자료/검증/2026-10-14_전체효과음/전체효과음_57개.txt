@@ -1,0 +1,59 @@
+PASS
+PASS 입장 큐 완료
+PASS 메뉴 열기와 시간 정지
+PASS 정지 중 UI 실제 샘플 진행
+PASS 동시에 전투 소리는 일시 정지
+PASS 메뉴에서 수첩 펼치기 1회
+PASS 넘김 중 중복·잘못된 요청에는 소리 없음
+PASS 반대 방향 페이지 넘김 소리 1회
+PASS 같은 페이지 요청 무음
+PASS 수첩 덮기 소리 1회
+PASS 메뉴 닫기·시간 재개
+PASS 실제 포인터 확정 클릭과 수첩 펼침
+PASS 준비 중 설정 버튼 무음
+PASS SwordAttack 공격음 한 번·결과음 한 번 True
+PASS 판정 결과에 맞는 소리 SwordAttack True
+PASS SwordAttack 공격음 한 번·결과음 한 번 False
+PASS 판정 결과에 맞는 소리 SwordAttack False
+PASS SwordMelee 공격음 한 번·결과음 한 번 True
+PASS 판정 결과에 맞는 소리 SwordMelee True
+PASS SwordMelee 공격음 한 번·결과음 한 번 False
+PASS 판정 결과에 맞는 소리 SwordMelee False
+PASS Unarmed 공격음 한 번·결과음 한 번 True
+PASS 판정 결과에 맞는 소리 Unarmed True
+PASS Unarmed 공격음 한 번·결과음 한 번 False
+PASS 판정 결과에 맞는 소리 Unarmed False
+PASS YujinGunFire 공격음 한 번·결과음 한 번 True
+PASS 판정 결과에 맞는 소리 YujinGunFire True
+PASS YujinGunFire 공격음 한 번·결과음 한 번 False
+PASS 판정 결과에 맞는 소리 YujinGunFire False
+PASS Hammer 공격음 한 번·결과음 한 번 True
+PASS 판정 결과에 맞는 소리 Hammer True
+PASS Hammer 공격음 한 번·결과음 한 번 False
+PASS 판정 결과에 맞는 소리 Hammer False
+PASS Club 공격음 한 번·결과음 한 번 True
+PASS 판정 결과에 맞는 소리 Club True
+PASS Club 공격음 한 번·결과음 한 번 False
+PASS 판정 결과에 맞는 소리 Club False
+PASS Crossbow 공격음 한 번·결과음 한 번 True
+PASS 판정 결과에 맞는 소리 Crossbow True
+PASS Crossbow 공격음 한 번·결과음 한 번 False
+PASS 판정 결과에 맞는 소리 Crossbow False
+PASS Bow 공격음 한 번·결과음 한 번 True
+PASS 판정 결과에 맞는 소리 Bow True
+PASS Bow 공격음 한 번·결과음 한 번 False
+PASS 판정 결과에 맞는 소리 Bow False
+PASS 치명 피해는 공격·피격·쓰러짐 각 1회
+PASS 정찰 투척·회수는 전투음 중복 없음 False
+PASS 정찰 투척·회수는 전투음 중복 없음 True
+PASS 기척·발각 점멸 소리 1회 False
+PASS 기척·발각 점멸 소리 1회 True
+PASS 해킹 실제 큐의 접속·완료 소리 각 1회
+PASS 문 연출 소리 1회·큐 대기 추가 없음
+PASS 스테이지 결과 소리 한 번 False
+PASS 결과 담당 중단에서 대기 해제
+PASS 스테이지 결과 소리 한 번 True
+PASS 결과 담당 중단에서 대기 해제
+PASS 새 25종 모두 실제 Presenter·UI에서 요청됨: 
+PASS 새 런타임 오류 없음: 
+재생 데이터: MenuOpen, YujinGunFire, ManualOpen, PageTurn, ManualClose, MenuClose, UiClick, SwordAttack, ImpactHit, Dodge, SwordMelee, Unarmed, YujinGunHit, YujinGunMiss, Hammer, Club, Crossbow, Bow, Death, SwordScout, SwordRecall, Suspicion, Alert, HackStart, HackComplete, DoorOpen, MissionFail, ElevatorDepart

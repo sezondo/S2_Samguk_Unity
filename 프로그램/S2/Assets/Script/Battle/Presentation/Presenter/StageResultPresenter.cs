@@ -9,6 +9,11 @@ using UnityEngine.UI;
 /// </summary>
 public class StageResultPresenter : MonoBehaviour, IPresentationEventHandler
 {
+    // 승강기 진입·작전 실패 소리와 재생 담당이다.
+    [SerializeField] private BattlePresentationContext presentationContext;
+    [SerializeField] private SoundData clearedSound, failedSound;
+    // 결과 화면을 중단할 때 정리할 소리의 권한이다.
+    private readonly PresentationAudioScope sounds = new();
     [Header("Reference")]
     // 결과가 발생하기 전에는 숨겨 둘 임시 결과 UI 루트다.
     [SerializeField] private GameObject resultRoot;
@@ -36,7 +41,7 @@ public class StageResultPresenter : MonoBehaviour, IPresentationEventHandler
     /// </summary>
     private void Awake()
     {
-        if (!HasValidReference())
+        if (!HasValidReference() || !HasValidData())
         {
             enabled = false;
             return;
@@ -72,6 +77,7 @@ public class StageResultPresenter : MonoBehaviour, IPresentationEventHandler
     /// </summary>
     private void OnDisable()
     {
+        sounds.StopAll();
         // 씬 종료·비활성화는 결과 확정으로 취급하지 않고 대기 핸들만 정리한다.
         var handle = pendingHandle;
         pendingHandle = null;
@@ -147,6 +153,7 @@ public class StageResultPresenter : MonoBehaviour, IPresentationEventHandler
 
         pendingCleared = presentationEvent.Type == PresentationEventType.StageCleared;
         pendingHandle = handle;
+        sounds.Play(presentationContext, pendingCleared ? clearedSound : failedSound, transform.position);
         titleText.text = pendingCleared ? "MISSION COMPLETE" : "MISSION FAILED";
         descriptionText.text = pendingCleared
             ? "목표를 달성했습니다.\n확인하면 다음 이야기 또는 로비로 이동합니다."
@@ -183,6 +190,8 @@ public class StageResultPresenter : MonoBehaviour, IPresentationEventHandler
     /// </summary>
     public bool HasValidReference()
     {
+        if (presentationContext == null || presentationContext.Audio == null)
+        { Debug.LogError("스테이지 결과에는 오디오 담당 Context가 필요합니다.", this); return false; }
         if (resultRoot == null || titleText == null || descriptionText == null || confirmButton == null)
         {
             Debug.LogError($"{nameof(StageResultPresenter)} on {name}에는 결과 UI 루트·텍스트·버튼 참조가 필요합니다.", this);
@@ -190,5 +199,13 @@ public class StageResultPresenter : MonoBehaviour, IPresentationEventHandler
         }
 
         return true;
+    }
+
+    /// <summary>스테이지 진입·실패 결과에 사용하는 효과음 데이터를 검사한다.</summary>
+    public bool HasValidData()
+    {
+        if (presentationContext == null || presentationContext.Audio == null)
+        { Debug.LogError("스테이지 결과의 오디오 담당 참조가 없습니다.", this); return false; }
+        return presentationContext.Audio.HasValidData(clearedSound) && presentationContext.Audio.HasValidData(failedSound);
     }
 }

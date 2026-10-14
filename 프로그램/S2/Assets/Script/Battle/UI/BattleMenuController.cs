@@ -9,6 +9,10 @@ public sealed class BattleMenuController : MonoBehaviour
 {
     // 같은 루트에 명시적으로 연결한 화면 참조다.
     [SerializeField] private BattleMenuContext context;
+    // 창·책을 펼치거나 덮을 때의 조작 효과음이다. 정지 중에도 재생하도록 데이터를 지정한다.
+    [SerializeField] private SoundData menuOpenSound, menuCloseSound, manualOpenSound, manualCloseSound;
+    // 이 메뉴 담당이 재생한 조작 소리의 중단 권한이다.
+    private readonly PresentationAudioScope sounds = new();
     // 현재 창과 수첩을 덮었을 때 돌아갈 창이다.
     public enum Window { None, Menu, Manual, Quit }
     private Window window, returnWindow;
@@ -27,7 +31,7 @@ public sealed class BattleMenuController : MonoBehaviour
     private void Awake()
     {
         if (Instance != null && Instance != this) { Debug.LogError("전투 메뉴가 중복 연결됐습니다.", this); enabled = false; return; }
-        if (!HasValidReference()) { enabled = false; return; }
+        if (!HasValidReference() || !HasValidData()) { enabled = false; return; }
         Instance = this;
         context.settings.interactable = false;
         context.menuOpen.onClick.AddListener(OpenMenu);
@@ -68,6 +72,11 @@ public sealed class BattleMenuController : MonoBehaviour
     /// <summary>새 창을 열 때만 기존 시간 배율을 저장하고 게임 진행을 정지한다.</summary>
     private void SetWindow(Window next)
     {
+        if (window == next) return;
+        // 클릭 소리와 창 전환 소리는 별개이며 실제 전환이 승인됐을 때만 재생한다.
+        SoundData sound = next == Window.Manual ? manualOpenSound : window == Window.Manual ? manualCloseSound :
+            next == Window.None ? menuCloseSound : menuOpenSound;
+        sounds.Play(context.presentation, sound, Vector3.zero);
         if (window == Window.None && next != Window.None) { previousTimeScale = Time.timeScale; Time.timeScale = 0; }
         if (window != Window.None && next == Window.None) { context.manualView.ResetTurn(); Time.timeScale = previousTimeScale; }
         consumedFrame = Time.frameCount;
@@ -143,6 +152,7 @@ public sealed class BattleMenuController : MonoBehaviour
     /// <summary>씬을 나갈 때 정지 배율과 전역 참조를 남기지 않는다.</summary>
     private void OnDestroy()
     {
+        sounds.StopAll();
         if (Instance != this) return;
         if (window != Window.None) Time.timeScale = previousTimeScale;
         Instance = null;
@@ -152,6 +162,8 @@ public sealed class BattleMenuController : MonoBehaviour
     public bool HasValidReference()
     {
         if (context == null) { Debug.LogError("전투 메뉴 Context가 필요합니다.", this); return false; }
+        if (context.presentation == null || context.presentation.Audio == null)
+        { Debug.LogError("전투 메뉴에는 오디오 담당 Context가 필요합니다.", this); return false; }
         UnityEngine.Object[] refs = {context.overlay, context.menu, context.manual, context.quit, context.menuOpen, context.manualOpen,
             context.menuClose, context.settings, context.menuManual, context.menuQuit, context.quitClose, context.quitCancel, context.quitAccept,
             context.manualClose, context.previous, context.next, context.manualView};
@@ -160,5 +172,15 @@ public sealed class BattleMenuController : MonoBehaviour
         if (valid) foreach (var tab in context.tabs) valid &= tab is BattleUiButton;
         if (!valid) Debug.LogError("전투 메뉴의 창·버튼 참조가 누락됐습니다.", this);
         return valid;
+    }
+
+    /// <summary>시간 정지 중에도 들려야 하는 창 전환 데이터의 연결과 재생 정책을 검사한다.</summary>
+    public bool HasValidData()
+    {
+        if (!HasValidReference()) return false;
+        foreach (var data in new[] {menuOpenSound, menuCloseSound, manualOpenSound, manualCloseSound})
+            if (!context.presentation.Audio.HasValidData(data) || !data.PlayDuringPause)
+            { Debug.LogError("메뉴 효과음은 유효하며 정지 중 재생이 켜져 있어야 합니다.", this); return false; }
+        return true;
     }
 }

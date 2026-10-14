@@ -1,0 +1,352 @@
+[
+  {
+    "file": "SwordScout_01.wav",
+    "duration": 0.43,
+    "peak": 0.7,
+    "rms": 0.08613246980958993,
+    "clipped": 0
+  },
+  {
+    "file": "SwordScout_02.wav",
+    "duration": 0.43,
+    "peak": 0.6999999999999998,
+    "rms": 0.10098986597365923,
+    "clipped": 0
+  },
+  {
+    "file": "SwordAttack_01.wav",
+    "duration": 0.32,
+    "peak": 0.7,
+    "rms": 0.10214070042536931,
+    "clipped": 0
+  },
+  {
+    "file": "SwordAttack_02.wav",
+    "duration": 0.32,
+    "peak": 0.7,
+    "rms": 0.10103188651456543,
+    "clipped": 0
+  },
+  {
+    "file": "SwordRecall_01.wav",
+    "duration": 0.42,
+    "peak": 0.7,
+    "rms": 0.1080683203104312,
+    "clipped": 0
+  },
+  {
+    "file": "SwordRecall_02.wav",
+    "duration": 0.42,
+    "peak": 0.7,
+    "rms": 0.0897519980761057,
+    "clipped": 0
+  },
+  {
+    "file": "SwordMelee_01.wav",
+    "duration": 0.38,
+    "peak": 0.7,
+    "rms": 0.08886378015179745,
+    "clipped": 0
+  },
+  {
+    "file": "SwordMelee_02.wav",
+    "duration": 0.38,
+    "peak": 0.6999999999999998,
+    "rms": 0.11065676753838204,
+    "clipped": 0
+  },
+  {
+    "file": "Unarmed_01.wav",
+    "duration": 0.22,
+    "peak": 0.7,
+    "rms": 0.12880557071862284,
+    "clipped": 0
+  },
+  {
+    "file": "Unarmed_02.wav",
+    "duration": 0.22,
+    "peak": 0.7,
+    "rms": 0.13277441886502495,
+    "clipped": 0
+  },
+  {
+    "file": "Hammer_01.wav",
+    "duration": 0.48,
+    "peak": 0.7,
+    "rms": 0.08087417740169817,
+    "clipped": 0
+  },
+  {
+    "file": "Hammer_02.wav",
+    "duration": 0.48,
+    "peak": 0.7,
+    "rms": 0.08277257488166911,
+    "clipped": 0
+  },
+  {
+    "file": "Club_01.wav",
+    "duration": 0.32,
+    "peak": 0.7,
+    "rms": 0.08701094938040974,
+    "clipped": 0
+  },
+  {
+    "file": "Club_02.wav",
+    "duration": 0.32,
+    "peak": 0.7,
+    "rms": 0.09292744304919812,
+    "clipped": 0
+  },
+  {
+    "file": "Crossbow_01.wav",
+    "duration": 0.33,
+    "peak": 0.7,
+    "rms": 0.10276743876823954,
+    "clipped": 0
+  },
+  {
+    "file": "Crossbow_02.wav",
+    "duration": 0.33,
+    "peak": 0.7,
+    "rms": 0.08966984053779142,
+    "clipped": 0
+  },
+  {
+    "file": "Bow_01.wav",
+    "duration": 0.36,
+    "peak": 0.7,
+    "rms": 0.10352872029099638,
+    "clipped": 0
+  },
+  {
+    "file": "Bow_02.wav",
+    "duration": 0.36,
+    "peak": 0.7,
+    "rms": 0.09938442194127549,
+    "clipped": 0
+  },
+  {
+    "file": "ImpactHit_01.wav",
+    "duration": 0.29,
+    "peak": 0.7,
+    "rms": 0.08436351065679408,
+    "clipped": 0
+  },
+  {
+    "file": "ImpactHit_02.wav",
+    "duration": 0.29,
+    "peak": 0.6999999999999998,
+    "rms": 0.09747384701335886,
+    "clipped": 0
+  },
+  {
+    "file": "Dodge_01.wav",
+    "duration": 0.24,
+    "peak": 0.7,
+    "rms": 0.12941973915680693,
+    "clipped": 0
+  },
+  {
+    "file": "Dodge_02.wav",
+    "duration": 0.24,
+    "peak": 0.7,
+    "rms": 0.1290816212338132,
+    "clipped": 0
+  },
+  {
+    "file": "Death_01.wav",
+    "duration": 0.55,
+    "peak": 0.7,
+    "rms": 0.08722979817888024,
+    "clipped": 0
+  },
+  {
+    "file": "Death_02.wav",
+    "duration": 0.55,
+    "peak": 0.7,
+    "rms": 0.05919169444772886,
+    "clipped": 0
+  },
+  {
+    "file": "Alert_01.wav",
+    "duration": 0.48,
+    "peak": 0.7,
+    "rms": 0.12432237481839253,
+    "clipped": 0
+  },
+  {
+    "file": "Alert_02.wav",
+    "duration": 0.48,
+    "peak": 0.7,
+    "rms": 0.1476202745555789,
+    "clipped": 0
+  },
+  {
+    "file": "Suspicion_01.wav",
+    "duration": 0.26,
+    "peak": 0.7,
+    "rms": 0.1284123336651376,
+    "clipped": 0
+  },
+  {
+    "file": "Suspicion_02.wav",
+    "duration": 0.26,
+    "peak": 0.6999999999999998,
+    "rms": 0.12864363915553317,
+    "clipped": 0
+  },
+  {
+    "file": "HackStart_01.wav",
+    "duration": 0.68,
+    "peak": 0.7,
+    "rms": 0.10328906182532295,
+    "clipped": 0
+  },
+  {
+    "file": "HackStart_02.wav",
+    "duration": 0.68,
+    "peak": 0.7,
+    "rms": 0.08251758267227628,
+    "clipped": 0
+  },
+  {
+    "file": "HackComplete_01.wav",
+    "duration": 0.47,
+    "peak": 0.7,
+    "rms": 0.12842244989617657,
+    "clipped": 0
+  },
+  {
+    "file": "HackComplete_02.wav",
+    "duration": 0.47,
+    "peak": 0.7,
+    "rms": 0.12151275225225362,
+    "clipped": 0
+  },
+  {
+    "file": "DoorOpen_01.wav",
+    "duration": 1.15,
+    "peak": 0.7,
+    "rms": 0.17186698431122518,
+    "clipped": 0
+  },
+  {
+    "file": "DoorOpen_02.wav",
+    "duration": 1.15,
+    "peak": 0.7,
+    "rms": 0.12700122757904442,
+    "clipped": 0
+  },
+  {
+    "file": "ElevatorDepart_01.wav",
+    "duration": 1.5,
+    "peak": 0.7,
+    "rms": 0.13010197031815338,
+    "clipped": 0
+  },
+  {
+    "file": "ElevatorDepart_02.wav",
+    "duration": 1.5,
+    "peak": 0.7,
+    "rms": 0.13041523780898148,
+    "clipped": 0
+  },
+  {
+    "file": "MissionFail_01.wav",
+    "duration": 0.7,
+    "peak": 0.7,
+    "rms": 0.12134596553982079,
+    "clipped": 0
+  },
+  {
+    "file": "MissionFail_02.wav",
+    "duration": 0.7,
+    "peak": 0.7,
+    "rms": 0.12262119604460579,
+    "clipped": 0
+  },
+  {
+    "file": "ManualOpen_01.wav",
+    "duration": 0.43,
+    "peak": 0.7,
+    "rms": 0.11558113592230587,
+    "clipped": 0
+  },
+  {
+    "file": "ManualOpen_02.wav",
+    "duration": 0.43,
+    "peak": 0.7,
+    "rms": 0.10531461387761,
+    "clipped": 0
+  },
+  {
+    "file": "ManualClose_01.wav",
+    "duration": 0.3,
+    "peak": 0.7,
+    "rms": 0.13259120044518113,
+    "clipped": 0
+  },
+  {
+    "file": "ManualClose_02.wav",
+    "duration": 0.3,
+    "peak": 0.7,
+    "rms": 0.12059760235645489,
+    "clipped": 0
+  },
+  {
+    "file": "PageTurn_01.wav",
+    "duration": 0.46,
+    "peak": 0.7,
+    "rms": 0.10696664340157937,
+    "clipped": 0
+  },
+  {
+    "file": "PageTurn_02.wav",
+    "duration": 0.46,
+    "peak": 0.7,
+    "rms": 0.09661928396780926,
+    "clipped": 0
+  },
+  {
+    "file": "MenuOpen_01.wav",
+    "duration": 0.2,
+    "peak": 0.7,
+    "rms": 0.06955507997090911,
+    "clipped": 0
+  },
+  {
+    "file": "MenuOpen_02.wav",
+    "duration": 0.2,
+    "peak": 0.7,
+    "rms": 0.057871235207523984,
+    "clipped": 0
+  },
+  {
+    "file": "MenuClose_01.wav",
+    "duration": 0.16,
+    "peak": 0.7,
+    "rms": 0.0850149469394266,
+    "clipped": 0
+  },
+  {
+    "file": "MenuClose_02.wav",
+    "duration": 0.16,
+    "peak": 0.7,
+    "rms": 0.06903594100476146,
+    "clipped": 0
+  },
+  {
+    "file": "UiClick_01.wav",
+    "duration": 0.085,
+    "peak": 0.7,
+    "rms": 0.07252404387185526,
+    "clipped": 0
+  },
+  {
+    "file": "UiClick_02.wav",
+    "duration": 0.085,
+    "peak": 0.7,
+    "rms": 0.11772582200269437,
+    "clipped": 0
+  }
+]

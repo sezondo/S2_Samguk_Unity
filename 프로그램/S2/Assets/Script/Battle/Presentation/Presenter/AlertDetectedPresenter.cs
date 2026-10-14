@@ -7,6 +7,11 @@ using UnityEngine;
 /// </summary>
 public class AlertDetectedPresenter : MonoBehaviour, IPresentationEventHandler
 {
+    // 명시적인 재생 담당과 발각·기척 감지 효과음이다.
+    [SerializeField] private BattlePresentationContext presentationContext;
+    [SerializeField] private SoundData alertSound, suspicionSound;
+    // 이 적의 경계 연출에서 시작한 소리를 중단할 권한이다.
+    private readonly PresentationAudioScope sounds = new();
     [Header("Target")]
     // 이 Presenter가 발각 연출을 처리할 적 Context다.
     [SerializeField] private EnemyContext targetEnemy;
@@ -72,6 +77,7 @@ public class AlertDetectedPresenter : MonoBehaviour, IPresentationEventHandler
     /// </summary>
     private void OnDisable()
     {
+        sounds.StopAll();
         UnsubscribeAwarenessState();
         SetAlertIconVisible(false);
         SetAlertIconFlashing(false);
@@ -221,6 +227,8 @@ public class AlertDetectedPresenter : MonoBehaviour, IPresentationEventHandler
     private IEnumerator PlayAlertDetected(PresentationEvent presentationEvent, PresentationEventHandle handle)
     {
         activeHandle = handle;
+        // 인식 상태 동기화 이벤트에는 소리를 붙이지 않고 눈 점멸 진입에만 한 번 재생한다.
+        sounds.Play(presentationContext, presentationEvent.Type == PresentationEventType.AlertDetected ? alertSound : suspicionSound, transform.position);
         SetAlertIconFlashing(true);
 
         if (logAlertFlow)
@@ -283,6 +291,8 @@ public class AlertDetectedPresenter : MonoBehaviour, IPresentationEventHandler
     /// </summary>
     public bool HasValidReference()
     {
+        if (presentationContext == null || presentationContext.Audio == null)
+        { Debug.LogError("발각 연출에는 오디오 담당 Context가 필요합니다.", this); return false; }
         if (targetEnemy == null)
         {
             Debug.LogError($"{nameof(AlertDetectedPresenter)} on {name}에는 발각 연출 대상 {nameof(EnemyContext)} 참조가 필요합니다.", this);
@@ -313,6 +323,7 @@ public class AlertDetectedPresenter : MonoBehaviour, IPresentationEventHandler
     /// </summary>
     public bool HasValidData()
     {
+        if (!HasValidReference() || !presentationContext.Audio.HasValidData(alertSound) || !presentationContext.Audio.HasValidData(suspicionSound)) return false;
         if (flashInterval <= 0f)
         {
             Debug.LogError($"{nameof(AlertDetectedPresenter)} on {name}의 점멸 간격은 0보다 커야 합니다.", this);

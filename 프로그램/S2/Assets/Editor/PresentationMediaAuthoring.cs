@@ -16,6 +16,9 @@ public static class PresentationMediaAuthoring
     [MenuItem("Tools/S2/Apply Presentation Media Data")]
     public static void Apply()
     {
+        // 초기 총격 이관 도구로 전체 효과음 연결을 되돌리는 실수를 막는다.
+        if (AssetDatabase.LoadAssetAtPath<SoundData>(Stage11AudioAuthoring.SoundRoot + "Death.asset") != null)
+        { Debug.LogWarning("전체 효과음이 적용되어 초기 총격 이관을 생략합니다. 새 연결은 Apply 1-1 Full Audio Draft를 사용하세요."); return; }
         if (EditorApplication.isPlayingOrWillChangePlaymode || SceneManager.GetActiveScene().isDirty)
             throw new Exception("저장된 편집 씬에서만 미디어 참조를 연결할 수 있습니다.");
         Directory.CreateDirectory(DataRoot + "Sound");

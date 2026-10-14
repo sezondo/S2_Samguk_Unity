@@ -40,7 +40,7 @@ public sealed class AudioManager : MonoBehaviour
         foreach(var handle in snapshot)
         {
             if (!handle.IsValid) { Stop(handle); continue; }
-            bool pause = Time.timeScale == 0f;
+            bool pause = Time.timeScale == 0f && !handle.Data.PlayDuringPause;
             if(pause && !handle.Paused) { handle.Source.Pause(); handle.Paused=true; }
             else if(!pause && handle.Paused) { handle.Source.UnPause(); handle.Paused=false; }
             if(!handle.Paused && !handle.Source.isPlaying) Stop(handle);
@@ -86,7 +86,7 @@ public sealed class AudioManager : MonoBehaviour
         source.gameObject.SetActive(true);
         var handle=new SoundHandle(this,source,data); active.Add(handle);
         source.Play();
-        if(Time.timeScale==0f) { source.Pause(); handle.Paused=true; }
+        if(Time.timeScale==0f && !data.PlayDuringPause) { source.Pause(); handle.Paused=true; }
         SoundStarted?.Invoke(handle);
         return handle;
     }

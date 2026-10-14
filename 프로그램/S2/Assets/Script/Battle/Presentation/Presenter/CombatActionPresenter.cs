@@ -331,6 +331,11 @@ public class CombatActionPresenter : MonoBehaviour, IPresentationEventHandler
             var result = presentationContext.Audio.Play(activeAttackMissed?entry.MissSound:entry.HitSound,activeTargetVisual.TargetRenderer.bounds.center);
             if (fire != null) ownedSounds.Add(fire);
             if (result != null) ownedSounds.Add(result);
+            if (activeTargetKilled)
+            {
+                var death = presentationContext.Audio.Play(entry.DeathSound, activeTargetVisual.TargetRenderer.bounds.center);
+                if (death != null) ownedSounds.Add(death);
+            }
         }
         UpdateCombatEffects(entry, 1f);
     }
@@ -536,7 +541,8 @@ public class CombatActionPresenter : MonoBehaviour, IPresentationEventHandler
             if ((entry.AttackerVfx != null && !presentationContext.Vfx.HasValidData(entry.AttackerVfx)) ||
                 !presentationContext.Vfx.HasValidData(entry.HitVfx) || !presentationContext.Vfx.HasValidData(entry.MissVfx)) return false;
             if (entry.PlayAudio && (!presentationContext.Audio.HasValidData(entry.FireSound) ||
-                !presentationContext.Audio.HasValidData(entry.HitSound) || !presentationContext.Audio.HasValidData(entry.MissSound))) return false;
+                !presentationContext.Audio.HasValidData(entry.HitSound) || !presentationContext.Audio.HasValidData(entry.MissSound) ||
+                !presentationContext.Audio.HasValidData(entry.DeathSound))) return false;
             if (entry.VfxDelay < 0f || entry.VfxDuration <= 0f || entry.VfxHeightRatio <= 0f ||
                 entry.VfxDelay + entry.VfxDuration > entry.PresentationDuration)
             {

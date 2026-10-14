@@ -5,6 +5,8 @@ using UnityEngine.UI;
 /// <summary>메뉴와 수첩에서 사용할 화면 참조만 모아둔다.</summary>
 public sealed class BattleMenuContext : MonoBehaviour
 {
+    // 메뉴·수첩의 효과음을 같은 씬의 재생 담당으로 전달한다.
+    public BattlePresentationContext presentation;
     // 전체 화면 가림막과 세 종류의 창이다.
     public GameObject overlay, menu, manual, quit;
     // 화면 크기에 맞춰 조립된 책을 축소할 기준과 책 루트다.

@@ -16,6 +16,9 @@ public sealed class SoundData : ScriptableObject
     [SerializeField] private Vector2 distanceRange = new(1f, 30f);
     // 연결하면 해당 믹서로 출력한다. 미지정은 Unity 기본 출력이라는 명시적 선택이다.
     [SerializeField] private AudioMixerGroup mixerGroup;
+    // 수첩·메뉴처럼 게임 시간이 멈춰도 실제 조작에 맞춰 들려야 하는 소리만 켠다.
+    [SerializeField] private bool playDuringPause;
+    public bool PlayDuringPause => playDuringPause;
     public AudioClip[] Clips => clips;
     public float Volume => volume;
     public Vector2 PitchRange => pitchRange;

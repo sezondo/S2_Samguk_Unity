@@ -6,6 +6,11 @@ using UnityEngine;
 /// </summary>
 public class SecurityDoorPresenter : MonoBehaviour, IPresentationEventHandler
 {
+    // 문 잠금 해제·기계 이동 소리와 명시적인 재생 담당이다.
+    [SerializeField] private BattlePresentationContext presentationContext;
+    [SerializeField] private SoundData openSound;
+    // 이 문이 시작한 소리만 중단할 권한이다.
+    private readonly PresentationAudioScope sounds = new();
     [Header("Target")]
     // 이 Presenter가 열림 연출을 처리할 보안문 논리 컴포넌트다.
     [SerializeField] private SecurityDoorController targetDoor;
@@ -27,7 +32,7 @@ public class SecurityDoorPresenter : MonoBehaviour, IPresentationEventHandler
     /// </summary>
     private void OnEnable()
     {
-        if (!HasValidReference())
+        if (!HasValidReference() || !HasValidData())
         {
             enabled = false;
             return;
@@ -50,6 +55,7 @@ public class SecurityDoorPresenter : MonoBehaviour, IPresentationEventHandler
     /// </summary>
     private void OnDisable()
     {
+        sounds.StopAll();
         if (ActionPresentationQueue.Instance != null)
         {
             ActionPresentationQueue.Instance.Unregister(this);
@@ -90,13 +96,14 @@ public class SecurityDoorPresenter : MonoBehaviour, IPresentationEventHandler
     /// </summary>
     public void Handle(PresentationEvent presentationEvent, PresentationEventHandle handle)
     {
-        if (!HasValidReference())
+        if (!HasValidReference() || !HasValidData())
         {
             handle.Complete();
             return;
         }
 
         ApplyCurrentDoorState();
+        sounds.Play(presentationContext, openSound, transform.position);
 
         if (logDoorPresentation)
         {
@@ -111,6 +118,8 @@ public class SecurityDoorPresenter : MonoBehaviour, IPresentationEventHandler
     /// </summary>
     public bool HasValidReference()
     {
+        if (presentationContext == null || presentationContext.Audio == null)
+        { Debug.LogError("보안문 연출에는 오디오 담당 Context가 필요합니다.", this); return false; }
         if (targetDoor == null)
         {
             Debug.LogError($"{nameof(SecurityDoorPresenter)} on {name}에는 연출 대상 {nameof(SecurityDoorController)} 참조가 필요합니다.", this);
@@ -143,4 +152,7 @@ public class SecurityDoorPresenter : MonoBehaviour, IPresentationEventHandler
             openDoorVisual.SetActive(targetDoor.IsOpen);
         }
     }
+
+    /// <summary>문을 열 때 재생할 필수 효과음 데이터를 검사한다.</summary>
+    public bool HasValidData() => HasValidReference() && presentationContext.Audio.HasValidData(openSound);
 }

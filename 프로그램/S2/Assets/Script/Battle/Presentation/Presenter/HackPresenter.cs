@@ -9,6 +9,10 @@ public class HackPresenter : MonoBehaviour, IPresentationEventHandler
 {
     // 현재 씬의 VFX·오디오 재생 담당을 명시적으로 제공한다.
     [SerializeField] private BattlePresentationContext presentationContext;
+    // 접속과 완료 섬광에 맞춰 재생할 효과음이다.
+    [SerializeField] private SoundData startSound, completeSound;
+    // 이 해킹 담당이 시작한 소리의 중단 권한이다.
+    private readonly PresentationAudioScope sounds = new();
 
     [Header("Target")]
     // 이 Presenter가 해킹 연출을 처리할 해킹 대상이다.
@@ -84,6 +88,7 @@ public class HackPresenter : MonoBehaviour, IPresentationEventHandler
             activeHandle.Complete();
             activeHandle = null;
         }
+        sounds.StopAll();
     }
 
     /// <summary>
@@ -142,6 +147,7 @@ public class HackPresenter : MonoBehaviour, IPresentationEventHandler
     private IEnumerator PlayHack(PresentationEvent evt, PresentationEventHandle handle)
     {
         activeHandle = handle;
+        sounds.Play(presentationContext, startSound, transform.position);
         hackEffect = presentationContext.Vfx.Acquire(hackVfx);
         if (hackEffect != null && hackEffect.PartCount != 4)
         {
@@ -158,6 +164,7 @@ public class HackPresenter : MonoBehaviour, IPresentationEventHandler
             if (!completionPresented && progress >= 0.8f)
             {
                 completionPresented = true;
+                sounds.Play(presentationContext, completeSound, transform.position);
                 cameraPresenter.PresentHackCompletion(evt);
             }
             UpdateHackEffect(evt, progress, elapsed);
@@ -215,8 +222,8 @@ public class HackPresenter : MonoBehaviour, IPresentationEventHandler
     /// </summary>
     public bool HasValidReference()
     {
-        if (presentationContext == null || presentationContext.Vfx == null)
-        { Debug.LogError("해킹 연출 Context에 VFX 담당이 필요합니다.",this); return false; }
+        if (presentationContext == null || presentationContext.Vfx == null || presentationContext.Audio == null)
+        { Debug.LogError("해킹 연출 Context에 VFX·오디오 담당이 필요합니다.",this); return false; }
         if (cameraPresenter == null)
         {
             Debug.LogError("해킹 연출 카메라 참조가 없습니다.", this);
@@ -240,6 +247,8 @@ public class HackPresenter : MonoBehaviour, IPresentationEventHandler
     public bool HasValidData()
     {
         if (!HasValidReference()) return false;
+        if (presentationContext.Audio == null || !presentationContext.Audio.HasValidData(startSound) ||
+            !presentationContext.Audio.HasValidData(completeSound)) return false;
         if (presentationContext.Vfx.HasValidData(hackVfx) && effectSize > 0f && minimumEffectDuration > 0f) return true;
         Debug.LogError("해킹 VFX 크기와 최소 시간은 0보다 커야 합니다.", this);
         return false;

@@ -6,6 +6,10 @@ public sealed class BattleManualView : MonoBehaviour
 {
     // 같은 루트의 화면 참조를 모은 주머니다.
     [SerializeField] private BattleMenuContext context;
+    // 양방향 종이 넘김에 사용할 정지 중 재생 효과음이다.
+    [SerializeField] private SoundData pageTurnSound;
+    // 넘김 중 화면이 사라지면 정리할 효과음 권한이다.
+    private readonly PresentationAudioScope sounds = new();
     // 현재 페이지와 진행 중인 종이 넘김이다.
     private int page;
     private Coroutine turning;
@@ -13,7 +17,7 @@ public sealed class BattleManualView : MonoBehaviour
     public bool IsTurning => turning != null;
 
     /// <summary>책과 페이지 연결을 검사한다.</summary>
-    private void Awake() { if (!HasValidReference()) enabled = false; }
+    private void Awake() { if (!HasValidReference() || !HasValidData()) enabled = false; }
 
     /// <summary>넓거나 좁은 창에서도 책 전체와 상하 안내가 화면 안에 들어오게 한다.</summary>
     private void LateUpdate()
@@ -39,6 +43,7 @@ public sealed class BattleManualView : MonoBehaviour
     public void TurnTo(int index)
     {
         if (turning != null || index < 0 || index >= context.pages.Length || index == page) return;
+        sounds.Play(context.presentation, pageTurnSound, Vector3.zero);
         turning = StartCoroutine(Turn(index));
     }
 
@@ -110,6 +115,8 @@ public sealed class BattleManualView : MonoBehaviour
     /// <summary>누락된 페이지를 임의로 생성하지 않고 명시적으로 오류를 알린다.</summary>
     public bool HasValidReference()
     {
+        if (context == null || context.presentation == null || context.presentation.Audio == null)
+        { Debug.LogError("수첩에는 오디오 담당 Context가 필요합니다.", this); return false; }
         bool valid = context != null && context.book != null && context.canvasRect != null &&
             context.pages != null && context.pages.Length == 5 && context.leftPages?.Length == 5 && context.rightPages?.Length == 5 &&
             context.tabs?.Length == 5 && context.activeTab != null && context.pageNumber != null && context.guideText != null && context.previous != null && context.next != null && context.manualClose != null;
@@ -118,5 +125,16 @@ public sealed class BattleManualView : MonoBehaviour
         if (!valid) Debug.LogError("전투 수첩의 페이지와 화면 연결이 누락됐습니다.", this);
         return valid;
     }
+
+    /// <summary>종이 넘김 음원의 연결과 정지 중 재생 정책을 검사한다.</summary>
+    public bool HasValidData()
+    {
+        if (!HasValidReference() || !context.presentation.Audio.HasValidData(pageTurnSound)) return false;
+        if (pageTurnSound.PlayDuringPause) return true;
+        Debug.LogError("종이 넘김 효과음은 정지 중 재생이 켜져 있어야 합니다.", this); return false;
+    }
+
+    /// <summary>수첩 화면이 닫힐 때 진행 중인 종이 소리를 정리한다.</summary>
+    private void OnDisable() => sounds.StopAll();
 }
 
