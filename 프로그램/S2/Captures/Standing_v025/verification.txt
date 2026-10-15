@@ -1,0 +1,9 @@
+Hammer_Idle: contact=0.000E+000, weapon=0.000E+000, loop=2.384E-007, foot=0.000E+000, height=2.384E-007, motion=3.763E-002
+Hammer_Low: contact=0.000E+000, weapon=0.000E+000, loop=2.384E-007, foot=2.384E-007, height=0.000E+000, motion=1.823E-002
+Hammer_Wall: contact=0.000E+000, weapon=0.000E+000, loop=2.384E-007, foot=2.384E-007, height=0.000E+000, motion=1.964E-002
+SmallNail_Idle: contact=0.000E+000, weapon=0.000E+000, loop=2.385E-007, foot=0.000E+000, height=0.000E+000, motion=4.464E-002
+SmallNail_Low: contact=0.000E+000, weapon=0.000E+000, loop=1.192E-007, foot=2.384E-007, height=0.000E+000, motion=2.547E-002
+SmallNail_Wall: contact=0.000E+000, weapon=0.000E+000, loop=2.403E-007, foot=0.000E+000, height=2.384E-007, motion=2.523E-002
+BigNail_Idle: contact=0.000E+000, weapon=0.000E+000, loop=2.384E-007, foot=0.000E+000, height=2.384E-007, motion=4.200E-002
+BigNail_Low: contact=0.000E+000, weapon=0.000E+000, loop=2.384E-007, foot=0.000E+000, height=0.000E+000, motion=2.868E-002
+BigNail_Wall: contact=0.000E+000, weapon=0.000E+000, loop=1.192E-007, foot=2.384E-007, height=2.384E-007, motion=1.694E-002

@@ -129,9 +129,9 @@ public sealed class BuildingOcclusionPresenter : MonoBehaviour
             }
 
             SpriteRenderer actorRenderer = visual.TargetRenderer;
-            // 최신 논리 시야 대신 연출에 적용된 시야 알파를 사용해 숨은 적의 위치를 누설하지 않는다.
+            // 최신 논리 시야 대신 표시 알파를 사용하고, 호흡 메시도 보이는 배우로 판정한다.
             if (!visual.isActiveAndEnabled || visual.VisionAlpha <= 0.001f ||
-                actorRenderer == null || !actorRenderer.enabled || !actorRenderer.gameObject.activeInHierarchy ||
+                actorRenderer == null || !visual.HasActivePresentationRenderer ||
                 actorRenderer.color.a <= 0.001f || visual.CurrentAnimationStateName == "Death")
             {
                 continue;
@@ -139,7 +139,7 @@ public sealed class BuildingOcclusionPresenter : MonoBehaviour
 
             Vector3 origin = actorRenderer.transform.position;
             bool inFront = IsInFrontOfBuilding(visual.GroundWorldPosition);
-            bool overlaps = buildingRenderer.bounds.Intersects(actorRenderer.bounds);
+            bool overlaps = buildingRenderer.bounds.Intersects(visual.PresentationBounds);
             visual.SetBuildingFrontSorting(buildingRenderer, inFront && overlaps);
             if (inFront && overlaps)
             {

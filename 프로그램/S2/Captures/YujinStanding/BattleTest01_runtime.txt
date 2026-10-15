@@ -1,0 +1,11 @@
+Idle: 호흡 메시 표시 정상
+LowCoverIdle: 호흡 메시 표시 정상
+WallCoverIdle: 호흡 메시 표시 정상
+Move: 기존 동작 원화 표시 정상
+MeleeWithSword: 기존 동작 원화 표시 정상
+MeleeUnarmed: 기존 동작 원화 표시 정상
+PlayerGun: 기존 동작 원화 표시 정상
+SwordThrow: 기존 동작 원화 표시 정상
+Hit: 기존 동작 원화 표시 정상
+Dodge: 기존 동작 원화 표시 정상
+Death: 기존 동작 원화 표시 정상

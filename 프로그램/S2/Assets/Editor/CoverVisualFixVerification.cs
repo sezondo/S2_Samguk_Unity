@@ -135,7 +135,10 @@ public static class CoverVisualFixVerification
         Application.runInBackground = true;
         double deadline = EditorApplication.timeSinceStartup + 40;
         while (ActionPresentationQueue.Instance.IsPlaying && EditorApplication.timeSinceStartup < deadline) yield return 0.1f;
-        var cover = UnityEngine.Object.FindObjectsByType<LowCoverIdlePresenter>(FindObjectsSortMode.None)[0];
+        // 적도 엄폐 Presenter를 사용하므로 순서 대신 조작 가능한 플레이어를 명시적으로 고른다.
+        var cover = Array.Find(UnityEngine.Object.FindObjectsByType<LowCoverIdlePresenter>(FindObjectsSortMode.None),
+            candidate => Read<TacticalUnitContext>(candidate, "unitContext") is TacticalUnitContext context && context.ControlType == UnitControlType.Player);
+        Require(cover != null, "플레이어 엄폐 검증 대상 연결");
         var unit = Read<TacticalUnitContext>(cover, "unitContext");
         var visual = Read<ActorVisualController>(cover, "visualController");
         var grid = Read<GridManager>(cover, "gridManager");

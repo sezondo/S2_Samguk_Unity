@@ -48,10 +48,11 @@ public sealed class PropDepthPresenter : MonoBehaviour
             {
                 if (unit?.GridActor == null || !unit.GridActor.isActiveAndEnabled ||
                     !presentationRegistry.TryGetVisual(unit.GridActor, out var visual) || !visual.isActiveAndEnabled) continue;
+                // 스프라이트를 숨긴 호흡 자세도 실제 메시의 표시 범위로 겹침을 확인한다.
                 SpriteRenderer renderer = visual.TargetRenderer;
-                if (renderer == null || !renderer.enabled || !renderer.gameObject.activeInHierarchy ||
+                if (renderer == null || !visual.HasActivePresentationRenderer ||
                     visual.VisionAlpha <= 0.001f || renderer.color.a <= 0.001f ||
-                    !propRenderer.bounds.Intersects(renderer.bounds)) continue;
+                    !propRenderer.bounds.Intersects(visual.PresentationBounds)) continue;
                 float y = propRenderer.transform.InverseTransformPoint(visual.GroundWorldPosition).y;
                 bool inFront = y <= groundLocalY;
                 if (targets.TryGetValue(visual, out bool previous) && Mathf.Abs(y - groundLocalY) <= boundaryHysteresis)

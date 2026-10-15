@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.Serialization;
@@ -201,6 +201,7 @@ public class ActorVisualController : MonoBehaviour
     /// <summary>표시를 중단하면 건물·소품의 임시 정렬 요청을 해제한다.</summary>
     private void OnDisable()
     {
+        SetPresentationRendererOverride(null, null);
         SetCombatWorldOffset(Vector3.zero);
         SetCombatBackground(null, 0f);
         isCombatStaged = false;
@@ -212,6 +213,26 @@ public class ActorVisualController : MonoBehaviour
         buildingSortingRequests.Clear();
         propSortingRequests.Clear();
         ApplyBuildingSorting();
+    }
+
+    // 호흡 메시처럼 원본 스프라이트 대신 현재 표시 중인 렌더러와 그 자세의 기준 원화다.
+    private Renderer presentationRendererOverride;
+    private Sprite presentationSpriteOverride;
+
+    /// <summary>스프라이트 또는 대체 메시가 실제 표시 가능한 상태인지 반환한다.</summary>
+    public bool HasActivePresentationRenderer => targetRenderer != null && targetRenderer.gameObject.activeInHierarchy &&
+        (targetRenderer.enabled || presentationRendererOverride != null && presentationRendererOverride.enabled && presentationRendererOverride.gameObject.activeInHierarchy);
+
+    /// <summary>현재 자세의 실제 표시 범위를 반환하며 동작 전환 중에는 새 스프라이트 범위를 사용한다.</summary>
+    public Bounds PresentationBounds => presentationRendererOverride != null && presentationRendererOverride.enabled &&
+        presentationRendererOverride.gameObject.activeInHierarchy && targetRenderer != null && targetRenderer.sprite == presentationSpriteOverride
+        ? presentationRendererOverride.bounds : targetRenderer != null ? targetRenderer.bounds : default;
+
+    /// <summary>대체 표시의 시작·종료를 등록한다. 정렬 정책과 원본 표시 색상은 변경하지 않는다.</summary>
+    public void SetPresentationRendererOverride(Renderer replacement, Sprite sourceSprite)
+    {
+        presentationRendererOverride = replacement;
+        presentationSpriteOverride = sourceSprite;
     }
 
     public SpriteRenderer TargetRenderer => targetRenderer;
